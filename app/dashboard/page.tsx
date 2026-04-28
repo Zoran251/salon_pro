@@ -7,6 +7,35 @@ import { waitForClientSession } from '@/lib/wait-client-session'
 import { buildSalonSlug, fallbackSalonSlug } from '@/lib/slug'
 import { getAppRole } from '@/lib/user-role'
 import { getPublicSiteBase } from '@/lib/public-site-url'
+import type { Database } from '@/lib/supabase'
+
+type SalonRow = Database['public']['Tables']['saloni']['Row']
+type UslugaRow = Database['public']['Tables']['usluge']['Row']
+type LagerRow = Database['public']['Tables']['lager']['Row']
+type TerminRow = Database['public']['Tables']['termini']['Row'] & {
+  usluge?: { naziv: string | null } | null
+}
+type CrnaListaRow = Database['public']['Tables']['kupci_crna_lista']['Row']
+type LojalnostRow = Database['public']['Tables']['lojalnost']['Row']
+type LojalnostForm = Pick<LojalnostRow, 'aktivan' | 'tip' | 'svaki_koji' | 'vrijednost'> &
+  Partial<Pick<LojalnostRow, 'id' | 'salon_id' | 'created_at'>>
+type ProfilForm = {
+  naziv: string
+  opis: string
+  telefon: string
+  adresa: string
+  grad: string
+  radno_od: string
+  radno_do: string
+  logo: string
+  boja_primarna: string
+}
+const defaultLojalnost: LojalnostForm = { aktivan: false, tip: 'popust', svaki_koji: 5, vrijednost: 20 }
+type ProfilTextField = {
+  label: string
+  key: keyof Pick<ProfilForm, 'naziv' | 'telefon' | 'adresa' | 'grad'>
+  placeholder: string
+}
 
 /** FK na saloni(id) — čest problem kad u bazi nema reda za auth.uid(). */
 function formatSalonFkErrorMessage(message: string | undefined): string {
@@ -22,7 +51,7 @@ function formatSalonFkErrorMessage(message: string | undefined): string {
 }
 
 /** Naziv usluge na terminu bez PostgREST embed-a (manje konflikata sa RLS / status kodovima). */
-function terminiSaUslugaNazivom(termini: any[] | null, uslugeLista: any[] | null): any[] {
+function terminiSaUslugaNazivom(termini: TerminRow[] | null, uslugeLista: UslugaRow[] | null): TerminRow[] {
   const map = new Map((uslugeLista || []).map((u: { id: string }) => [u.id, u]))
   return (termini || []).map((t) => ({
     ...t,
@@ -48,16 +77,16 @@ export default function Dashboard() {
   const [aktivan, setAktivan] = useState('pregled')
   const [ucitavanje, setUcitavanje] = useState(true)
   const [autentifikovan, setAutentifikovan] = useState(false)
-  const [salon, setSalon] = useState<any>(null)
-  const [usluge, setUsluge] = useState<any[]>([])
-  const [lager, setLager] = useState<any[]>([])
-  const [termini, setTermini] = useState<any[]>([])
-  const [crnaLista, setCrnaLista] = useState<any[]>([])
+  const [salon, setSalon] = useState<SalonRow | null>(null)
+  const [usluge, setUsluge] = useState<UslugaRow[]>([])
+  const [lager, setLager] = useState<LagerRow[]>([])
+  const [termini, setTermini] = useState<TerminRow[]>([])
+  const [crnaLista, setCrnaLista] = useState<CrnaListaRow[]>([])
   const [crnaRučnoTelefon, setCrnaRučnoTelefon] = useState('')
   const [crnaRučnoIme, setCrnaRučnoIme] = useState('')
   const [crnaRučnoLoading, setCrnaRučnoLoading] = useState(false)
   const [crnaRučnoGreska, setCrnaRučnoGreska] = useState('')
-  const [lojalnost, setLojalnost] = useState<any>(null)
+  const [lojalnost, setLojalnost] = useState<LojalnostForm>(defaultLojalnost)
   const [resolvedSlug, setResolvedSlug] = useState('')
   const [qrDataUrl, setQrDataUrl] = useState('')
   const [qrSvg, setQrSvg] = useState('')
@@ -73,7 +102,7 @@ export default function Dashboard() {
   const [lagerGreska, setLagerGreska] = useState('')
   const [terminiPotvrdaGreska, setTerminiPotvrdaGreska] = useState('')
   const [sauvano, setSacuvano] = useState('')
-  const [profil, setProfil] = useState({
+  const [profil, setProfil] = useState<ProfilForm>({
     naziv: '', opis: '', telefon: '', adresa: '', grad: '',
     radno_od: '09:00', radno_do: '20:00', logo: '', boja_primarna: '#d4af37'
   })
@@ -244,7 +273,7 @@ export default function Dashboard() {
         .eq('salon_id', userId)
         .single()
 
-      setLojalnost(lojalnostData || { aktivan: false, tip: 'popust', svaki_koji: 5, vrijednost: 20 })
+      setLojalnost(lojalnostData || defaultLojalnost)
 
       console.log('Svi podaci učitani uspješno')
     } catch (err) {
@@ -489,11 +518,17 @@ export default function Dashboard() {
   const sacuvajLojalnost = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+    const payload = {
+      aktivan: lojalnost.aktivan,
+      tip: lojalnost.tip,
+      svaki_koji: lojalnost.svaki_koji,
+      vrijednost: lojalnost.vrijednost,
+    }
     const { data: existing } = await supabase.from('lojalnost').select('id').eq('salon_id', user.id).single()
     if (existing) {
-      await supabase.from('lojalnost').update({ ...lojalnost }).eq('salon_id', user.id)
+      await supabase.from('lojalnost').update(payload).eq('salon_id', user.id)
     } else {
-      await supabase.from('lojalnost').insert({ ...lojalnost, salon_id: user.id })
+      await supabase.from('lojalnost').insert({ ...payload, salon_id: user.id })
     }
     setSacuvano('lojalnost')
     setTimeout(() => setSacuvano(''), 3000)
@@ -686,15 +721,15 @@ export default function Dashboard() {
       <div style={cardStyle}>
         <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '20px' }}>Informacije o salonu</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '14px' }}>
-          {[
+          {([
             { label: 'NAZIV SALONA', key: 'naziv', placeholder: 'Ime vašeg salona' },
             { label: 'TELEFON', key: 'telefon', placeholder: '+381 60 000 000' },
             { label: 'ADRESA', key: 'adresa', placeholder: 'Ulica i broj' },
             { label: 'GRAD', key: 'grad', placeholder: 'Vaš grad' },
-          ].map(f => (
+          ] satisfies ProfilTextField[]).map(f => (
             <div key={f.key}>
               <label style={labelStyle}>{f.label}</label>
-              <input style={inputStyle} value={(profil as any)[f.key]} placeholder={f.placeholder}
+              <input style={inputStyle} value={profil[f.key]} placeholder={f.placeholder}
                 onChange={e => setProfil({ ...profil, [f.key]: e.target.value })} />
             </div>
           ))}

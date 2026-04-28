@@ -7,6 +7,20 @@ import { formatAuthError } from '@/lib/format-auth-error'
 import { buildSalonSlug, fallbackSalonSlug } from '@/lib/slug'
 
 const tipovi = ['Frizerski salon', 'Kozmetički salon', 'Salon za nokte', 'Spa / Wellness', 'Barbershop', 'Drugo']
+type SalonRegistrationForm = {
+  naziv: string
+  email: string
+  lozinka: string
+  telefon: string
+  grad: string
+  tip: string
+}
+type SalonRegistrationField = {
+  label: string
+  name: keyof Pick<SalonRegistrationForm, 'naziv' | 'email' | 'lozinka'>
+  type: string
+  placeholder: string
+}
 
 export default function Registracija() {
   const [korak, setKorak] = useState(1)
@@ -210,14 +224,14 @@ export default function Registracija() {
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '28px' }}>
-                {[
+                {([
                   { label: 'NAZIV SALONA', name: 'naziv', type: 'text', placeholder: 'npr. Salon Elegance' },
                   { label: 'EMAIL ADRESA', name: 'email', type: 'email', placeholder: 'salon@email.com' },
                   { label: 'LOZINKA', name: 'lozinka', type: 'password', placeholder: 'Minimalno 6 karaktera' },
-                ].map(f => (
+                ] satisfies SalonRegistrationField[]).map(f => (
                   <div key={f.name}>
                     <label style={{ fontSize: '12px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '6px', letterSpacing: '.3px' }}>{f.label}</label>
-                    <input name={f.name} type={f.type} placeholder={f.placeholder} value={(forma as any)[f.name]} onChange={handleChange} />
+                    <input name={f.name} type={f.type} placeholder={f.placeholder} value={forma[f.name]} onChange={handleChange} />
                   </div>
                 ))}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
