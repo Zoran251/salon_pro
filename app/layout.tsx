@@ -1,0 +1,52 @@
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import { AuthSessionRecovery } from "@/app/auth-session-recovery";
+import { getGoogleMapsEmbedApiKey } from "@/lib/env-google-maps";
+import { getPublicSupabaseEnv } from "@/lib/env-supabase";
+import "./globals.css";
+
+/** Svaki zahtjev dobija svjež process.env s Vercela; injektuje Supabase u browser bez oslanjanja samo na NEXT_PUBLIC u starom bundleu. */
+export const dynamic = "force-dynamic";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "Salon Pro",
+  description: "SaaS platforma za salone, online zakazivanje i portal kupaca.",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  const { url, anonKey } = getPublicSupabaseEnv();
+  const supabaseBootstrap = JSON.stringify({ url, anonKey });
+  const mapsKey = JSON.stringify(getGoogleMapsEmbedApiKey());
+  return (
+    <html
+      lang="sr"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+    >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.__SALON_SUPABASE__=${supabaseBootstrap};window.__GOOGLE_MAPS_EMBED_KEY__=${mapsKey};`,
+          }}
+        />
+      </head>
+      <body className="min-h-full flex flex-col">
+        <AuthSessionRecovery />
+        {children}
+      </body>
+    </html>
+  );
+}
