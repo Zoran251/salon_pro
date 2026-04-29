@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getServerSupabaseClient } from '@/lib/server-supabase'
+import { createClient } from '@supabase/supabase-js'
+import { getPublicSupabaseEnv } from '@/lib/env-supabase'
 import { storageTerminStatus } from '@/lib/termin-status'
 
 export const dynamic = 'force-dynamic'
@@ -28,10 +29,36 @@ function isMissingRpcFunction(message: string): boolean {
   return /function .* does not exist|Could not find the function/i.test(message)
 }
 
+function getAuthHeaderToken(request: Request): string | null {
+  const authHeader = request.headers.get('authorization')
+  if (!authHeader?.toLowerCase().startsWith('bearer ')) return null
+  const token = authHeader.slice(7).trim()
+  return token || null
+}
+
+function getAnonSupabaseClient() {
+  const { url, anonKey, ok } = getPublicSupabaseEnv()
+  if (!ok) return null
+  return createClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+}
+
+function getUserSupabaseClient(authToken: string) {
+  const { url, anonKey, ok } = getPublicSupabaseEnv()
+  if (!ok) return null
+  return createClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      headers: { Authorization: `Bearer ${authToken}` },
+    },
+  })
+}
+
 export async function POST(request: Request) {
   try {
-    const supabase = getServerSupabaseClient()
-    if (!supabase) {
+    const anonClient = getAnonSupabaseClient()
+    if (!anonClient) {
       return NextResponse.json(
         { error: 'Server nije konfigurisan: nedostaje Supabase URL ili API key.' },
         { status: 500 }
@@ -47,19 +74,33 @@ export async function POST(request: Request) {
 
     const imeKlijenta = String(ime_klijenta).trim()
     const telefonKlijenta = String(telefon_klijenta).trim()
-    const clientEmail = typeof email === 'string' && email.trim() ? email.trim() : null
 
-    const authHeader = request.headers.get('authorization')
-    let authUserId: string | null = null
-    if (authHeader?.toLowerCase().startsWith('bearer ')) {
-      const jwt = authHeader.slice(7).trim()
-      if (jwt) {
-        const { data: userRes } = await supabase.auth.getUser(jwt)
-        authUserId = userRes.user?.id ?? null
-      }
+    const authToken = getAuthHeaderToken(request)
+    if (!authToken) {
+      return NextResponse.json(
+        { error: 'Za zakazivanje termina morate biti prijavljeni kao kupac.' },
+        { status: 401 }
+      )
     }
 
-    const { data: blockedPhone, error: rpcPhoneErr } = await supabase.rpc('je_telefon_blokiran', {
+    const { data: userRes, error: userErr } = await anonClient.auth.getUser(authToken)
+    const authUserId = userRes.user?.id ?? null
+    if (userErr || !authUserId) {
+      return NextResponse.json(
+        { error: 'Sesija kupca nije važeća. Prijavite se ponovo.' },
+        { status: 401 }
+      )
+    }
+
+    const userClient = getUserSupabaseClient(authToken)
+    if (!userClient) {
+      return NextResponse.json(
+        { error: 'Server nije konfigurisan: nedostaje Supabase URL ili API key.' },
+        { status: 500 }
+      )
+    }
+
+    const { data: blockedPhone, error: rpcPhoneErr } = await userClient.rpc('je_telefon_blokiran', {
       p_telefon: telefonKlijenta,
     })
     if (!rpcPhoneErr && blockedPhone === true) {
@@ -69,25 +110,21 @@ export async function POST(request: Request) {
       )
     }
 
-    if (authUserId) {
-      const { data: blockedAuth, error: rpcAuthErr } = await supabase.rpc('je_auth_blokiran', {
-        p_uid: authUserId,
-      })
-      if (!rpcAuthErr && blockedAuth === true) {
-        return NextResponse.json(
-          { error: 'Zakazivanje nije moguće: vaš nalog je na crnoj listi.' },
-          { status: 403 }
-        )
-      }
+    const { data: blockedAuth, error: rpcAuthErr } = await userClient.rpc('je_auth_blokiran', {
+      p_uid: authUserId,
+    })
+    if (!rpcAuthErr && blockedAuth === true) {
+      return NextResponse.json(
+        { error: 'Zakazivanje nije moguće: vaš nalog je na crnoj listi.' },
+        { status: 403 }
+      )
     }
 
-    // Direktan INSERT u salon_clients sa anon ključem krši RLS (samo vlasnik salona sme).
-    // RPC ensure_salon_client_for_booking (security definer) — migracija 2026-04-24.
-    const { data: clientIdRaw, error: clientRpcError } = await supabase.rpc('ensure_salon_client_for_booking', {
+    const { data: clientIdRaw, error: clientRpcError } = await userClient.rpc('link_salon_client', {
       p_salon_id: salon_id,
-      p_ime: imeKlijenta,
       p_telefon: telefonKlijenta,
-      p_email: clientEmail,
+      p_ime: imeKlijenta,
+      p_email: typeof email === 'string' && email.trim() ? email.trim() : userRes.user.email || '',
     })
 
     if (clientRpcError) {
@@ -95,7 +132,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: missingFn
-            ? 'Baza nije ažurirana: pokreni migraciju 2026-04-24_ensure_salon_client_booking_rpc.sql u Supabase SQL Editor-u, ili postavi SUPABASE_SERVICE_ROLE_KEY na serveru.'
+            ? 'Baza nije ažurirana: pokreni migraciju 2026-04-20_link_salon_client_rpc.sql u Supabase SQL Editor-u.'
             : clientRpcError.message,
         },
         { status: 500 }
@@ -107,15 +144,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Neuspješno povezivanje klijenta sa salonom.' }, { status: 500 })
     }
 
-    if (authUserId) {
-      await supabase
-        .from('salon_clients')
-        .update({ auth_user_id: authUserId })
-        .eq('id', clientId)
-        .is('auth_user_id', null)
-    }
-
-    const { data: rpcBookingId, error: bookingRpcError } = await supabase.rpc('create_public_booking', {
+    const { data: rpcBookingId, error: bookingRpcError } = await userClient.rpc('create_authenticated_booking', {
       p_salon_id: salon_id,
       p_client_id: clientId,
       p_usluga_id: usluga_id || null,
@@ -130,38 +159,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, termin_id: terminIdOut })
     }
 
-    if (!isMissingRpcFunction(bookingRpcError.message)) {
-      return NextResponse.json({ error: bookingRpcError.message }, { status: 500 })
-    }
-
-    const { data: inserted, error } = await supabase
-      .from('termini')
-      .insert({
-        salon_id,
-        client_id: clientId,
-        usluga_id,
-        ime_klijenta: imeKlijenta,
-        telefon_klijenta: telefonKlijenta,
-        datum_vrijeme,
-        napomena,
-        status: 'ceka',
-      })
-      .select('id')
-      .single()
-
-    if (error) {
-      const rlsHint = !process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() && /row-level security/i.test(error.message)
-      return NextResponse.json(
-        {
-          error: rlsHint
-            ? 'RLS blokira javno zakazivanje. Uradi jedno od dva: (1) Vercel → Environment Variables → dodaj SUPABASE_SERVICE_ROLE_KEY (Project Settings → API → service_role) pa Redeploy; ili (2) u Supabase SQL Editor pokreni migraciju db/migrations/2026-05-04_create_public_booking_rpc.sql, odnosno db/migrations/2026-05-03_ensure_anon_insert_termini.sql ako želiš direktan anon INSERT.'
-            : error.message,
-        },
-        { status: 500 }
-      )
-    }
-    const terminIdOut = inserted?.id != null ? String(inserted.id) : null
-    return NextResponse.json({ success: true, termin_id: terminIdOut })
+    return NextResponse.json(
+      {
+        error: isMissingRpcFunction(bookingRpcError.message)
+          ? 'Baza nije ažurirana: pokreni migraciju db/migrations/2026-05-05_authenticated_customer_booking.sql u Supabase SQL Editor-u.'
+          : bookingRpcError.message,
+      },
+      { status: isMissingRpcFunction(bookingRpcError.message) ? 503 : 500 }
+    )
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Greška servera'
     return NextResponse.json({ error: message }, { status: 500 })
@@ -169,7 +174,7 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const supabase = getServerSupabaseClient()
+  const supabase = getAnonSupabaseClient()
   if (!supabase) {
     return NextResponse.json(
       { error: 'Server nije konfigurisan: nedostaje Supabase URL ili API key.' },

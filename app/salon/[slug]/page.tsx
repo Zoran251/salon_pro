@@ -145,7 +145,6 @@ export default function SalonLanding() {
   const bookingNotifRef = useRef<BookingNotification | null>(null)
   const [clientAuthSuccess, setClientAuthSuccess] = useState('')
   const [klijentUlogovan, setKlijentUlogovan] = useState(false)
-  const [guestAuthCollapsed, setGuestAuthCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [activeView, setActiveView] = useState<PageView>('booking')
   const [clientSummary, setClientSummary] = useState<ClientSummary | null>(null)
@@ -727,7 +726,6 @@ export default function SalonLanding() {
   const handleClientLogout = async () => {
     await supabase.auth.signOut()
     setKlijentUlogovan(false)
-    setGuestAuthCollapsed(false)
     setClientSummary(null)
     setProfilUredi(false)
     setKupacMenuOpen(false)
@@ -1127,7 +1125,7 @@ export default function SalonLanding() {
                     clientMeError.includes('telefona') ||
                     clientMeError.includes('profil')) && (
                     <p style={{ marginBottom: '12px', color: 'rgba(245,240,232,.55)' }}>
-                      Ako ste se tek prijavili, proverite da li su ime i telefon sačuvani u profilu kupca (meni profila), ili zakazujte kao gost.
+                      Ako ste se tek prijavili, proverite da li su ime i telefon sačuvani u profilu kupca (meni profila), pa pokušajte ponovo.
                     </p>
                   )}
                   <button
@@ -1639,8 +1637,8 @@ export default function SalonLanding() {
             </h3>
             <p style={{ fontSize: '13px', color: 'rgba(245,240,232,.4)', marginBottom: '24px' }}>
               {klijentUlogovan && clientSummary?.client
-                ? 'Ime i telefon su preuzeti iz vašeg profila (možete ih izmeniti za ovaj termin).'
-                : 'Popunite podatke i salon će vas kontaktirati za potvrdu.'}
+                ? 'Ime i telefon su preuzeti iz vašeg profila za ovaj salon.'
+                : 'Prijavite se kao kupac da biste zakazali termin.'}
             </p>
             <div className="forma-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
               {[
@@ -2001,83 +1999,44 @@ export default function SalonLanding() {
                 >
                   <div style={{ fontSize: 11, color: 'rgba(245,240,232,.45)', marginBottom: 10, letterSpacing: '0.04em' }}>KUPAC</div>
                   {!klijentUlogovan ? (
-                    <>
-                      {!guestAuthCollapsed ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                          <Link
-                            href={`/kupac/registracija?next=${kupacReturnEnc}`}
-                            onClick={() => setKupacMenuOpen(false)}
-                            style={{
-                              textAlign: 'center',
-                              background: `linear-gradient(135deg,${gold},#b8960c)`,
-                              color: '#0a0a0a',
-                              padding: '11px 14px',
-                              borderRadius: 10,
-                              fontWeight: 600,
-                              fontSize: 13,
-                              textDecoration: 'none',
-                            }}
-                          >
-                            Registracija kupca
-                          </Link>
-                          <Link
-                            href={`/kupac/prijava?next=${kupacReturnEnc}`}
-                            onClick={() => setKupacMenuOpen(false)}
-                            style={{
-                              textAlign: 'center',
-                              background: 'transparent',
-                              color: gold,
-                              border: `0.5px solid ${goldBorder}`,
-                              padding: '11px 14px',
-                              borderRadius: 10,
-                              fontWeight: 600,
-                              fontSize: 13,
-                              textDecoration: 'none',
-                            }}
-                          >
-                            Prijava kupca
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setGuestAuthCollapsed(true)
-                              setActiveView('booking')
-                              setKupacMenuOpen(false)
-                            }}
-                            style={{
-                              background: 'transparent',
-                              color: 'rgba(245,240,232,.75)',
-                              border: '0.5px solid rgba(245,240,232,.18)',
-                              padding: '10px 12px',
-                              borderRadius: 10,
-                              fontSize: 12,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Nastavi kao gost
-                          </button>
-                        </div>
-                      ) : (
-                        <div style={{ fontSize: 12, color: 'rgba(245,240,232,.7)', lineHeight: 1.55 }}>
-                          <p style={{ marginBottom: 10 }}>Zakazujete kao gost — nije potreban nalog.</p>
-                          <button
-                            type="button"
-                            onClick={() => setGuestAuthCollapsed(false)}
-                            style={{
-                              background: 'transparent',
-                              color: gold,
-                              border: `0.5px solid ${goldBorder}`,
-                              borderRadius: 10,
-                              padding: '8px 12px',
-                              fontSize: 12,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Nazad na nalog kupca
-                          </button>
-                        </div>
-                      )}
-                    </>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <p style={{ fontSize: 12, color: 'rgba(245,240,232,.65)', lineHeight: 1.5 }}>
+                        Za zakazivanje termina potrebno je da se prijavite ili registrujete kao kupac.
+                      </p>
+                      <Link
+                        href={`/kupac/registracija?next=${kupacReturnEnc}`}
+                        onClick={() => setKupacMenuOpen(false)}
+                        style={{
+                          textAlign: 'center',
+                          background: `linear-gradient(135deg,${gold},#b8960c)`,
+                          color: '#0a0a0a',
+                          padding: '11px 14px',
+                          borderRadius: 10,
+                          fontWeight: 600,
+                          fontSize: 13,
+                          textDecoration: 'none',
+                        }}
+                      >
+                        Registracija kupca
+                      </Link>
+                      <Link
+                        href={`/kupac/prijava?next=${kupacReturnEnc}`}
+                        onClick={() => setKupacMenuOpen(false)}
+                        style={{
+                          textAlign: 'center',
+                          background: 'transparent',
+                          color: gold,
+                          border: `0.5px solid ${goldBorder}`,
+                          padding: '11px 14px',
+                          borderRadius: 10,
+                          fontWeight: 600,
+                          fontSize: 13,
+                          textDecoration: 'none',
+                        }}
+                      >
+                        Prijava kupca
+                      </Link>
+                    </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       <p style={{ fontSize: 12, color: 'rgba(245,240,232,.65)', lineHeight: 1.5 }}>Prijavljeni ste kao kupac ovog salona.</p>
