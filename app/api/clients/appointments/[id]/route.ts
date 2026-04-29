@@ -22,7 +22,7 @@ function getUserClient(authToken: string) {
   })
 }
 
-const MINUTES_WARN = 60
+const MINUTES_WARN = 180
 const MINUTES_BLACKLIST = 30
 
 function minutesUntilStart(iso: string): number {
@@ -36,7 +36,7 @@ function isMissingRpcFunction(message: string): boolean {
 
 type RouteCtx = { params: Promise<{ id: string }> }
 
-/** Otkazivanje termina od strane kupca (pragovi: ≥60 min upozorenje, ≤30 min crna lista). */
+/** Otkazivanje termina od strane kupca (bez posledica ≥3h, upozorenje <3h, crna lista za ponavljanje ili ≤30 min). */
 export async function DELETE(request: Request, context: RouteCtx) {
   try {
     const { ok: envOk } = getPublicSupabaseEnv()
@@ -120,7 +120,7 @@ export async function DELETE(request: Request, context: RouteCtx) {
 
     const minutesBefore = minutesUntilStart(datumVrijeme)
 
-    let tier: 'early_warning' | 'late_warning' | 'blacklist' = 'early_warning'
+    let tier: 'no_penalty' | 'late_warning' | 'blacklist' = 'no_penalty'
     if (minutesBefore <= MINUTES_BLACKLIST) {
       tier = 'blacklist'
     } else if (minutesBefore < MINUTES_WARN) {
@@ -160,12 +160,12 @@ export async function DELETE(request: Request, context: RouteCtx) {
     }
 
     const messages: Record<string, string> = {
-      early_warning:
-        'Termin je otkazan. Hvala što ste nas obavestili bar sat vremena unapred — ipak, česta otkazivanja otežavaju rad salona.',
+      no_penalty:
+        'Termin je otkazan. Hvala što ste nas obavestili na vreme.',
       late_warning:
-        'Termin je otkazan. Otkazivanje u roku kraćem od jednog sata pre termina nije poželjno; molimo vas da ubuduće javite ranije.',
+        'Termin je otkazan manje od 3 sata pre početka. Ovo je upozorenje: ako još jednom otkažete kasno, nalog može biti blokiran.',
       blacklist:
-        'Termin je otkazan vrlo kasno. Vaš nalog je zabeležen na globalnoj crnoj listi i nećete moći zakazivati termine u salonima na ovoj platformi dok administrator ne ukloni zapis.',
+        'Termin je otkazan vrlo kasno ili je kasno otkazivanje ponovljeno. Vaš nalog je stavljen na crnu listu dok ga administrator ne odblokira.',
     }
 
     return NextResponse.json({

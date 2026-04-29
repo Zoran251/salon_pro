@@ -615,6 +615,36 @@ export default function Dashboard() {
     if (refreshedLager) setLager(refreshedLager)
   }
 
+  const oznaciDaNijeDosao = async (id: string) => {
+    setTerminiPotvrdaGreska('')
+    if (!window.confirm('Označiti da se kupac nije pojavio? Nalog kupca biće stavljen na crnu listu.')) return
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+    if (!token) {
+      setTerminiPotvrdaGreska('Sesija je istekla. Prijavi se ponovo.')
+      return
+    }
+    const res = await fetch(`/api/appointments/${id}/no-show`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+    const data = (await res.json()) as { error?: string }
+    if (!res.ok || data.error) {
+      setTerminiPotvrdaGreska(data.error || 'Označavanje nedolaska nije uspelo.')
+      return
+    }
+    const sid = salon?.id ?? session.user.id
+    const { data: refreshed } = await supabase
+      .from('termini')
+      .select('*')
+      .eq('salon_id', sid)
+      .order('datum_vrijeme', { ascending: true })
+    if (refreshed) setTermini(terminiSaUslugaNazivom(refreshed, usluge))
+    await osveziCrnuListu()
+  }
+
   const sacuvajLojalnost = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -1098,7 +1128,12 @@ export default function Dashboard() {
                 >
                   {t.status}
                 </div>
-                {t.status !== 'potvrđen' && t.status !== 'otkazan' && <button style={btnGold} onClick={() => potvrdiTermin(t.id)}>Potvrdi</button>}
+                {t.status !== 'potvrđen' && t.status !== 'otkazan' && (
+                  <button style={btnGold} onClick={() => potvrdiTermin(t.id)}>Potvrdi</button>
+                )}
+                {t.status !== 'otkazan' && (
+                  <button style={btnOutline} onClick={() => void oznaciDaNijeDosao(t.id)}>Nije došao</button>
+                )}
               </div>
             </div>
           ))
