@@ -33,6 +33,13 @@ type NovaUslugaLagerItem = {
   lager_id: string
   kolicina: string
 }
+type SalonNotification = {
+  id: string
+  title: string
+  body: string
+  created_at: string
+  appointment_id: string | null
+}
 type ProfilForm = {
   naziv: string
   opis: string
@@ -95,6 +102,7 @@ export default function Dashboard() {
   const [usluge, setUsluge] = useState<UslugaRow[]>([])
   const [lager, setLager] = useState<LagerRow[]>([])
   const [termini, setTermini] = useState<TerminRow[]>([])
+  const [salonNotifications, setSalonNotifications] = useState<SalonNotification[]>([])
   const [crnaLista, setCrnaLista] = useState<CrnaListaRow[]>([])
   const [crnaRučnoTelefon, setCrnaRučnoTelefon] = useState('')
   const [crnaRučnoIme, setCrnaRučnoIme] = useState('')
@@ -309,6 +317,20 @@ export default function Dashboard() {
         .select('*, saloni ( naziv )')
         .order('created_at', { ascending: false })
       if (!crnaListaErr) setCrnaLista(crnaListaData || [])
+
+      const { data: salonNotifData, error: salonNotifErr } = await supabase
+        .from('salon_notifications')
+        .select('id, title, body, created_at, appointment_id')
+        .eq('salon_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      if (salonNotifErr) {
+        const missingTable = /relation .*salon_notifications.* does not exist/i.test(salonNotifErr.message)
+        if (!missingTable) console.error('[dashboard] Obaveštenja salona:', salonNotifErr.message, salonNotifErr)
+      } else {
+        setSalonNotifications((salonNotifData || []) as SalonNotification[])
+      }
 
       // Učitaj lojalnost
       const { data: lojalnostData } = await supabase
@@ -743,6 +765,21 @@ export default function Dashboard() {
   // Render funkcije ostaju identične...
   const renderPregled = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {salonNotifications.length > 0 && (
+        <div style={{ ...cardStyle, borderColor: 'rgba(220,100,100,.35)', background: 'rgba(120,45,45,.12)' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#ffb3b3', marginBottom: '12px' }}>Nova obaveštenja</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {salonNotifications.map((n) => (
+              <div key={n.id} style={{ borderBottom: '0.5px solid rgba(255,255,255,.08)', paddingBottom: '10px' }}>
+                <div style={{ fontSize: '13px', color: text, fontWeight: 600 }}>{n.title}</div>
+                <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.7)', lineHeight: 1.5, marginTop: '4px' }}>{n.body}</div>
+                <div style={{ fontSize: '11px', color: muted, marginTop: '4px' }}>{new Date(n.created_at).toLocaleString('sr')}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: '12px' }}>
         {[
           { label: 'Termini danas', value: termini.filter(t => new Date(t.datum_vrijeme).toDateString() === new Date().toDateString()).length.toString(), icon: '📅' },
