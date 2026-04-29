@@ -1385,7 +1385,7 @@ export default function Dashboard() {
           <div style={{ flex: 1 }} />
           <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(212,175,55,.06)', border: '0.5px solid rgba(212,175,55,.15)', marginTop: '12px' }}>
             <div style={{ fontSize: '11px', color: muted, marginBottom: '4px' }}>PLAN</div>
-            <div style={{ fontSize: '13px', color: gold, fontWeight: 500 }}>Pro · $19.99/mes</div>
+            <div style={{ fontSize: '13px', color: gold, fontWeight: 500 }}>Pro · 29,99 €/mes</div>
           </div>
           <button onClick={handleOdjava} style={{ background: 'none', border: 'none', color: muted, fontSize: '12px', cursor: 'pointer', padding: '10px', marginTop: '8px', fontFamily: 'sans-serif' }}>
             Odjavi se
