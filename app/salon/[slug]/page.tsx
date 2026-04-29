@@ -180,6 +180,7 @@ export default function SalonLanding() {
   } | null>(null)
   const [terminEditLoading, setTerminEditLoading] = useState(false)
   const [terminCancelLoading, setTerminCancelLoading] = useState<string | null>(null)
+  const [isMobileHeader, setIsMobileHeader] = useState(false)
 
   const uslugeKategorije = useMemo(() => {
     const s = new Set(usluge.map((u) => (u.kategorija?.trim() ? u.kategorija.trim() : 'Ostalo')))
@@ -190,6 +191,14 @@ export default function SalonLanding() {
     () => usluge.filter((u) => (u.kategorija?.trim() ? u.kategorija.trim() : 'Ostalo') === bookingPickerKategorija),
     [usluge, bookingPickerKategorija]
   )
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const update = () => setIsMobileHeader(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
 
   const otvoriZakazivanjePicker = useCallback(() => {
     if (klijentUlogovan && clientSummary?.booking_blocked) {
@@ -644,6 +653,83 @@ export default function SalonLanding() {
   const kupacReturnEnc = encodeURIComponent(`/salon/${slug}`)
   const neprocitaneObavestenja =
     clientSummary?.notifications?.filter((n) => !n.read_at).length ?? 0
+  const modalBackdropStyle: React.CSSProperties = {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,.72)',
+    zIndex: 200,
+  }
+  const modalPanelStyle: React.CSSProperties = {
+    width: 'min(420px, 100%)',
+    maxHeight: 'calc(100vh - 110px)',
+    overflowY: 'auto',
+    background: '#121212',
+    border: `0.5px solid ${goldBorder}`,
+    borderRadius: 18,
+    boxShadow: '0 24px 70px rgba(0,0,0,.65)',
+    padding: '16px 16px 14px',
+  }
+  const customerPanelStyle: React.CSSProperties = isMobileHeader
+    ? {
+        ...modalPanelStyle,
+        position: 'fixed',
+        left: 16,
+        right: 16,
+        top: 72,
+        width: 'auto',
+        zIndex: 220,
+      }
+    : {
+        position: 'absolute',
+        right: 0,
+        top: 'calc(100% + 8px)',
+        width: 'min(300px, calc(100vw - 32px))',
+        maxHeight: 420,
+        overflowY: 'auto',
+        background: '#121212',
+        border: `0.5px solid ${goldBorder}`,
+        borderRadius: 14,
+        boxShadow: '0 20px 50px rgba(0,0,0,.55)',
+        zIndex: 65,
+        padding: '14px 14px 12px',
+      }
+  const notificationsPanelStyle: React.CSSProperties = isMobileHeader
+    ? {
+        ...modalPanelStyle,
+        position: 'fixed',
+        left: 16,
+        right: 16,
+        top: 72,
+        width: 'auto',
+        zIndex: 220,
+        padding: '12px 0',
+      }
+    : {
+        position: 'absolute',
+        right: 0,
+        top: 'calc(100% + 8px)',
+        width: 'min(340px, calc(100vw - 32px))',
+        maxHeight: 360,
+        overflowY: 'auto',
+        background: '#121212',
+        border: `0.5px solid ${goldBorder}`,
+        borderRadius: 14,
+        boxShadow: '0 20px 50px rgba(0,0,0,.55)',
+        zIndex: 60,
+        padding: '12px 0',
+      }
+  const modalCloseStyle: React.CSSProperties = {
+    background: 'transparent',
+    color: 'rgba(245,240,232,.7)',
+    border: `0.5px solid ${goldBorder}`,
+    borderRadius: 10,
+    padding: '8px 12px',
+    fontSize: 12,
+    cursor: 'pointer',
+    display: 'block',
+    marginLeft: 'auto',
+    marginBottom: 12,
+  }
 
   const locationQuery = salon ? buildLocationQuery(salon) : ''
   const mapsUrl = locationQuery ? buildMapsEmbedSrc(locationQuery) : ''
@@ -653,7 +739,6 @@ export default function SalonLanding() {
     : isTerminOtkazan(bookingNotif?.status)
       ? 'Termin je otkazan'
       : 'Termin čeka potvrdu'
-
   const handleZakazivanje = async () => {
     if (klijentUlogovan && clientSummary?.booking_blocked) {
       setGreska('Zakazivanje nije dostupno: vaš nalog je na crnoj listi zbog kasnih otkazivanja.')
@@ -1952,7 +2037,10 @@ export default function SalonLanding() {
                 aria-haspopup="menu"
                 aria-expanded={kupacMenuOpen}
                 aria-label="Kupac — nalog, prijava ili registracija"
-                onClick={() => setKupacMenuOpen((o) => !o)}
+                onClick={() => {
+                  setNotifPanelOpen(false)
+                  setKupacMenuOpen((o) => !o)
+                }}
                 style={{
                   background: kupacMenuOpen
                     ? `linear-gradient(160deg, rgba(212,175,55,.22), rgba(212,175,55,.06))`
@@ -1980,23 +2068,21 @@ export default function SalonLanding() {
                 </svg>
               </button>
               {kupacMenuOpen && (
-                <div
-                  role="menu"
-                  style={{
-                    position: 'absolute',
-                    right: 0,
-                    top: 'calc(100% + 8px)',
-                    width: 'min(300px, calc(100vw - 32px))',
-                    maxHeight: 420,
-                    overflowY: 'auto',
-                    background: '#121212',
-                    border: `0.5px solid ${goldBorder}`,
-                    borderRadius: 14,
-                    boxShadow: '0 20px 50px rgba(0,0,0,.55)',
-                    zIndex: 65,
-                    padding: '14px 14px 12px',
-                  }}
-                >
+                <>
+                  {isMobileHeader && <div style={modalBackdropStyle} onClick={() => setKupacMenuOpen(false)} />}
+                  <div
+                    role="menu"
+                    style={customerPanelStyle}
+                  >
+                  {isMobileHeader && (
+                    <button
+                      type="button"
+                      onClick={() => setKupacMenuOpen(false)}
+                      style={modalCloseStyle}
+                    >
+                      Zatvori
+                    </button>
+                  )}
                   <div style={{ fontSize: 11, color: 'rgba(245,240,232,.45)', marginBottom: 10, letterSpacing: '0.04em' }}>KUPAC</div>
                   {!klijentUlogovan ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -2062,7 +2148,8 @@ export default function SalonLanding() {
                       ✓ {clientAuthSuccess}
                     </div>
                   ) : null}
-                </div>
+                  </div>
+                </>
               )}
             </div>
             {klijentUlogovan && (
@@ -2072,7 +2159,10 @@ export default function SalonLanding() {
                   aria-haspopup="dialog"
                   aria-expanded={notifPanelOpen}
                   aria-label="Obaveštenja u aplikaciji"
-                  onClick={() => setNotifPanelOpen((o) => !o)}
+                  onClick={() => {
+                    setKupacMenuOpen(false)
+                    setNotifPanelOpen((o) => !o)
+                  }}
                   style={{
                     position: 'relative',
                     background: notifPanelOpen ? 'rgba(212,175,55,.12)' : '#141414',
@@ -2111,24 +2201,22 @@ export default function SalonLanding() {
                   ) : null}
                 </button>
                 {notifPanelOpen && (
-                  <div
-                    role="dialog"
-                    aria-label="Obaveštenja"
-                    style={{
-                      position: 'absolute',
-                      right: 0,
-                      top: 'calc(100% + 8px)',
-                      width: 'min(340px, calc(100vw - 32px))',
-                      maxHeight: 360,
-                      overflowY: 'auto',
-                      background: '#121212',
-                      border: `0.5px solid ${goldBorder}`,
-                      borderRadius: 14,
-                      boxShadow: '0 20px 50px rgba(0,0,0,.55)',
-                      zIndex: 60,
-                      padding: '12px 0',
-                    }}
-                  >
+                  <>
+                    {isMobileHeader && <div style={modalBackdropStyle} onClick={() => setNotifPanelOpen(false)} />}
+                    <div
+                      role="dialog"
+                      aria-label="Obaveštenja"
+                      style={notificationsPanelStyle}
+                    >
+                    {isMobileHeader && (
+                      <button
+                        type="button"
+                        onClick={() => setNotifPanelOpen(false)}
+                        style={{ ...modalCloseStyle, margin: '0 14px 10px auto' }}
+                      >
+                        Zatvori
+                      </button>
+                    )}
                     <div style={{ padding: '0 14px 10px', borderBottom: `0.5px solid ${goldBorder}` }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: '#f5f0e8' }}>Obaveštenja</div>
                       <div style={{ fontSize: 11, color: 'rgba(245,240,232,.45)', marginTop: 4 }}>
@@ -2209,7 +2297,8 @@ export default function SalonLanding() {
                         Sva obaveštenja i profil →
                       </button>
                     </div>
-                  </div>
+                    </div>
+                  </>
                 )}
               </div>
             )}
