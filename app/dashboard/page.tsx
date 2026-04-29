@@ -19,6 +19,20 @@ type CrnaListaRow = Database['public']['Tables']['kupci_crna_lista']['Row']
 type LojalnostRow = Database['public']['Tables']['lojalnost']['Row']
 type LojalnostForm = Pick<LojalnostRow, 'aktivan' | 'tip' | 'svaki_koji' | 'vrijednost'> &
   Partial<Pick<LojalnostRow, 'id' | 'salon_id' | 'created_at'>>
+type UslugaLagerConsumption = {
+  id: string
+  usluga_id: string
+  lager_id: string
+  kolicina: number
+  lager?: {
+    naziv: string | null
+    jedinica: string | null
+  } | null
+}
+type NovaUslugaLagerItem = {
+  lager_id: string
+  kolicina: string
+}
 type ProfilForm = {
   naziv: string
   opis: string
@@ -94,6 +108,8 @@ export default function Dashboard() {
   const [qrError, setQrError] = useState('')
   // ...ostatak state-a ostaje isti...
   const [novaUsluga, setNovaUsluga] = useState({ naziv: '', cijena: '', trajanje: '', opis: '' })
+  const [novaUslugaLager, setNovaUslugaLager] = useState<NovaUslugaLagerItem[]>([])
+  const [uslugaLager, setUslugaLager] = useState<UslugaLagerConsumption[]>([])
   const [noviLager, setNoviLager] = useState({ naziv: '', kategorija: '', kolicina: '', minimum: '', jedinica: 'kom' })
   const [showNovaUsluga, setShowNovaUsluga] = useState(false)
   const [showNoviLager, setShowNoviLager] = useState(false)
@@ -248,6 +264,34 @@ export default function Dashboard() {
       }
       setLager(lagerData || [])
 
+      const { data: potrosnjaData, error: potrosnjaErr } = await supabase
+        .from('usluga_lager_potrosnja')
+        .select('id, usluga_id, lager_id, kolicina')
+        .eq('salon_id', userId)
+        .order('created_at', { ascending: true })
+
+      if (potrosnjaErr) {
+        const missingTable = /relation .*usluga_lager_potrosnja.* does not exist/i.test(potrosnjaErr.message)
+        if (missingTable) {
+          console.warn('[dashboard] Pokreni migraciju 2026-05-07_service_lager_consumption.sql za povezivanje usluga i lagera.')
+        } else {
+          console.error('[dashboard] Potrošnja lagera:', potrosnjaErr.message, potrosnjaErr)
+        }
+      }
+      const lagerMap = new Map((lagerData || []).map((l) => [l.id, l]))
+      setUslugaLager(
+        (potrosnjaData || []).map((p) => {
+          const item = lagerMap.get(p.lager_id)
+          return {
+            id: p.id,
+            usluga_id: p.usluga_id,
+            lager_id: p.lager_id,
+            kolicina: p.kolicina,
+            lager: item ? { naziv: item.naziv, jedinica: item.jedinica } : null,
+          }
+        }),
+      )
+
       // Učitaj termine (bez embed usluge — spajamo u memoriji posle učitanih usluga)
       const { data: terminiData, error: terminiErr } = await supabase
         .from('termini')
@@ -401,9 +445,23 @@ export default function Dashboard() {
     const naziv = novaUsluga.naziv.trim()
     const cijena = parseFloat(novaUsluga.cijena.replace(',', '.'))
     const trajanje = parseInt(novaUsluga.trajanje, 10) || 30
+    const potrosnja = novaUslugaLager
+      .map((item) => ({
+        lager_id: item.lager_id,
+        kolicina: parseFloat(item.kolicina.replace(',', '.')),
+      }))
+      .filter((item) => item.lager_id && !Number.isNaN(item.kolicina) && item.kolicina > 0)
 
     if (!naziv || Number.isNaN(cijena) || cijena <= 0) {
       setUslugaGreska('Unesite naziv i ispravnu cenu.')
+      return
+    }
+    if (novaUslugaLager.length !== potrosnja.length) {
+      setUslugaGreska('Za svaku stavku lagera izaberite artikal i unesite količinu veću od nule.')
+      return
+    }
+    if (new Set(potrosnja.map((item) => item.lager_id)).size !== potrosnja.length) {
+      setUslugaGreska('Isti artikal iz lagera dodajte samo jednom po usluzi.')
       return
     }
 
@@ -436,8 +494,42 @@ export default function Dashboard() {
         return
       }
 
+      let novaPotrosnja: UslugaLagerConsumption[] = []
+      if (potrosnja.length > 0) {
+        const { data: potrosnjaRows, error: potrosnjaError } = await supabase
+          .from('usluga_lager_potrosnja')
+          .insert(
+            potrosnja.map((item) => ({
+              salon_id: salon.id,
+              usluga_id: data.id,
+              lager_id: item.lager_id,
+              kolicina: item.kolicina,
+            })),
+          )
+          .select('id, usluga_id, lager_id, kolicina')
+
+        if (potrosnjaError) {
+          setUslugaGreska(
+            /relation .*usluga_lager_potrosnja.* does not exist/i.test(potrosnjaError.message)
+              ? 'U Supabase pokrenite migraciju 2026-05-07_service_lager_consumption.sql, pa pokušajte ponovo.'
+              : potrosnjaError.message,
+          )
+          await supabase.from('usluge').delete().eq('id', data.id)
+          return
+        }
+        novaPotrosnja = (potrosnjaRows || []).map((row) => {
+          const lagerRow = lager.find((l) => l.id === row.lager_id)
+          return {
+            ...row,
+            lager: lagerRow ? { naziv: lagerRow.naziv, jedinica: lagerRow.jedinica } : null,
+          }
+        }) as UslugaLagerConsumption[]
+      }
+
       setUsluge((prev) => [...prev, data])
+      setUslugaLager((prev) => [...prev, ...novaPotrosnja])
       setNovaUsluga({ naziv: '', cijena: '', trajanje: '', opis: '' })
+      setNovaUslugaLager([])
       setShowNovaUsluga(false)
     } catch {
       setUslugaGreska('Došlo je do greške. Pokušajte ponovo.')
@@ -449,6 +541,7 @@ export default function Dashboard() {
   const obrisiUslugu = async (id: string) => {
     await supabase.from('usluge').delete().eq('id', id)
     setUsluge(usluge.filter(u => u.id !== id))
+    setUslugaLager((prev) => prev.filter((p) => p.usluga_id !== id))
   }
 
   const dodajLager = async () => {
@@ -508,11 +601,18 @@ export default function Dashboard() {
       .select('*')
       .eq('salon_id', sid)
       .order('datum_vrijeme', { ascending: true })
+    const { data: refreshedLager } = await supabase
+      .from('lager')
+      .select('*')
+      .eq('salon_id', sid)
+      .order('created_at', { ascending: true })
     if (refErr) {
       setTermini(terminiSaUslugaNazivom(termini.map((t) => (t.id === id ? { ...t, status: 'potvrđen' } : t)), usluge))
+      if (refreshedLager) setLager(refreshedLager)
       return
     }
     if (refreshed) setTermini(terminiSaUslugaNazivom(refreshed, usluge))
+    if (refreshedLager) setLager(refreshedLager)
   }
 
   const sacuvajLojalnost = async () => {
@@ -780,6 +880,15 @@ export default function Dashboard() {
                 {u.trajanje} min · {Number(u.cijena).toLocaleString()} RSD
               </div>
               {u.opis && <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.3)', marginTop: '2px' }}>{u.opis}</div>}
+              {uslugaLager.filter((p) => p.usluga_id === u.id).length > 0 && (
+                <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.45)', marginTop: '6px' }}>
+                  Troši:{' '}
+                  {uslugaLager
+                    .filter((p) => p.usluga_id === u.id)
+                    .map((p) => `${p.lager?.naziv || 'Artikal'} ${p.kolicina} ${p.lager?.jedinica || ''}`.trim())
+                    .join(' · ')}
+                </div>
+              )}
             </div>
           </div>
           <button style={btnOutline} onClick={() => obrisiUslugu(u.id)}>Obriši</button>
@@ -799,9 +908,72 @@ export default function Dashboard() {
             <div><label style={labelStyle}>TRAJANJE (min)</label><input style={inputStyle} placeholder="45" value={novaUsluga.trajanje} onChange={e => setNovaUsluga({ ...novaUsluga, trajanje: e.target.value })} /></div>
             <div style={{ gridColumn: '1/-1' }}><label style={labelStyle}>OPIS (opciono)</label><input style={inputStyle} placeholder="Kratki opis usluge" value={novaUsluga.opis} onChange={e => setNovaUsluga({ ...novaUsluga, opis: e.target.value })} /></div>
           </div>
+          <div style={{ background: 'rgba(255,255,255,.03)', border: `0.5px solid ${goldBorder}`, borderRadius: '12px', padding: '14px', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: text }}>Potrošnja lagera</div>
+                <div style={{ fontSize: '11px', color: muted, marginTop: '3px' }}>Izaberi artikle koji se skidaju kada potvrdiš termin za ovu uslugu.</div>
+              </div>
+              <button
+                style={{ ...btnOutline, padding: '8px 12px', fontSize: '12px', opacity: lager.length === 0 ? 0.5 : 1 }}
+                disabled={lager.length === 0}
+                onClick={() => setNovaUslugaLager([...novaUslugaLager, { lager_id: lager[0]?.id || '', kolicina: '' }])}
+              >
+                + Dodaj potrošnju
+              </button>
+            </div>
+            {lager.length === 0 ? (
+              <p style={{ fontSize: '12px', color: muted }}>Prvo dodaj artikle u lager, pa ih možeš vezati za uslugu.</p>
+            ) : novaUslugaLager.length === 0 ? (
+              <p style={{ fontSize: '12px', color: muted }}>Nije dodata potrošnja. Usluga neće automatski skidati lager.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {novaUslugaLager.map((item, idx) => {
+                  const selected = lager.find((l) => l.id === item.lager_id)
+                  return (
+                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: 'minmax(160px,1fr) minmax(100px,140px) auto', gap: '8px', alignItems: 'end' }}>
+                      <div>
+                        <label style={labelStyle}>ARTIKAL</label>
+                        <select
+                          style={inputStyle}
+                          value={item.lager_id}
+                          onChange={(e) =>
+                            setNovaUslugaLager(novaUslugaLager.map((row, i) => (i === idx ? { ...row, lager_id: e.target.value } : row)))
+                          }
+                        >
+                          {lager.map((l) => (
+                            <option key={l.id} value={l.id}>
+                              {l.naziv} ({l.kolicina} {l.jedinica})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={labelStyle}>KOLIČINA</label>
+                        <input
+                          style={inputStyle}
+                          placeholder={selected?.jedinica ? `npr. 20 ${selected.jedinica}` : 'npr. 1'}
+                          value={item.kolicina}
+                          onChange={(e) =>
+                            setNovaUslugaLager(novaUslugaLager.map((row, i) => (i === idx ? { ...row, kolicina: e.target.value } : row)))
+                          }
+                        />
+                      </div>
+                      <button
+                        style={{ ...btnOutline, padding: '11px 12px' }}
+                        onClick={() => setNovaUslugaLager(novaUslugaLager.filter((_, i) => i !== idx))}
+                      >
+                        Ukloni
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button style={btnGold} disabled={uslugaLoading} onClick={dodajUslugu}>{uslugaLoading ? 'Dodavanje...' : 'Dodaj uslugu'}</button>
-            <button style={btnOutline} onClick={() => { setShowNovaUsluga(false); setUslugaGreska('') }}>Odustani</button>
+            <button style={btnOutline} onClick={() => { setShowNovaUsluga(false); setUslugaGreska(''); setNovaUslugaLager([]) }}>Odustani</button>
           </div>
         </div>
       ) : (

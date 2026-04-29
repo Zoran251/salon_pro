@@ -97,6 +97,26 @@ export type Database = {
         Update: Partial<Database['public']['Tables']['lager']['Insert']>
         Relationships: []
       }
+      usluga_lager_potrosnja: {
+        Row: {
+          id: string
+          salon_id: string
+          usluga_id: string
+          lager_id: string
+          kolicina: number
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          salon_id: string
+          usluga_id: string
+          lager_id: string
+          kolicina: number
+          created_at?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['usluga_lager_potrosnja']['Insert']>
+        Relationships: []
+      }
       termini: {
         Row: {
           id: string
