@@ -141,7 +141,7 @@ export async function POST(request: Request) {
 
     const clientId = typeof clientIdRaw === 'string' ? clientIdRaw : null
     if (!clientId) {
-      return NextResponse.json({ error: 'Neuspješno povezivanje klijenta sa salonom.' }, { status: 500 })
+      return NextResponse.json({ error: 'Neuspešno povezivanje kupca sa salonom.' }, { status: 500 })
     }
 
     const { data: rpcBookingId, error: bookingRpcError } = await userClient.rpc('create_authenticated_booking', {
@@ -198,7 +198,7 @@ export async function GET(request: Request) {
     const termin_id = termin_id_raw && uuidRe.test(termin_id_raw.trim()) ? termin_id_raw.trim() : null
 
     if (!termin_id && (!ime || !telefon || !datum_vrijeme)) {
-      return NextResponse.json({ error: 'Nedostaju podaci za provjeru statusa termina' }, { status: 400 })
+      return NextResponse.json({ error: 'Nedostaju podaci za proveru statusa termina.' }, { status: 400 })
     }
 
     const { data: rpcStatus, error: rpcErr } = await supabase.rpc('get_public_termin_status', {

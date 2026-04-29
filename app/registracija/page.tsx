@@ -69,7 +69,7 @@ export default function Registracija() {
           setGreska(
             formatAuthError(
               j2.error ||
-                'Kreiranje salona nije uspjelo. Isključi obaveznu potvrdu emaila u Supabase (Authentication) ili dodaj SUPABASE_SERVICE_ROLE_KEY na Vercel.',
+                'Kreiranje salona nije uspelo. Isključi obaveznu potvrdu emaila u Supabase-u (Authentication) ili dodaj SUPABASE_SERVICE_ROLE_KEY na Vercel.',
               'salon-register',
             ),
           )
@@ -93,7 +93,7 @@ export default function Registracija() {
       }
       if (!sessionReady) {
         setGreska(
-          'Sesija nije sačuvana u pregledniku (kolačići / privatni mod). Dozvoli storage za ovaj sajt ili probaj drugi preglednik.',
+          'Sesija nije sačuvana u pregledaču (kolačići / privatni režim). Dozvoli skladište podataka za ovaj sajt ili probaj drugi pregledač.',
         )
         setLoading(false)
         return
@@ -274,7 +274,7 @@ export default function Registracija() {
                 Dobrodošao, <span style={{ color: '#d4af37', fontWeight: 500 }}>{forma.naziv}</span>!
               </p>
               <p style={{ fontSize: '14px', color: 'rgba(245,240,232,.45)', lineHeight: 1.7, marginBottom: '32px' }}>
-                Provjeri email i potvrdi registraciju, zatim se prijavi.
+                Proveri email i potvrdi registraciju, zatim se prijavi.
               </p>
               <div style={{ background: 'rgba(212,175,55,.08)', border: '0.5px solid rgba(212,175,55,.2)', borderRadius: '12px', padding: '16px', marginBottom: '28px' }}>
                 <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.4)', marginBottom: '6px' }}>TVOJA LANDING PAGE</div>

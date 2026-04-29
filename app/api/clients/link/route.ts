@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     })
 
     if (rpcError) {
-      const msg = rpcError.message || 'Povezivanje nije uspjelo.'
+      const msg = rpcError.message || 'Povezivanje nije uspelo.'
       const isMissingFn = /function public\.link_salon_client|link_salon_client/i.test(msg) && /does not exist/i.test(msg)
       return NextResponse.json(
         {

@@ -6,7 +6,7 @@ const DEFAULT_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_75tUcK380X5UJFaIZRp9aw_
  * Podržava anon i publishable key imena, jer Supabase/Vercel integracija
  * može automatski dodati novije PUBLISHABLE_KEY varijable.
  * Podržava i NEXT_PUBLIC_* (ugrađuje se u klijent) i obične varijable (samo server),
- * koje layout injektuje u window.__SALON_SUPABASE__ pri svakom zahtjevu.
+ * koje layout injektuje u window.__SALON_SUPABASE__ pri svakom zahtevu.
  */
 export function getPublicSupabaseEnv(): { url: string; anonKey: string; ok: boolean } {
   const url = (

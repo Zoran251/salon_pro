@@ -541,7 +541,7 @@ export default function SalonLanding() {
         if (klijentUlogovan) void ucitajClientSummary({ silent: true })
       }
     } catch {
-      setGreska('Ne možemo provjeriti status trenutno. Pokušajte ponovo.')
+      setGreska('Trenutno ne možemo da proverimo status termina. Pokušajte ponovo.')
     } finally {
       setStatusLoading(false)
     }
@@ -633,7 +633,7 @@ export default function SalonLanding() {
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>✂️</div>
         <h1 style={{ color: '#f5f0e8', fontSize: '24px', fontWeight: 500, marginBottom: '8px' }}>Salon nije pronađen</h1>
-        <p style={{ color: 'rgba(245,240,232,.4)', fontSize: '14px' }}>Provjerite link i pokušajte ponovo.</p>
+        <p style={{ color: 'rgba(245,240,232,.4)', fontSize: '14px' }}>Proverite link i pokušajte ponovo.</p>
       </div>
     </div>
   )
@@ -764,7 +764,7 @@ export default function SalonLanding() {
         }),
       })
       const data = (await res.json()) as { error?: string }
-      if (!res.ok) throw new Error(data.error || 'Snimanje nije uspjelo.')
+      if (!res.ok) throw new Error(data.error || 'Snimanje nije uspelo.')
       setProfilUredi(false)
       setProfilPoruka('Podaci su sačuvani.')
       await ucitajClientSummary()
@@ -826,7 +826,7 @@ export default function SalonLanding() {
         }),
       })
       const data = (await res.json()) as { error?: string }
-      if (!res.ok) throw new Error(data.error || 'Snimanje nije uspjelo.')
+      if (!res.ok) throw new Error(data.error || 'Snimanje nije uspelo.')
       setTerminEdit(null)
       setTerminAkcijaPoruka('Termin je ažuriran.')
       await ucitajClientSummary()
@@ -852,7 +852,7 @@ export default function SalonLanding() {
         method: 'DELETE',
       })
       const data = (await res.json()) as { error?: string; message?: string }
-      if (!res.ok) throw new Error(data.error || 'Otkazivanje nije uspjelo.')
+      if (!res.ok) throw new Error(data.error || 'Otkazivanje nije uspelo.')
       setTerminEdit(null)
       setTerminAkcijaPoruka(data.message || 'Termin je otkazan.')
       await ucitajClientSummary()
@@ -1586,7 +1586,7 @@ export default function SalonLanding() {
                   cursor: 'pointer',
                 }}
               >
-                {statusLoading ? 'Provjera...' : 'Provjeri status'}
+                {statusLoading ? 'Provera...' : 'Proveri status'}
               </button>
             ) : null}
           </div>
@@ -1645,7 +1645,7 @@ export default function SalonLanding() {
                 { label: 'IME I PREZIME *', key: 'ime', placeholder: 'Ana Marković', type: 'text' },
                 { label: 'TELEFON *', key: 'telefon', placeholder: '+381 60 000 000', type: 'tel' },
                 { label: 'DATUM *', key: 'datum', placeholder: '', type: 'date' },
-                { label: 'VRIJEME *', key: 'vrijeme', placeholder: '', type: 'time' },
+                { label: 'VREME *', key: 'vrijeme', placeholder: '', type: 'time' },
               ].map((f) => (
                 <div key={f.key}>
                   <label style={{ fontSize: '11px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '5px', letterSpacing: '.3px' }}>{f.label}</label>
@@ -1663,7 +1663,7 @@ export default function SalonLanding() {
                 <label style={{ fontSize: '11px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '5px', letterSpacing: '.3px' }}>NAPOMENA</label>
                 <textarea
                   style={{ width: '100%', background: '#1a1a1a', border: '0.5px solid rgba(212,175,55,.2)', borderRadius: '10px', padding: '12px 14px', fontSize: '14px', resize: 'none', height: '80px' }}
-                  placeholder="Posebni zahtjevi..."
+                  placeholder="Posebni zahtevi..."
                   value={forma.napomena}
                   onChange={(e) => setForma({ ...forma, napomena: e.target.value })}
                 />

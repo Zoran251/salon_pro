@@ -97,13 +97,13 @@ export default function Home() {
         ))}
       </section>
 
-      {/* CIJENA */}
+      {/* CENA */}
       <section className="sp" style={{padding:'0 48px 80px',maxWidth:'1200px',margin:'0 auto'}}>
         <div className="pb pi" style={{background:'linear-gradient(135deg,#1a1500,#0f0e00)',border:'0.5px solid rgba(212,175,55,.35)',borderRadius:'24px',padding:'48px'}}>
           <div style={{flexShrink:0}}>
             <p style={{fontSize:'14px',color:'rgba(245,240,232,.5)',marginBottom:'8px'}}>Sve uključeno</p>
             <div className="pa" style={{fontSize:'64px',fontWeight:500,color:'#d4af37',lineHeight:1}}>$19<span style={{fontSize:'32px'}}>.99</span></div>
-            <p style={{fontSize:'13px',color:'rgba(245,240,232,.4)',marginTop:'4px'}}>po salonu / mjesečno</p>
+            <p style={{fontSize:'13px',color:'rgba(245,240,232,.4)',marginTop:'4px'}}>po salonu / mesečno</p>
           </div>
           <ul style={{listStyle:'none',padding:0,display:'flex',flexDirection:'column',gap:'12px',flexShrink:0}}>
             {['Personalizovana landing page','QR kod za štampanje','Online zakazivanje termina','Upravljanje lagrom i sirovinama','Otkaži kad hoćeš'].map(item=>(

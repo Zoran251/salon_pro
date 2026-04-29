@@ -3,11 +3,11 @@ import { isInvalidRefreshTokenError } from '@/lib/auth-refresh-errors'
 export type AuthErrorNetworkHint = 'customer' | 'salon-login' | 'salon-register'
 
 const NETWORK_MESSAGES: Record<AuthErrorNetworkHint, string> = {
-  customer: 'Ne možemo se povezati. Provjeri internet ili env na serveru.',
+  customer: 'Ne možemo da se povežemo. Proverite internet vezu ili podešavanja servera.',
   'salon-login':
-    'Ne možemo se povezati s bazom. U Vercel dodaj NEXT_PUBLIC_SUPABASE_URL i NEXT_PUBLIC_SUPABASE_ANON_KEY, pa Redeploy.',
+    'Ne možemo da se povežemo sa bazom. U Vercel dodajte NEXT_PUBLIC_SUPABASE_URL i NEXT_PUBLIC_SUPABASE_ANON_KEY, pa ponovo pokrenite deploy.',
   'salon-register':
-    'Ne možemo se povezati s bazom (mrežna greška). Na production sajtu u Vercel → Settings → Environment Variables moraju biti NEXT_PUBLIC_SUPABASE_URL i NEXT_PUBLIC_SUPABASE_ANON_KEY (iste vrijednosti kao u .env.local), zatim Redeploy. Bez toga sajt šalje zahtjeve na pogrešan adresu.',
+    'Ne možemo da se povežemo sa bazom (mrežna greška). U Vercel → Settings → Environment Variables podesite NEXT_PUBLIC_SUPABASE_URL i NEXT_PUBLIC_SUPABASE_ANON_KEY, zatim ponovo pokrenite deploy. Bez toga sajt šalje zahteve na pogrešnu adresu.',
 }
 
 /**
@@ -15,14 +15,14 @@ const NETWORK_MESSAGES: Record<AuthErrorNetworkHint, string> = {
  */
 export function formatAuthError(message: string, networkHint: AuthErrorNetworkHint = 'customer'): string {
   if (isInvalidRefreshTokenError(message)) {
-    return 'Sesija u pregledniku je nevažeća (istekao ili oštećen token). Odjavi se ili obriši podatke sajta za ovu domenu (skladište / kolačići), zatim ponovo prijavi.'
+    return 'Sesija u pregledaču nije važeća (token je istekao ili je oštećen). Odjavite se ili obrišite podatke sajta za ovaj domen (skladište / kolačići), pa se ponovo prijavite.'
   }
   const m = message.toLowerCase()
   if (m.includes('failed to fetch') || m.includes('networkerror')) {
     return NETWORK_MESSAGES[networkHint]
   }
   if (m.includes('email not confirmed') || m.includes('not confirmed')) {
-    return 'Potvrdi email (link iz pisma) prije prijave.'
+    return 'Potvrdite email adresu pre prijave.'
   }
   if (m.includes('invalid login') || m.includes('invalid credentials')) {
     return 'Pogrešan email ili lozinka.'

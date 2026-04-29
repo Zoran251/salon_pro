@@ -40,7 +40,7 @@ export async function authPasswordViaApi(
     })
   } catch {
     return {
-      error: 'Mrežna greška (Failed to fetch). Provjeri internet ili probaj kasnije.',
+      error: 'Mrežna greška (Failed to fetch). Proverite internet vezu ili pokušajte kasnije.',
       userId: null,
       serverReturnedSession: false,
     }

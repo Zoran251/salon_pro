@@ -157,7 +157,7 @@ export default function Dashboard() {
           router.push('/login')
         }
       } catch (err) {
-        console.error('Greška pri provjeri autentifikacije:', err)
+        console.error('Greška pri proveri autentifikacije:', err)
         if (!cancelled) router.push('/login')
       }
     })()
@@ -275,7 +275,7 @@ export default function Dashboard() {
 
       setLojalnost(lojalnostData || defaultLojalnost)
 
-      console.log('Svi podaci učitani uspješno')
+      console.log('Svi podaci su uspešno učitani')
     } catch (err) {
       console.error('Greška pri učitavanju podataka:', err)
     } finally {
@@ -403,7 +403,7 @@ export default function Dashboard() {
     const trajanje = parseInt(novaUsluga.trajanje, 10) || 30
 
     if (!naziv || Number.isNaN(cijena) || cijena <= 0) {
-      setUslugaGreska('Unesi naziv i ispravnu cijenu.')
+      setUslugaGreska('Unesite naziv i ispravnu cenu.')
       return
     }
 
@@ -418,7 +418,7 @@ export default function Dashboard() {
       }
 
       if (!salon?.id) {
-        setUslugaGreska('Salon nije učitan. Osvježite stranicu ili ponovo se prijavite.')
+        setUslugaGreska('Salon nije učitan. Osvežite stranicu ili se ponovo prijavite.')
         return
       }
 
@@ -432,7 +432,7 @@ export default function Dashboard() {
       }).select().single()
 
       if (error || !data) {
-        setUslugaGreska(formatSalonFkErrorMessage(error?.message) || 'Neuspješno dodavanje usluge.')
+        setUslugaGreska(formatSalonFkErrorMessage(error?.message) || 'Dodavanje usluge nije uspelo.')
         return
       }
 
@@ -440,7 +440,7 @@ export default function Dashboard() {
       setNovaUsluga({ naziv: '', cijena: '', trajanje: '', opis: '' })
       setShowNovaUsluga(false)
     } catch {
-      setUslugaGreska('Došlo je do greške. Pokušaj ponovo.')
+      setUslugaGreska('Došlo je do greške. Pokušajte ponovo.')
     } finally {
       setUslugaLoading(false)
     }
@@ -457,7 +457,7 @@ export default function Dashboard() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     if (!salon?.id) {
-      setLagerGreska('Salon nije učitan. Osvježite stranicu.')
+      setLagerGreska('Salon nije učitan. Osvežite stranicu.')
       return
     }
     const kol = parseInt(noviLager.kolicina)
@@ -689,7 +689,7 @@ export default function Dashboard() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {sauvano === 'profil' && (
         <div style={{ background: 'rgba(50,200,100,.1)', border: '0.5px solid rgba(50,200,100,.3)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: '#4caf81' }}>
-          ✓ Profil je uspješno sačuvan!
+          ✓ Profil je uspešno sačuvan!
         </div>
       )}
       <div style={cardStyle}>
@@ -743,7 +743,7 @@ export default function Dashboard() {
       </div>
 
       <div style={cardStyle}>
-        <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '20px' }}>Radno vrijeme</h3>
+        <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '20px' }}>Radno vreme</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
           <div>
             <label style={labelStyle}>RADI OD</label>

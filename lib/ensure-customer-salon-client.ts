@@ -105,7 +105,7 @@ export async function ensureSalonClientForCustomer(
   })
 
   if (rpcErr) {
-    const msg = rpcErr.message || 'Povezivanje sa salonom nije uspjelo.'
+    const msg = rpcErr.message || 'Povezivanje sa salonom nije uspelo.'
     const status = /drugim nalogom/i.test(msg) ? 409 : /does not exist/i.test(msg) ? 503 : 400
     return { ok: false, error: msg, status }
   }

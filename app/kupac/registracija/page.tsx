@@ -33,7 +33,7 @@ async function linkKupacNaSalon(params: {
     }),
   })
   const data = (await res.json()) as { error?: string }
-  if (!res.ok || data.error) return { ok: false, error: data.error || 'Povezivanje nije uspjelo.' }
+  if (!res.ok || data.error) return { ok: false, error: data.error || 'Povezivanje nije uspelo.' }
   return { ok: true }
 }
 
@@ -128,7 +128,7 @@ function KupacRegistracijaForm() {
           email,
         })
         if (!link.ok) {
-          setGreska(link.error || 'Kupac je snimljen, ali povezivanje s salonom nije uspjelo.')
+          setGreska(link.error || 'Kupac je sačuvan, ali povezivanje sa salonom nije uspelo.')
           setLoading(false)
           return
         }

@@ -14,7 +14,7 @@ export async function GET() {
     ok,
     supabaseHost: host,
     hint: ok
-      ? 'Server vidi Supabase URL. Ako i dalje imaš Failed to fetch, provjeri da li je Supabase projekat aktivan i URL tačan.'
+      ? 'Server vidi Supabase URL. Ako i dalje imaš Failed to fetch, proveri da li je Supabase projekat aktivan i URL tačan.'
       : 'Postavi NEXT_PUBLIC_SUPABASE_URL i NEXT_PUBLIC_SUPABASE_ANON_KEY (ili SUPABASE_URL i SUPABASE_ANON_KEY) u Vercel → Environment Variables, pa Redeploy bez cache.',
   })
 }
