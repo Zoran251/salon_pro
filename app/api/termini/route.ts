@@ -24,6 +24,10 @@ function unwrapRpcText(raw: unknown): string | null {
   return null
 }
 
+function isMissingRpcFunction(message: string): boolean {
+  return /function .* does not exist|Could not find the function/i.test(message)
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = getServerSupabaseClient()
@@ -111,6 +115,25 @@ export async function POST(request: Request) {
         .is('auth_user_id', null)
     }
 
+    const { data: rpcBookingId, error: bookingRpcError } = await supabase.rpc('create_public_booking', {
+      p_salon_id: salon_id,
+      p_client_id: clientId,
+      p_usluga_id: usluga_id || null,
+      p_ime: imeKlijenta,
+      p_telefon: telefonKlijenta,
+      p_datum_vrijeme: datum_vrijeme,
+      p_napomena: napomena || null,
+    })
+
+    if (!bookingRpcError) {
+      const terminIdOut = typeof rpcBookingId === 'string' ? rpcBookingId : null
+      return NextResponse.json({ success: true, termin_id: terminIdOut })
+    }
+
+    if (!isMissingRpcFunction(bookingRpcError.message)) {
+      return NextResponse.json({ error: bookingRpcError.message }, { status: 500 })
+    }
+
     const { data: inserted, error } = await supabase
       .from('termini')
       .insert({
@@ -131,7 +154,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: rlsHint
-            ? 'RLS blokira javno zakazivanje. Uradi jedno od dva: (1) Vercel → Environment Variables → dodaj SUPABASE_SERVICE_ROLE_KEY (Project Settings → API → service_role) pa Redeploy; ili (2) u Supabase SQL Editor pokreni migraciju db/migrations/2026-05-03_ensure_anon_insert_termini.sql (ili 2026-04-14_client_portal.sql ako još nisi).'
+            ? 'RLS blokira javno zakazivanje. Uradi jedno od dva: (1) Vercel → Environment Variables → dodaj SUPABASE_SERVICE_ROLE_KEY (Project Settings → API → service_role) pa Redeploy; ili (2) u Supabase SQL Editor pokreni migraciju db/migrations/2026-05-04_create_public_booking_rpc.sql, odnosno db/migrations/2026-05-03_ensure_anon_insert_termini.sql ako želiš direktan anon INSERT.'
             : error.message,
         },
         { status: 500 }
