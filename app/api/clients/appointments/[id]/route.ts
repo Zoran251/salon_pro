@@ -30,6 +30,10 @@ function minutesUntilStart(iso: string): number {
   return (start - Date.now()) / 60_000
 }
 
+function isMissingRpcFunction(message: string): boolean {
+  return /function .* does not exist|Could not find the function/i.test(message)
+}
+
 type RouteCtx = { params: Promise<{ id: string }> }
 
 /** Otkazivanje termina od strane kupca (pragovi: ≥60 min upozorenje, ≤30 min crna lista). */
@@ -73,27 +77,48 @@ export async function DELETE(request: Request, context: RouteCtx) {
     }
     const clientData = ensured.client
 
+    const { data: cancelledRaw, error: cancelRpcError } = await userClient.rpc('cancel_customer_appointment', {
+      p_termin_id: terminId,
+      p_salon_id: salonId,
+    })
+
+    if (cancelRpcError) {
+      if (!isMissingRpcFunction(cancelRpcError.message)) {
+        const status = /nije pronađen|nije povezan|ne pripada/i.test(cancelRpcError.message) ? 404 : 500
+        return NextResponse.json({ error: cancelRpcError.message }, { status })
+      }
+    }
+
+    const cancelled = !cancelRpcError ? (cancelledRaw as { status?: string | null; datum_vrijeme?: string | null } | null) : null
+
+    if (cancelled?.status === 'already_cancelled') {
+      return NextResponse.json({ success: true, tier: 'already_cancelled', message: 'Termin je već otkazan.' })
+    }
+
     const service = getServerSupabaseClient()
     if (!service) {
       return NextResponse.json({ error: 'Server nije konfigurisan.' }, { status: 500 })
     }
 
-    const { data: termin, error: terminError } = await service
-      .from('termini')
-      .select('id, salon_id, client_id, datum_vrijeme, status')
-      .eq('id', terminId)
-      .maybeSingle()
+    let datumVrijeme = typeof cancelled?.datum_vrijeme === 'string' ? cancelled.datum_vrijeme : ''
+    if (!datumVrijeme) {
+      const { data: termin, error: terminError } = await service
+        .from('termini')
+        .select('id, salon_id, client_id, datum_vrijeme, status')
+        .eq('id', terminId)
+        .maybeSingle()
 
-    if (terminError) return NextResponse.json({ error: terminError.message }, { status: 500 })
-    if (!termin || termin.salon_id !== salonId || termin.client_id !== clientData.id) {
-      return NextResponse.json({ error: 'Termin nije pronađen.' }, { status: 404 })
+      if (terminError) return NextResponse.json({ error: terminError.message }, { status: 500 })
+      if (!termin || termin.salon_id !== salonId || termin.client_id !== clientData.id) {
+        return NextResponse.json({ error: 'Termin nije pronađen.' }, { status: 404 })
+      }
+      if (termin.status === 'otkazan') {
+        return NextResponse.json({ success: true, tier: 'already_cancelled', message: 'Termin je već otkazan.' })
+      }
+      datumVrijeme = termin.datum_vrijeme as string
     }
 
-    if (termin.status === 'otkazan') {
-      return NextResponse.json({ success: true, tier: 'already_cancelled', message: 'Termin je već otkazan.' })
-    }
-
-    const minutesBefore = minutesUntilStart(termin.datum_vrijeme as string)
+    const minutesBefore = minutesUntilStart(datumVrijeme)
 
     let tier: 'early_warning' | 'late_warning' | 'blacklist' = 'early_warning'
     if (minutesBefore <= MINUTES_BLACKLIST) {
@@ -111,13 +136,6 @@ export async function DELETE(request: Request, context: RouteCtx) {
         { status: 503 }
       )
     }
-
-    const { error: updErr } = await service
-      .from('termini')
-      .update({ status: 'otkazan' })
-      .eq('id', terminId)
-
-    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
 
     if (tier === 'blacklist') {
       const { error: blErr } = await service.from('kupci_crna_lista').upsert(
@@ -208,19 +226,16 @@ export async function PATCH(request: Request, context: RouteCtx) {
       napomena?: string | null
     }
 
-    const service = getServerSupabaseClient()
-    if (!service) {
-      return NextResponse.json({ error: 'Server nije konfigurisan.' }, { status: 500 })
-    }
-
-    const { data: termin, error: terminError } = await service
+    const { data: termin, error: terminError } = await userClient
       .from('termini')
       .select('id, salon_id, client_id, datum_vrijeme, status')
       .eq('id', terminId)
+      .eq('salon_id', salonId)
+      .eq('client_id', clientData.id)
       .maybeSingle()
 
     if (terminError) return NextResponse.json({ error: terminError.message }, { status: 500 })
-    if (!termin || termin.salon_id !== salonId || termin.client_id !== clientData.id) {
+    if (!termin) {
       return NextResponse.json({ error: 'Termin nije pronađen.' }, { status: 404 })
     }
 
@@ -250,7 +265,7 @@ export async function PATCH(request: Request, context: RouteCtx) {
       return NextResponse.json({ error: 'Nema podataka za izmenu.' }, { status: 400 })
     }
 
-    const { error: updErr } = await service.from('termini').update(patch).eq('id', terminId)
+    const { error: updErr } = await userClient.from('termini').update(patch).eq('id', terminId)
 
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
     return NextResponse.json({ success: true })
