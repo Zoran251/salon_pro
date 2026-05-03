@@ -101,7 +101,7 @@ function addDaysToDateKey(dateKey: string, days: number): string {
 function formatDateLabel(dateKey: string): string {
   const d = new Date(`${dateKey}T12:00:00`)
   if (Number.isNaN(d.getTime())) return 'Izabrani dan'
-  return d.toLocaleDateString('sr', {
+  return d.toLocaleDateString('sr-Latn-RS', {
     weekday: 'long',
     day: '2-digit',
     month: 'long',
@@ -879,7 +879,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <div style={{ fontSize: '14px', color: text, fontWeight: 500 }}>{t.ime_klijenta}</div>
-                  <div style={{ fontSize: '12px', color: muted }}>{t.usluge?.naziv || 'Bez usluge'} · {new Date(t.datum_vrijeme).toLocaleDateString('sr')}</div>
+                  <div style={{ fontSize: '12px', color: muted }}>{t.usluge?.naziv || 'Bez usluge'} · {new Date(t.datum_vrijeme).toLocaleDateString('sr-Latn-RS')}</div>
                 </div>
               </div>
               <div
@@ -1294,7 +1294,7 @@ export default function Dashboard() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 220, flex: '1 1 260px' }}>
                       <div style={{ width: '52px', minHeight: '52px', background: goldFaint, borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: gold, textAlign: 'center' }}>
                         <span style={{ fontSize: '13px', fontWeight: 700 }}>{terminDate.toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' })}</span>
-                        <span style={{ fontSize: '9px', color: muted, marginTop: 2 }}>{terminDate.toLocaleDateString('sr')}</span>
+                        <span style={{ fontSize: '9px', color: muted, marginTop: 2 }}>{terminDate.toLocaleDateString('sr-Latn-RS')}</span>
                       </div>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: '14px', fontWeight: 600, color: text }}>{t.ime_klijenta}</div>
