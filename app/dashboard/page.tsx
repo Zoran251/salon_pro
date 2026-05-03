@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -40,6 +40,7 @@ type SalonNotification = {
   created_at: string
   appointment_id: string | null
 }
+type TerminFilter = 'danas' | 'datum' | 'buduci' | 'prosli' | 'svi'
 type ProfilForm = {
   naziv: string
   opis: string
@@ -81,6 +82,31 @@ function terminiSaUslugaNazivom(termini: TerminRow[] | null, uslugeLista: Usluga
         ? { naziv: (map.get(t.usluga_id) as { naziv?: string | null }).naziv ?? null }
         : null,
   }))
+}
+
+function getLocalDateKey(value: Date | string): string {
+  const d = typeof value === 'string' ? new Date(value) : value
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function addDaysToDateKey(dateKey: string, days: number): string {
+  const base = dateKey ? new Date(`${dateKey}T12:00:00`) : new Date()
+  if (Number.isNaN(base.getTime())) return getLocalDateKey(new Date())
+  base.setDate(base.getDate() + days)
+  return getLocalDateKey(base)
+}
+
+function formatDateLabel(dateKey: string): string {
+  const d = new Date(`${dateKey}T12:00:00`)
+  if (Number.isNaN(d.getTime())) return 'Izabrani dan'
+  return d.toLocaleDateString('sr', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  })
 }
 
 const navItems = [
@@ -125,6 +151,8 @@ export default function Dashboard() {
   const [uslugaLoading, setUslugaLoading] = useState(false)
   const [lagerGreska, setLagerGreska] = useState('')
   const [terminiPotvrdaGreska, setTerminiPotvrdaGreska] = useState('')
+  const [terminFilter, setTerminFilter] = useState<TerminFilter>('danas')
+  const [izabraniDatum, setIzabraniDatum] = useState(() => getLocalDateKey(new Date()))
   const [sauvano, setSacuvano] = useState('')
   const [profil, setProfil] = useState<ProfilForm>({
     naziv: '', opis: '', telefon: '', adresa: '', grad: '',
@@ -136,6 +164,34 @@ export default function Dashboard() {
   const goldBorder = 'rgba(212,175,55,.25)'
   const muted = 'rgba(245,240,232,.45)'
   const text = '#f5f0e8'
+  const todayKey = getLocalDateKey(new Date())
+  const nowTime = Date.now()
+  const danasnjiTermini = termini.filter((t) => getLocalDateKey(t.datum_vrijeme) === todayKey)
+  const terminiZaIzabraniDatum = termini.filter((t) => getLocalDateKey(t.datum_vrijeme) === izabraniDatum)
+  const buduciTermini = termini.filter(
+    (t) => new Date(t.datum_vrijeme).getTime() >= nowTime && t.status !== 'otkazan' && t.status !== 'nije_dosao',
+  )
+  const prosliTermini = termini.filter((t) => new Date(t.datum_vrijeme).getTime() < nowTime)
+  const filtriraniTermini =
+    terminFilter === 'danas'
+      ? danasnjiTermini
+      : terminFilter === 'datum'
+      ? terminiZaIzabraniDatum
+      : terminFilter === 'buduci'
+        ? buduciTermini
+        : terminFilter === 'prosli'
+          ? prosliTermini
+          : termini
+  const terminFilterLabel =
+    terminFilter === 'danas'
+      ? `Danas - ${formatDateLabel(todayKey)}`
+      : terminFilter === 'datum'
+        ? formatDateLabel(izabraniDatum)
+        : terminFilter === 'buduci'
+          ? 'Budući termini'
+          : terminFilter === 'prosli'
+            ? 'Prošli termini'
+            : 'Svi termini'
   const neprocitaniTermini = termini.filter(t => t.status !== 'potvrđen' && t.status !== 'otkazan').length
 
   // getSession() pri prvom renderu često vrati null dok Supabase ne učita sesiju iz localStorage.
@@ -782,10 +838,10 @@ export default function Dashboard() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: '12px' }}>
         {[
-          { label: 'Termini danas', value: termini.filter(t => new Date(t.datum_vrijeme).toDateString() === new Date().toDateString()).length.toString(), icon: '📅' },
+          { label: 'Termini danas', value: danasnjiTermini.length.toString(), icon: '📅' },
+          { label: 'Budući termini', value: buduciTermini.length.toString(), icon: '⏭️' },
+          { label: 'Prošli termini', value: prosliTermini.length.toString(), icon: '↩️' },
           { label: 'Ukupno termina', value: termini.length.toString(), icon: '📋' },
-          { label: 'Usluge', value: usluge.length.toString(), icon: '💈' },
-          { label: 'Artikala u lageru', value: lager.length.toString(), icon: '📦' },
         ].map((s, i) => (
           <div key={i} style={{ ...cardStyle, textAlign: 'center' }}>
             <div style={{ fontSize: '24px', marginBottom: '8px' }}>{s.icon}</div>
@@ -796,10 +852,26 @@ export default function Dashboard() {
       </div>
 
       <div style={cardStyle}>
-        <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '16px' }}>Nadolazeći termini</h3>
-        {termini.length === 0
-          ? <p style={{ fontSize: '13px', color: muted }}>Nema zakazanih termina.</p>
-          : termini.slice(0, 5).map((t, i) => (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          <div>
+            <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '4px' }}>Današnji termini</h3>
+            <p style={{ fontSize: '12px', color: muted }}>{formatDateLabel(todayKey)}</p>
+          </div>
+          <button
+            type="button"
+            style={{ ...btnOutline, padding: '8px 12px', fontSize: '12px' }}
+            onClick={() => {
+              setAktivan('termini')
+              setTerminFilter('danas')
+              setIzabraniDatum(todayKey)
+            }}
+          >
+            Otvori kalendar →
+          </button>
+        </div>
+        {danasnjiTermini.length === 0
+          ? <p style={{ fontSize: '13px', color: muted }}>Za danas nema zakazanih termina.</p>
+          : danasnjiTermini.slice(0, 6).map((t, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: i < 4 ? `0.5px solid rgba(255,255,255,.06)` : 'none', gap: '12px', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{ width: '44px', height: '44px', background: goldFaint, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 600, color: gold, flexShrink: 0, textAlign: 'center' }}>
@@ -1118,66 +1190,148 @@ export default function Dashboard() {
     </div>
   )
 
-  const renderTermini = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      <div style={cardStyle}>
-        <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '16px' }}>Svi termini</h3>
-        {terminiPotvrdaGreska && (
-          <div style={{ background: 'rgba(220,50,50,.1)', border: '0.5px solid rgba(220,50,50,.3)', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px', fontSize: '12px', color: '#ff6b6b' }}>
-            ⚠️ {terminiPotvrdaGreska}
-          </div>
-        )}
-        {termini.length === 0
-          ? <p style={{ fontSize: '13px', color: muted }}>Nema zakazanih termina.</p>
-          : termini.map((t, i) => (
-            <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: i < termini.length - 1 ? `0.5px solid rgba(255,255,255,.06)` : 'none', gap: '12px', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '44px', height: '44px', background: goldFaint, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '11px', fontWeight: 600, color: gold, textAlign: 'center' }}>
-                  {new Date(t.datum_vrijeme).toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' })}
-                </div>
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: 500, color: text }}>{t.ime_klijenta}</div>
-                  <div style={{ fontSize: '12px', color: muted }}>{t.usluge?.naziv || 'Bez usluge'} · {new Date(t.datum_vrijeme).toLocaleDateString('sr')}</div>
-                  <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.3)' }}>{t.telefon_klijenta}</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <div
-                  style={{
-                    fontSize: '11px',
-                    padding: '4px 10px',
-                    borderRadius: '20px',
-                    background:
-                      t.status === 'potvrđen'
-                        ? 'rgba(50,200,100,.1)'
-                        : t.status === 'otkazan'
-                          ? 'rgba(200,80,80,.12)'
-                          : goldFaint,
-                    color: t.status === 'potvrđen' ? '#4caf81' : t.status === 'otkazan' ? '#e07a7a' : gold,
-                    border: `0.5px solid ${
-                      t.status === 'potvrđen'
-                        ? 'rgba(50,200,100,.2)'
-                        : t.status === 'otkazan'
-                          ? 'rgba(220,100,100,.3)'
-                          : goldBorder
-                    }`,
-                  }}
-                >
-                  {t.status}
-                </div>
-                {t.status !== 'potvrđen' && t.status !== 'otkazan' && (
-                  <button style={btnGold} onClick={() => potvrdiTermin(t.id)}>Potvrdi</button>
-                )}
-                {t.status !== 'otkazan' && (
-                  <button style={btnOutline} onClick={() => void oznaciDaNijeDosao(t.id)}>Nije došao</button>
-                )}
-              </div>
+  const renderTermini = () => {
+    const filterTabs: Array<{ id: TerminFilter; label: string; count: number }> = [
+      { id: 'danas', label: 'Danas', count: danasnjiTermini.length },
+      { id: 'buduci', label: 'Budući', count: buduciTermini.length },
+      { id: 'prosli', label: 'Prošli', count: prosliTermini.length },
+      { id: 'svi', label: 'Svi', count: termini.length },
+    ]
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '16px' }}>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: text, marginBottom: '6px' }}>
+                Termini po datumu
+              </h3>
+              <p style={{ fontSize: '12px', color: muted, lineHeight: 1.5 }}>
+                Primarno vidiš današnji raspored, a po potrebi možeš otvoriti prošle, buduće ili sve termine.
+              </p>
             </div>
-          ))
-        }
+            <div style={{ minWidth: 190 }}>
+              <label style={labelStyle}>IZABERI DATUM</label>
+              <input
+                style={inputStyle}
+                type="date"
+                value={izabraniDatum}
+                onChange={(e) => {
+                  setIzabraniDatum(e.target.value || todayKey)
+                  setTerminFilter('datum')
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+            {filterTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setTerminFilter(tab.id)}
+                style={{
+                  ...(terminFilter === tab.id ? btnGold : btnOutline),
+                  padding: '9px 13px',
+                  fontSize: '12px',
+                }}
+              >
+                {tab.label} ({tab.count})
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setTerminFilter('datum')}
+              style={{
+                ...(terminFilter === 'datum' ? btnGold : btnOutline),
+                padding: '9px 13px',
+                fontSize: '12px',
+              }}
+            >
+              Datum ({terminiZaIzabraniDatum.length})
+            </button>
+          </div>
+
+          {terminiPotvrdaGreska && (
+            <div style={{ background: 'rgba(220,50,50,.1)', border: '0.5px solid rgba(220,50,50,.3)', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px', fontSize: '12px', color: '#ff6b6b' }}>
+              ⚠️ {terminiPotvrdaGreska}
+            </div>
+          )}
+
+          <div style={{ marginBottom: '12px', fontSize: '12px', color: muted }}>
+            Prikaz: <span style={{ color: gold }}>{terminFilterLabel}</span>
+          </div>
+
+          {filtriraniTermini.length === 0 ? (
+            <p style={{ fontSize: '13px', color: muted }}>Nema termina za ovaj prikaz.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {filtriraniTermini.map((t) => {
+                const terminDate = new Date(t.datum_vrijeme)
+                const statusColor =
+                  t.status === 'potvrđen'
+                    ? '#4caf81'
+                    : t.status === 'otkazan'
+                      ? '#e07a7a'
+                      : t.status === 'nije_dosao'
+                        ? '#ff8a8a'
+                        : gold
+                return (
+                  <div
+                    key={t.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'stretch',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      flexWrap: 'wrap',
+                      padding: '14px',
+                      border: `0.5px solid ${goldBorder}`,
+                      borderRadius: '14px',
+                      background: 'rgba(255,255,255,.018)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 220, flex: '1 1 260px' }}>
+                      <div style={{ width: '52px', minHeight: '52px', background: goldFaint, borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: gold, textAlign: 'center' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700 }}>{terminDate.toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span style={{ fontSize: '9px', color: muted, marginTop: 2 }}>{terminDate.toLocaleDateString('sr')}</span>
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '14px', fontWeight: 600, color: text }}>{t.ime_klijenta}</div>
+                        <div style={{ fontSize: '12px', color: muted, marginTop: 3 }}>{t.usluge?.naziv || 'Bez usluge'}</div>
+                        <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.35)', marginTop: 3 }}>{t.telefon_klijenta}</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', flex: '1 1 220px' }}>
+                      <div
+                        style={{
+                          fontSize: '11px',
+                          padding: '5px 10px',
+                          borderRadius: '20px',
+                          background: 'rgba(255,255,255,.035)',
+                          color: statusColor,
+                          border: `0.5px solid ${goldBorder}`,
+                        }}
+                      >
+                        {t.status}
+                      </div>
+                      {t.status !== 'potvrđen' && t.status !== 'otkazan' && t.status !== 'nije_dosao' && (
+                        <button style={btnGold} onClick={() => potvrdiTermin(t.id)}>Potvrdi</button>
+                      )}
+                      {t.status !== 'otkazan' && t.status !== 'nije_dosao' && (
+                        <button style={btnOutline} onClick={() => void oznaciDaNijeDosao(t.id)}>Nije došao</button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   const renderStranica = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
