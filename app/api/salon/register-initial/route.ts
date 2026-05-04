@@ -2,23 +2,33 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
 import { buildSalonSlug, fallbackSalonSlug } from '@/lib/slug'
+import { rateLimitByIp } from '@/lib/rate-limit'
 
 /**
  * Kreiranje reda u `saloni` kada nakon signUp nema sesije (obavezna potvrda emaila).
  * Zahtijeva SUPABASE_SERVICE_ROLE_KEY na serveru.
+ * Zahtijeva da caller dokaže identitet: userId mora postojati u auth.users.
  */
 export async function POST(request: Request) {
+  const rl = rateLimitByIp(request, 'salon-register', { maxRequests: 5, windowMs: 60_000 })
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'Previše zahteva. Pokušajte ponovo za minut.' },
+      { status: 429 },
+    )
+  }
+
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
   if (!serviceKey) {
     return NextResponse.json(
-      { error: 'SUPABASE_SERVICE_ROLE_KEY nije postavljen na serveru.' },
+      { error: 'Server konfiguracija nepotpuna.' },
       { status: 503 },
     )
   }
 
   const { url, ok } = getPublicSupabaseEnv()
   if (!ok) {
-    return NextResponse.json({ error: 'Supabase env nedostaje.' }, { status: 500 })
+    return NextResponse.json({ error: 'Server konfiguracija nepotpuna.' }, { status: 500 })
   }
 
   const admin = createClient(url, serviceKey, {
@@ -39,21 +49,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Nedostaju obavezni podaci.' }, { status: 400 })
     }
 
-    // Nakon signUp korisnik ponekad nije odmah vidljiv u Admin API — nekoliko pokušaja.
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRe.test(uid)) {
+      return NextResponse.json({ error: 'Nevažeći format korisničkog ID-a.' }, { status: 400 })
+    }
+
+    let verifiedUser: { id: string; email?: string } | null = null
     let lastAuthErr: { message: string } | null = null
-    let found = false
     for (let attempt = 0; attempt < 6; attempt++) {
       const { data, error: authErr } = await admin.auth.admin.getUserById(uid)
       lastAuthErr = authErr
       if (!authErr && data?.user) {
-        found = true
+        verifiedUser = data.user
         break
       }
       await new Promise((r) => setTimeout(r, 180 * (attempt + 1)))
     }
-    if (!found && lastAuthErr) {
-      // I dalje nastavi s insertom — ako postoji FK ka auth.users, baza će vratiti jasnu grešku.
-      console.warn('[register-initial] getUserById nakon retry:', lastAuthErr.message)
+    if (!verifiedUser) {
+      console.warn('[register-initial] getUserById failed after retries:', lastAuthErr?.message)
+      return NextResponse.json({ error: 'Korisnički nalog nije pronađen.' }, { status: 403 })
+    }
+
+    if (verifiedUser.email && verifiedUser.email.toLowerCase() !== email.toLowerCase()) {
+      return NextResponse.json({ error: 'Email se ne poklapa sa registrovanim nalogom.' }, { status: 403 })
     }
 
     const baseSlug = fallbackSalonSlug(buildSalonSlug(naziv))
@@ -78,12 +96,13 @@ export async function POST(request: Request) {
     })
 
     if (insErr) {
-      return NextResponse.json({ error: insErr.message }, { status: 400 })
+      console.error('[register-initial] insert error:', insErr.message)
+      return NextResponse.json({ error: 'Kreiranje salona nije uspelo.' }, { status: 400 })
     }
 
     return NextResponse.json({ ok: true, slug })
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Greška na serveru.'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('[register-initial] unexpected error:', e instanceof Error ? e.message : e)
+    return NextResponse.json({ error: 'Greška na serveru.' }, { status: 500 })
   }
 }

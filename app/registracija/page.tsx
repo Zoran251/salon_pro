@@ -201,9 +201,9 @@ export default function Registracija() {
                 <h1 style={{ fontSize: '26px', fontWeight: 500, color: '#f5f0e8', marginBottom: '8px' }}>Koji tip salona vodiš?</h1>
                 <p style={{ fontSize: '14px', color: 'rgba(245,240,232,.4)', lineHeight: 1.6 }}>Odaberi kategoriju koja najbolje opisuje tvoj salon.</p>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '28px' }}>
+              <div role="radiogroup" aria-label="Tip salona" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '28px' }}>
                 {tipovi.map(t => (
-                  <div key={t} className={`tip-btn${forma.tip === t ? ' tip-active' : ''}`} onClick={() => setForma({ ...forma, tip: t })}>{t}</div>
+                  <button type="button" key={t} role="radio" aria-checked={forma.tip === t} className={`tip-btn${forma.tip === t ? ' tip-active' : ''}`} onClick={() => setForma({ ...forma, tip: t })}>{t}</button>
                 ))}
               </div>
               <button className="submit-btn" disabled={!forma.tip} onClick={() => setKorak(2)}>Nastavi →</button>
@@ -247,8 +247,8 @@ export default function Registracija() {
               </div>
 
               {greska && (
-                <div style={{ background: 'rgba(220,50,50,.1)', border: '0.5px solid rgba(220,50,50,.3)', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', color: '#ff6b6b' }}>
-                  ⚠️ {greska}
+                <div role="alert" style={{ background: 'rgba(220,50,50,.1)', border: '0.5px solid rgba(220,50,50,.3)', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', color: '#ff6b6b' }}>
+                  <span aria-hidden="true">⚠️ </span>{greska}
                 </div>
               )}
 
@@ -291,7 +291,7 @@ export default function Registracija() {
       </div>
 
       <footer style={{ textAlign: 'center', padding: '20px', borderTop: '0.5px solid rgba(212,175,55,.1)', color: 'rgba(245,240,232,.25)', fontSize: '12px' }}>
-        © 2025 SalonPro
+        © {new Date().getFullYear()} SalonPro
       </footer>
     </main>
   )

@@ -320,8 +320,8 @@ function getSupabaseInternal(): SupabaseClient<Database> {
 }
 
 if (process.env.NODE_ENV === 'development' && !getPublicSupabaseEnv().ok) {
-  throw new Error(
-    'Nedostaju Supabase env varijable: NEXT_PUBLIC_SUPABASE_URL i NEXT_PUBLIC_SUPABASE_ANON_KEY (ili SUPABASE_URL i SUPABASE_ANON_KEY u .env.local)',
+  console.warn(
+    '[SalonPro] Supabase env varijable nisu postavljene (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY). Funkcionalnosti koje zahtevaju bazu neće raditi.',
   )
 }
 
