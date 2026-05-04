@@ -217,6 +217,30 @@ export type Database = {
         Update: Partial<Database['public']['Tables']['kupac_nalozi']['Insert']>
         Relationships: []
       }
+      rashodi: {
+        Row: {
+          id: string
+          salon_id: string
+          naziv: string
+          iznos: number
+          kategorija: string
+          datum: string
+          napomena: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          salon_id: string
+          naziv: string
+          iznos: number
+          kategorija?: string
+          datum?: string
+          napomena?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['rashodi']['Insert']>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
