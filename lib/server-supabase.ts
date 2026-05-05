@@ -3,12 +3,13 @@ import { getPublicSupabaseEnv } from '@/lib/env-supabase'
 
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-/** Server-side client: requires service role key for elevated operations. */
+/** Server-side client: prefers service role za RLS; inače anon key. */
 export function getServerSupabaseClient(): SupabaseClient | null {
-  const { url: supabaseUrl, ok } = getPublicSupabaseEnv()
+  const { url: supabaseUrl, anonKey: supabaseAnonKey, ok } = getPublicSupabaseEnv()
   if (!ok) return null
-  if (!supabaseServiceRoleKey?.trim()) return null
-  return createClient(supabaseUrl, supabaseServiceRoleKey.trim(), {
+  const key = supabaseServiceRoleKey || supabaseAnonKey
+  if (!key) return null
+  return createClient(supabaseUrl, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 }
