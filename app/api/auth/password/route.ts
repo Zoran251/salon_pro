@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
 import { APP_ROLE_KEY } from '@/lib/user-role'
 import { rateLimitByIp } from '@/lib/rate-limit'
+import { setAuthCookies, clearAuthCookies } from '@/lib/auth-cookies'
 
 /**
  * Prijava / registracija preko servera → preglednik ne mora direktno zvati *.supabase.co
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
         }
       }
 
-      return NextResponse.json({
+      const signinResponse = NextResponse.json({
         session: data.session
           ? {
               access_token: data.session.access_token,
@@ -75,6 +76,10 @@ export async function POST(request: Request) {
           : null,
         user: data.user,
       })
+      if (data.session) {
+        setAuthCookies(signinResponse, data.session)
+      }
+      return signinResponse
     }
 
     if (action === 'signup') {
@@ -89,7 +94,7 @@ export async function POST(request: Request) {
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 400 })
       }
-      return NextResponse.json({
+      const signupResponse = NextResponse.json({
         session: data.session
           ? {
               access_token: data.session.access_token,
@@ -101,6 +106,10 @@ export async function POST(request: Request) {
           : null,
         user: data.user,
       })
+      if (data.session) {
+        setAuthCookies(signupResponse, data.session)
+      }
+      return signupResponse
     }
 
     return NextResponse.json({ error: 'Nepoznata akcija (očekuje se signin ili signup).' }, { status: 400 })
