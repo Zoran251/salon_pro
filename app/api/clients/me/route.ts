@@ -23,6 +23,16 @@ function getUserClient(authToken: string) {
   })
 }
 
+function getAuthToken(request: Request): string | null {
+  const authHeader = request.headers.get('authorization')
+  if (authHeader?.toLowerCase().startsWith('bearer ')) {
+    const token = authHeader.slice(7).trim()
+    if (token) return token
+  }
+  const { searchParams } = new URL(request.url)
+  return searchParams.get('auth_token')
+}
+
 /**
  * Profil kupca + obaveštenja — JWT + RLS.
  */
@@ -39,7 +49,7 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const authToken = searchParams.get('auth_token')
+    const authToken = getAuthToken(request)
     const salonId = searchParams.get('salon_id')
     if (!authToken || !salonId) {
       return NextResponse.json({ error: 'Nedostaju auth token ili salon_id.' }, { status: 400 })
@@ -137,8 +147,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: SUPABASE_PUBLIC_ENV_MISSING }, { status: 500 })
     }
 
+    const authToken = getAuthToken(request)
     const url = new URL(request.url)
-    const authToken = url.searchParams.get('auth_token')
     const salonId = url.searchParams.get('salon_id')
     if (!authToken || !salonId) {
       return NextResponse.json({ error: 'Nedostaju auth token ili salon_id.' }, { status: 400 })

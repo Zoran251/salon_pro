@@ -2,6 +2,8 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
 import { APP_ROLE_KEY } from '@/lib/user-role'
+import { rateLimitByIp } from '@/lib/rate-limit'
+import { setAuthCookies, clearAuthCookies } from '@/lib/auth-cookies'
 
 /**
  * Prijava / registracija preko servera → preglednik ne mora direktno zvati *.supabase.co
@@ -9,6 +11,13 @@ import { APP_ROLE_KEY } from '@/lib/user-role'
  */
 export async function POST(request: Request) {
   try {
+    const rl = rateLimitByIp(request, 'auth-password', { maxRequests: 10, windowMs: 60_000 })
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: 'Previše zahteva. Pokušajte ponovo za minut.' },
+        { status: 429 },
+      )
+    }
     const body = await request.json()
     const action = body.action as string
     const email = typeof body.email === 'string' ? body.email.trim() : ''
@@ -55,7 +64,7 @@ export async function POST(request: Request) {
         }
       }
 
-      return NextResponse.json({
+      const signinResponse = NextResponse.json({
         session: data.session
           ? {
               access_token: data.session.access_token,
@@ -67,11 +76,15 @@ export async function POST(request: Request) {
           : null,
         user: data.user,
       })
+      if (data.session) {
+        setAuthCookies(signinResponse, data.session)
+      }
+      return signinResponse
     }
 
     if (action === 'signup') {
       const appRole = body.app_role as string | undefined
-      const roleOk = appRole === 'salon_owner' || appRole === 'customer'
+      const roleOk = appRole === 'customer'
 
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -81,7 +94,7 @@ export async function POST(request: Request) {
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 400 })
       }
-      return NextResponse.json({
+      const signupResponse = NextResponse.json({
         session: data.session
           ? {
               access_token: data.session.access_token,
@@ -93,11 +106,15 @@ export async function POST(request: Request) {
           : null,
         user: data.user,
       })
+      if (data.session) {
+        setAuthCookies(signupResponse, data.session)
+      }
+      return signupResponse
     }
 
     return NextResponse.json({ error: 'Nepoznata akcija (očekuje se signin ili signup).' }, { status: 400 })
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Greška na serveru.'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('[auth/password] unexpected error:', e instanceof Error ? e.message : e)
+    return NextResponse.json({ error: 'Greška na serveru.' }, { status: 500 })
   }
 }

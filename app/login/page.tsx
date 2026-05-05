@@ -65,21 +65,21 @@ export default function Login() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
             <div>
               <label style={{ fontSize: '12px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '6px', letterSpacing: '.3px' }}>EMAIL ADRESA</label>
-              <input name="email" type="email" placeholder="salon@email.com" value={forma.email} onChange={handleChange} />
+              <input name="email" type="email" autoComplete="email" placeholder="salon@email.com" value={forma.email} onChange={handleChange} />
             </div>
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <label style={{ fontSize: '12px', color: 'rgba(245,240,232,.4)', letterSpacing: '.3px' }}>LOZINKA</label>
                 <Link href="/zaboravljena-lozinka" style={{ fontSize: '12px', color: 'rgba(212,175,55,.6)', textDecoration: 'none' }}>Zaboravili ste?</Link>
               </div>
-              <input name="lozinka" type="password" placeholder="Vaša lozinka" value={forma.lozinka} onChange={handleChange}
+              <input name="lozinka" type="password" autoComplete="current-password" placeholder="Vaša lozinka" value={forma.lozinka} onChange={handleChange}
                 onKeyDown={e => e.key === 'Enter' && handleLogin()} />
             </div>
           </div>
 
           {greska && (
-            <div style={{ background: 'rgba(220,50,50,.1)', border: '0.5px solid rgba(220,50,50,.3)', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', color: '#ff6b6b' }}>
-              ⚠️ {greska}
+            <div role="alert" style={{ background: 'rgba(220,50,50,.1)', border: '0.5px solid rgba(220,50,50,.3)', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', color: '#ff6b6b' }}>
+              <span aria-hidden="true">⚠️ </span>{greska}
             </div>
           )}
 
@@ -105,7 +105,7 @@ export default function Login() {
       </div>
 
       <footer style={{ textAlign: 'center', padding: '20px', borderTop: '0.5px solid rgba(212,175,55,.1)', color: 'rgba(245,240,232,.25)', fontSize: '12px' }}>
-        © 2025 SalonPro
+        © {new Date().getFullYear()} SalonPro
       </footer>
     </main>
   )

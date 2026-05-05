@@ -129,11 +129,12 @@ export async function POST(request: Request) {
 
     if (clientRpcError) {
       const missingFn = /function .* does not exist|Could not find the function/i.test(clientRpcError.message)
+      console.error('[termini] link_salon_client RPC error:', clientRpcError.message)
       return NextResponse.json(
         {
           error: missingFn
-            ? 'Baza nije ažurirana: pokreni migraciju 2026-04-20_link_salon_client_rpc.sql u Supabase SQL Editor-u.'
-            : clientRpcError.message,
+            ? 'Baza nije ažurirana. Kontaktirajte administratora.'
+            : 'Povezivanje kupca sa salonom nije uspelo.',
         },
         { status: 500 }
       )
@@ -159,17 +160,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, termin_id: terminIdOut })
     }
 
+    console.error('[termini] booking RPC error:', bookingRpcError.message)
     return NextResponse.json(
       {
         error: isMissingRpcFunction(bookingRpcError.message)
-          ? 'Baza nije ažurirana: pokreni migraciju db/migrations/2026-05-05_authenticated_customer_booking.sql u Supabase SQL Editor-u.'
-          : bookingRpcError.message,
+          ? 'Baza nije ažurirana. Kontaktirajte administratora.'
+          : 'Zakazivanje termina nije uspelo.',
       },
       { status: isMissingRpcFunction(bookingRpcError.message) ? 503 : 500 }
     )
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Greška servera'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('[termini] unexpected error:', error instanceof Error ? error.message : error)
+    return NextResponse.json({ error: 'Greška servera.' }, { status: 500 })
   }
 }
 
@@ -213,11 +215,12 @@ export async function GET(request: Request) {
       const missingFn =
         /get_public_termin_status|does not exist/i.test(rpcErr.message) &&
         /function|Could not find/i.test(rpcErr.message)
+      console.error('[termini] get_public_termin_status RPC error:', rpcErr.message)
       return NextResponse.json(
         {
           error: missingFn
-            ? 'Baza: pokreni migraciju db/migrations/2026-04-30_get_public_termin_status_rpc.sql (funkcija get_public_termin_status).'
-            : rpcErr.message,
+            ? 'Baza nije ažurirana. Kontaktirajte administratora.'
+            : 'Provera statusa termina nije uspela.',
         },
         { status: missingFn ? 503 : 500 }
       )
@@ -242,6 +245,9 @@ export async function GET(request: Request) {
     .eq('salon_id', salon_id)
     .order('datum_vrijeme', { ascending: true })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    console.error('[termini] GET query error:', error.message)
+    return NextResponse.json({ error: 'Učitavanje termina nije uspelo.' }, { status: 500 })
+  }
   return NextResponse.json({ termini: data })
 }

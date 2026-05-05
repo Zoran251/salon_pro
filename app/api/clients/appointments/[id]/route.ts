@@ -22,6 +22,16 @@ function getUserClient(authToken: string) {
   })
 }
 
+function getAuthToken(request: Request): string | null {
+  const authHeader = request.headers.get('authorization')
+  if (authHeader?.toLowerCase().startsWith('bearer ')) {
+    const token = authHeader.slice(7).trim()
+    if (token) return token
+  }
+  const { searchParams } = new URL(request.url)
+  return searchParams.get('auth_token')
+}
+
 const MINUTES_WARN = 180
 const MINUTES_BLACKLIST = 30
 
@@ -49,11 +59,11 @@ export async function DELETE(request: Request, context: RouteCtx) {
       return NextResponse.json({ error: 'Nedostaje id termina.' }, { status: 400 })
     }
 
+    const authToken = getAuthToken(request)
     const url = new URL(request.url)
-    const authToken = url.searchParams.get('auth_token')
     const salonId = url.searchParams.get('salon_id')
     if (!authToken || !salonId) {
-      return NextResponse.json({ error: 'Nedostaju auth_token ili salon_id.' }, { status: 400 })
+      return NextResponse.json({ error: 'Nedostaju auth token ili salon_id.' }, { status: 400 })
     }
 
     const anonClient = getAnonClient()
@@ -192,11 +202,11 @@ export async function PATCH(request: Request, context: RouteCtx) {
       return NextResponse.json({ error: 'Nedostaje id termina.' }, { status: 400 })
     }
 
+    const authToken = getAuthToken(request)
     const url = new URL(request.url)
-    const authToken = url.searchParams.get('auth_token')
     const salonId = url.searchParams.get('salon_id')
     if (!authToken || !salonId) {
-      return NextResponse.json({ error: 'Nedostaju auth_token ili salon_id.' }, { status: 400 })
+      return NextResponse.json({ error: 'Nedostaju auth token ili salon_id.' }, { status: 400 })
     }
 
     const anonClient = getAnonClient()

@@ -40,6 +40,8 @@ type SalonNotification = {
   created_at: string
   appointment_id: string | null
 }
+type RashodRow = Database['public']['Tables']['rashodi']['Row']
+type AnalitikaPeriod = 'danas' | 'sedmica' | 'mesec' | 'godina' | 'svi'
 type TerminFilter = 'danas' | 'datum' | 'buduci' | 'prosli' | 'svi'
 type ProfilForm = {
   naziv: string
@@ -111,6 +113,7 @@ function formatDateLabel(dateKey: string): string {
 
 const navItems = [
   { id: 'pregled', icon: '🏠', label: 'Pregled' },
+  { id: 'analitika', icon: '📊', label: 'Analitika' },
   { id: 'profil', icon: '👤', label: 'Profil' },
   { id: 'usluge', icon: '💈', label: 'Usluge' },
   { id: 'lager', icon: '📦', label: 'Lager' },
@@ -153,6 +156,11 @@ export default function Dashboard() {
   const [terminiPotvrdaGreska, setTerminiPotvrdaGreska] = useState('')
   const [terminFilter, setTerminFilter] = useState<TerminFilter>('danas')
   const [izabraniDatum, setIzabraniDatum] = useState(() => getLocalDateKey(new Date()))
+  const [rashodi, setRashodi] = useState<RashodRow[]>([])
+  const [analitikaPeriod, setAnalitikaPeriod] = useState<AnalitikaPeriod>('mesec')
+  const [showNoviRashod, setShowNoviRashod] = useState(false)
+  const [noviRashod, setNoviRashod] = useState({ naziv: '', iznos: '', kategorija: 'Ostalo', datum: getLocalDateKey(new Date()), napomena: '' })
+  const [rashodGreska, setRashodGreska] = useState('')
   const [sauvano, setSacuvano] = useState('')
   const [profil, setProfil] = useState<ProfilForm>({
     naziv: '', opis: '', telefon: '', adresa: '', grad: '',
@@ -388,7 +396,17 @@ export default function Dashboard() {
         setSalonNotifications((salonNotifData || []) as SalonNotification[])
       }
 
-      // Učitaj lojalnost
+      const { data: rashodiData, error: rashodiErr } = await supabase
+        .from('rashodi')
+        .select('*')
+        .eq('salon_id', userId)
+        .order('datum', { ascending: false })
+      if (rashodiErr) {
+        const missingTable = /relation .*rashodi.* does not exist/i.test(rashodiErr.message)
+        if (!missingTable) console.error('[dashboard] Rashodi:', rashodiErr.message)
+      }
+      setRashodi(rashodiData || [])
+
       const { data: lojalnostData } = await supabase
         .from('lojalnost')
         .select('*')
@@ -1408,6 +1426,228 @@ export default function Dashboard() {
     </div>
   )
 
+  const dodajRashod = async () => {
+    const naziv = noviRashod.naziv.trim()
+    const iznos = parseFloat(noviRashod.iznos.replace(',', '.'))
+    if (!naziv || Number.isNaN(iznos) || iznos <= 0) {
+      setRashodGreska('Unesite naziv i ispravan iznos.')
+      return
+    }
+    setRashodGreska('')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user || !salon?.id) return
+    const { data, error } = await supabase.from('rashodi').insert({
+      salon_id: salon.id,
+      naziv,
+      iznos,
+      kategorija: noviRashod.kategorija || 'Ostalo',
+      datum: noviRashod.datum || getLocalDateKey(new Date()),
+      napomena: noviRashod.napomena.trim() || null,
+    }).select().single()
+    if (error) {
+      setRashodGreska(formatSalonFkErrorMessage(error.message))
+      return
+    }
+    if (data) {
+      setRashodi(prev => [data, ...prev])
+      setNoviRashod({ naziv: '', iznos: '', kategorija: 'Ostalo', datum: getLocalDateKey(new Date()), napomena: '' })
+      setShowNoviRashod(false)
+    }
+  }
+
+  const obrisiRashod = async (id: string) => {
+    await supabase.from('rashodi').delete().eq('id', id)
+    setRashodi(prev => prev.filter(r => r.id !== id))
+  }
+
+  const renderAnalitika = () => {
+    const now = new Date()
+    const periodStart = (() => {
+      switch (analitikaPeriod) {
+        case 'danas': { const d = new Date(now); d.setHours(0,0,0,0); return d }
+        case 'sedmica': { const d = new Date(now); d.setDate(d.getDate() - 7); return d }
+        case 'mesec': { const d = new Date(now); d.setMonth(d.getMonth() - 1); return d }
+        case 'godina': { const d = new Date(now); d.setFullYear(d.getFullYear() - 1); return d }
+        default: return new Date(0)
+      }
+    })()
+
+    const uslugeMap = new Map(usluge.map(u => [u.id, u]))
+    const relevantTermini = termini.filter(t => {
+      const d = new Date(t.datum_vrijeme)
+      return d >= periodStart && (t.status === 'potvrđen' || t.status === 'završen')
+    })
+    const prihod = relevantTermini.reduce((sum, t) => {
+      const u = t.usluga_id ? uslugeMap.get(t.usluga_id) : null
+      return sum + (u ? Number(u.cijena) : 0)
+    }, 0)
+
+    const relevantRashodi = rashodi.filter(r => {
+      const d = new Date(r.datum + 'T12:00:00')
+      return d >= periodStart
+    })
+    const ukupanRashod = relevantRashodi.reduce((sum, r) => sum + Number(r.iznos), 0)
+    const profit = prihod - ukupanRashod
+
+    const prihodPoUsluzi = new Map<string, { naziv: string; prihod: number; count: number }>()
+    for (const t of relevantTermini) {
+      const u = t.usluga_id ? uslugeMap.get(t.usluga_id) : null
+      if (u) {
+        const existing = prihodPoUsluzi.get(u.id)
+        if (existing) {
+          existing.prihod += Number(u.cijena)
+          existing.count += 1
+        } else {
+          prihodPoUsluzi.set(u.id, { naziv: u.naziv, prihod: Number(u.cijena), count: 1 })
+        }
+      }
+    }
+    const topUsluge = Array.from(prihodPoUsluzi.values()).sort((a, b) => b.prihod - a.prihod)
+    const maxPrihod = topUsluge.length > 0 ? topUsluge[0].prihod : 1
+
+    const rashodPoKategoriji = new Map<string, number>()
+    for (const r of relevantRashodi) {
+      rashodPoKategoriji.set(r.kategorija, (rashodPoKategoriji.get(r.kategorija) || 0) + Number(r.iznos))
+    }
+    const topKategorije = Array.from(rashodPoKategoriji.entries()).sort((a, b) => b[1] - a[1])
+    const maxRashod = topKategorije.length > 0 ? topKategorije[0][1] : 1
+
+    const periodLabels: Record<AnalitikaPeriod, string> = {
+      danas: 'Danas', sedmica: 'Ova sedmica', mesec: 'Ovaj mesec', godina: 'Ova godina', svi: 'Svi podaci',
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {(Object.keys(periodLabels) as AnalitikaPeriod[]).map(p => (
+            <button key={p} type="button" onClick={() => setAnalitikaPeriod(p)}
+              style={{ ...(analitikaPeriod === p ? btnGold : btnOutline), padding: '9px 14px', fontSize: '12px' }}>
+              {periodLabels[p]}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '12px' }}>
+          <div style={{ ...cardStyle, textAlign: 'center' }}>
+            <div style={{ fontSize: '11px', color: muted, marginBottom: '6px' }}>PRIHOD</div>
+            <div style={{ fontSize: '24px', fontWeight: 600, color: '#4caf81' }}>{prihod.toLocaleString()} <span style={{ fontSize: '14px' }}>RSD</span></div>
+            <div style={{ fontSize: '11px', color: muted, marginTop: '4px' }}>{relevantTermini.length} potvrđenih termina</div>
+          </div>
+          <div style={{ ...cardStyle, textAlign: 'center' }}>
+            <div style={{ fontSize: '11px', color: muted, marginBottom: '6px' }}>RASHOD</div>
+            <div style={{ fontSize: '24px', fontWeight: 600, color: '#e07a7a' }}>{ukupanRashod.toLocaleString()} <span style={{ fontSize: '14px' }}>RSD</span></div>
+            <div style={{ fontSize: '11px', color: muted, marginTop: '4px' }}>{relevantRashodi.length} stavki</div>
+          </div>
+          <div style={{ ...cardStyle, textAlign: 'center' }}>
+            <div style={{ fontSize: '11px', color: muted, marginBottom: '6px' }}>PROFIT</div>
+            <div style={{ fontSize: '24px', fontWeight: 600, color: profit >= 0 ? gold : '#e07a7a' }}>{profit.toLocaleString()} <span style={{ fontSize: '14px' }}>RSD</span></div>
+            <div style={{ fontSize: '11px', color: muted, marginTop: '4px' }}>prihod − rashod</div>
+          </div>
+        </div>
+
+        <div style={cardStyle}>
+          <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '16px' }}>Prihod po usluzi</h3>
+          {topUsluge.length === 0 ? (
+            <p style={{ fontSize: '13px', color: muted }}>Nema potvrđenih termina sa uslugom u ovom periodu.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {topUsluge.map((u, i) => (
+                <div key={i}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '13px', color: text }}>{u.naziv} <span style={{ color: muted, fontSize: '11px' }}>({u.count}x)</span></span>
+                    <span style={{ fontSize: '13px', color: gold, fontWeight: 500 }}>{u.prihod.toLocaleString()} RSD</span>
+                  </div>
+                  <div style={{ height: '6px', background: 'rgba(255,255,255,.06)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${(u.prihod / maxPrihod) * 100}%`, background: `linear-gradient(90deg,${gold},#b8960c)`, borderRadius: '3px', transition: 'width .3s' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: 500, color: text }}>Rashodi</h3>
+            <button type="button" style={{ ...btnGold, padding: '8px 14px', fontSize: '12px' }}
+              onClick={() => { setShowNoviRashod(true); setRashodGreska('') }}>
+              + Dodaj rashod
+            </button>
+          </div>
+
+          {showNoviRashod && (
+            <div style={{ background: 'rgba(255,255,255,.03)', border: `0.5px solid ${goldBorder}`, borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 500, color: text, marginBottom: '12px' }}>Novi rashod</h4>
+              {rashodGreska && (
+                <div role="alert" style={{ background: 'rgba(220,50,50,.1)', border: '0.5px solid rgba(220,50,50,.3)', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px', fontSize: '12px', color: '#ff6b6b' }}>
+                  {rashodGreska}
+                </div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: '12px', marginBottom: '14px' }}>
+                <div><label style={labelStyle}>NAZIV</label><input style={inputStyle} placeholder="Zakup prostora" value={noviRashod.naziv} onChange={e => setNoviRashod({ ...noviRashod, naziv: e.target.value })} /></div>
+                <div><label style={labelStyle}>IZNOS (RSD)</label><input style={inputStyle} placeholder="25000" value={noviRashod.iznos} onChange={e => setNoviRashod({ ...noviRashod, iznos: e.target.value })} /></div>
+                <div>
+                  <label style={labelStyle}>KATEGORIJA</label>
+                  <select style={inputStyle} value={noviRashod.kategorija} onChange={e => setNoviRashod({ ...noviRashod, kategorija: e.target.value })}>
+                    {['Zakup', 'Plate', 'Materijal', 'Komunalije', 'Marketing', 'Oprema', 'Ostalo'].map(k => <option key={k} value={k}>{k}</option>)}
+                  </select>
+                </div>
+                <div><label style={labelStyle}>DATUM</label><input style={inputStyle} type="date" value={noviRashod.datum} onChange={e => setNoviRashod({ ...noviRashod, datum: e.target.value })} /></div>
+                <div style={{ gridColumn: '1/-1' }}><label style={labelStyle}>NAPOMENA (opciono)</label><input style={inputStyle} placeholder="Npr. rata za maj" value={noviRashod.napomena} onChange={e => setNoviRashod({ ...noviRashod, napomena: e.target.value })} /></div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button type="button" style={btnGold} onClick={() => void dodajRashod()}>Dodaj</button>
+                <button type="button" style={btnOutline} onClick={() => { setShowNoviRashod(false); setRashodGreska('') }}>Odustani</button>
+              </div>
+            </div>
+          )}
+
+          {topKategorije.length > 0 && (
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '12px', color: muted, marginBottom: '10px' }}>Rashodi po kategoriji</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {topKategorije.map(([kat, izn]) => (
+                  <div key={kat}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '13px', color: text }}>{kat}</span>
+                      <span style={{ fontSize: '13px', color: '#e07a7a', fontWeight: 500 }}>{izn.toLocaleString()} RSD</span>
+                    </div>
+                    <div style={{ height: '6px', background: 'rgba(255,255,255,.06)', borderRadius: '3px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${(izn / maxRashod) * 100}%`, background: 'linear-gradient(90deg,#e07a7a,#c04040)', borderRadius: '3px', transition: 'width .3s' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {relevantRashodi.length === 0 ? (
+            <p style={{ fontSize: '13px', color: muted }}>Nema rashoda za ovaj period. Dodajte prvi rashod iznad.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {relevantRashodi.slice(0, 20).map(r => (
+                <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px', border: `0.5px solid ${goldBorder}`, borderRadius: '12px', background: 'rgba(255,255,255,.018)', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: '1 1 200px' }}>
+                    <div style={{ width: '40px', height: '40px', background: 'rgba(220,80,80,.08)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>💸</div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 500, color: text }}>{r.naziv}</div>
+                      <div style={{ fontSize: '11px', color: muted }}>{r.kategorija} · {new Date(r.datum + 'T12:00:00').toLocaleDateString('sr-Latn-RS')}</div>
+                      {r.napomena && <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.3)', marginTop: '2px' }}>{r.napomena}</div>}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '15px', fontWeight: 600, color: '#e07a7a' }}>{Number(r.iznos).toLocaleString()} RSD</span>
+                    <button type="button" style={btnOutline} onClick={() => void obrisiRashod(r.id)}>Obriši</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   const renderLojalnost = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {sauvano === 'lojalnost' && (
@@ -1538,7 +1778,7 @@ export default function Dashboard() {
   )
 
   const sections: Record<string, () => React.ReactElement> = {
-    pregled: renderPregled, profil: renderProfil, usluge: renderUsluge,
+    pregled: renderPregled, analitika: renderAnalitika, profil: renderProfil, usluge: renderUsluge,
     lager: renderLager, termini: renderTermini, stranica: renderStranica, lojalnost: renderLojalnost
   }
 

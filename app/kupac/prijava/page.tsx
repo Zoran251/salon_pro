@@ -125,6 +125,7 @@ function KupacPrijavaForm() {
 
       {greska && (
         <div
+          role="alert"
           style={{
             background: 'rgba(220,50,50,.1)',
             border: '0.5px solid rgba(220,50,50,.3)',
@@ -135,7 +136,7 @@ function KupacPrijavaForm() {
             color: '#ff6b6b',
           }}
         >
-          ⚠️ {greska}
+          <span aria-hidden="true">⚠️ </span>{greska}
         </div>
       )}
 
@@ -187,6 +188,9 @@ export default function KupacPrijavaPage() {
         @media(max-width:768px){.kupac-auth-card{padding:28px 20px!important}}
       `}</style>
 
+      <style>{`
+        @keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
+      `}</style>
       <nav
         style={{
           display: 'flex',
@@ -195,9 +199,12 @@ export default function KupacPrijavaPage() {
           padding: '18px 48px',
           borderBottom: '0.5px solid rgba(212,175,55,.2)',
           background: 'rgba(10,10,10,.97)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
         }}
       >
-        <Link href="/" style={{ fontSize: 20, fontWeight: 600, color: '#d4af37', textDecoration: 'none' }}>
+        <Link href="/" style={{ fontSize: 22, fontWeight: 500, background: 'linear-gradient(90deg,#d4af37,#f5e17a,#d4af37)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'shimmer 3s linear infinite', textDecoration: 'none' }}>
           SalonPro
         </Link>
         <span style={{ fontSize: 12, color: 'rgba(245,240,232,.35)' }}>Kupac</span>

@@ -39,11 +39,11 @@ export default function Home() {
         <div className="dn" style={{gap:'12px',alignItems:'center'}}>
           <Link href="/registracija" style={{fontSize:'14px',background:'linear-gradient(135deg,#d4af37,#b8960c)',color:'#0a0a0a',padding:'10px 22px',borderRadius:'24px',fontWeight:600,textDecoration:'none',animation:'pulse 2.5s ease infinite'}}>Počni besplatno</Link>
         </div>
-        <div className="mh" style={{flexDirection:'column',gap:'5px',cursor:'pointer',padding:'8px'}} onClick={()=>setMenuOpen(!menuOpen)}>
-          <div style={{width:'22px',height:'1.5px',background:'#d4af37',transition:'transform .3s',transform:menuOpen?'rotate(45deg) translate(4px,4px)':'none'}}/>
-          <div style={{width:'22px',height:'1.5px',background:'#d4af37',transition:'opacity .3s',opacity:menuOpen?0:1}}/>
-          <div style={{width:'22px',height:'1.5px',background:'#d4af37',transition:'transform .3s',transform:menuOpen?'rotate(-45deg) translate(4px,-4px)':'none'}}/>
-        </div>
+        <button type="button" className="mh" aria-label={menuOpen?'Zatvori meni':'Otvori meni'} aria-expanded={menuOpen} style={{flexDirection:'column',gap:'5px',cursor:'pointer',padding:'8px',background:'none',border:'none'}} onClick={()=>setMenuOpen(!menuOpen)}>
+          <span style={{width:'22px',height:'1.5px',background:'#d4af37',transition:'transform .3s',transform:menuOpen?'rotate(45deg) translate(4px,4px)':'none',display:'block'}}/>
+          <span style={{width:'22px',height:'1.5px',background:'#d4af37',transition:'opacity .3s',opacity:menuOpen?0:1,display:'block'}}/>
+          <span style={{width:'22px',height:'1.5px',background:'#d4af37',transition:'transform .3s',transform:menuOpen?'rotate(-45deg) translate(4px,-4px)':'none',display:'block'}}/>
+        </button>
       </nav>
 
       {menuOpen&&<div style={{background:'#111',borderBottom:'0.5px solid rgba(212,175,55,.2)',padding:'20px 24px',display:'flex',flexDirection:'column',gap:'12px',zIndex:99}}>
@@ -53,7 +53,7 @@ export default function Home() {
       {/* HERO */}
       <section className="sp hg" style={{padding:'80px 48px 48px',maxWidth:'1200px',margin:'0 auto'}}>
         <div style={{opacity:visible?1:0,transform:visible?'translateY(0)':'translateY(24px)',transition:'all .7s ease'}}>
-          <div style={{display:'inline-block',fontSize:'12px',color:'#d4af37',border:'0.5px solid rgba(212,175,55,.4)',padding:'5px 14px',borderRadius:'20px',marginBottom:'20px',letterSpacing:'.5px'}}>✦ Premium salon platforma</div>
+          <div style={{display:'inline-block',fontSize:'12px',color:'#d4af37',border:'0.5px solid rgba(212,175,55,.4)',padding:'5px 14px',borderRadius:'20px',marginBottom:'20px',letterSpacing:'.5px'}}><span aria-hidden="true">✦ </span>Premium salon platforma</div>
           <h1 className="ht" style={{fontSize:'52px',fontWeight:500,lineHeight:1.15,marginBottom:'20px',color:'#f5f0e8'}}>Tvoj salon,<br/><span style={{color:'#d4af37'}}>digitalno savršen</span></h1>
           <p style={{fontSize:'16px',color:'rgba(245,240,232,.55)',lineHeight:1.8,marginBottom:'32px',maxWidth:'440px'}}>QR kod, online zakazivanje, lager i usluge — sve na jednom mjestu. Profesionalno, elegantno, tvoje.</p>
           <div className="hb" style={{display:'flex',gap:'12px'}}>
@@ -120,7 +120,7 @@ export default function Home() {
       </section>
 
       <footer style={{textAlign:'center',padding:'24px',borderTop:'0.5px solid rgba(212,175,55,.1)',color:'rgba(245,240,232,.3)',fontSize:'13px'}}>
-        © 2025 SalonPro. Sva prava zadržana.
+        © {new Date().getFullYear()} SalonPro. Sva prava zadržana.
       </footer>
     </main>
   )
