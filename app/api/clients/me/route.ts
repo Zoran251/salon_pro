@@ -71,12 +71,23 @@ export async function GET(request: Request) {
     }
     const clientData = ensured.client
 
-    const { data: appointments, error: appointmentsError } = await userClient
+    let { data: appointments, error: appointmentsError } = await userClient
       .from('termini')
-      .select('id, datum_vrijeme, status, ime_klijenta, telefon_klijenta, usluga_id, napomena, usluge(naziv)')
+      .select('id, datum_vrijeme, status, ime_klijenta, telefon_klijenta, usluga_id, zaposleni_id, napomena, usluge(naziv), zaposleni(ime)')
       .eq('salon_id', salonId)
       .eq('client_id', clientData.id)
       .order('datum_vrijeme', { ascending: false })
+
+    if (appointmentsError && /zaposleni_id|zaposleni|schema cache/i.test(appointmentsError.message)) {
+      const retry = await userClient
+        .from('termini')
+        .select('id, datum_vrijeme, status, ime_klijenta, telefon_klijenta, usluga_id, napomena, usluge(naziv)')
+        .eq('salon_id', salonId)
+        .eq('client_id', clientData.id)
+        .order('datum_vrijeme', { ascending: false })
+      appointments = retry.data
+      appointmentsError = retry.error
+    }
 
     if (appointmentsError) return NextResponse.json({ error: appointmentsError.message }, { status: 500 })
 
@@ -94,12 +105,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: loyaltyError.message }, { status: 500 })
     }
 
-    const { data: notifRows, error: notifErr } = await userClient
+    const includeAllNotifications = searchParams.get('notifications') === 'all'
+    let notifQuery = userClient
       .from('notifications')
       .select('id, title, body, tip, created_at, read_at, appointment_id')
       .eq('client_id', clientData.id)
       .order('created_at', { ascending: false })
-      .limit(30)
+    if (!includeAllNotifications) {
+      notifQuery = notifQuery.limit(30)
+    }
+    const { data: notifRows, error: notifErr } = await notifQuery
 
     if (notifErr) return NextResponse.json({ error: notifErr.message }, { status: 500 })
 

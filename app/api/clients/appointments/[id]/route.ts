@@ -233,6 +233,7 @@ export async function PATCH(request: Request, context: RouteCtx) {
     const body = (await request.json()) as {
       datum_vrijeme?: string
       usluga_id?: string | null
+      zaposleni_id?: string | null
       napomena?: string | null
     }
 
@@ -266,6 +267,21 @@ export async function PATCH(request: Request, context: RouteCtx) {
     }
     if (body.usluga_id !== undefined) {
       patch.usluga_id = body.usluga_id === null || body.usluga_id === '' ? null : String(body.usluga_id)
+    }
+    if (body.zaposleni_id !== undefined) {
+      const zaposleniId = body.zaposleni_id === null || body.zaposleni_id === '' ? null : String(body.zaposleni_id)
+      if (zaposleniId) {
+        const { data: zaposleni, error: zaposleniError } = await userClient
+          .from('zaposleni')
+          .select('id')
+          .eq('id', zaposleniId)
+          .eq('salon_id', salonId)
+          .eq('aktivan', true)
+          .maybeSingle()
+        if (zaposleniError) return NextResponse.json({ error: zaposleniError.message }, { status: 500 })
+        if (!zaposleni) return NextResponse.json({ error: 'Zaposleni nije pronađen za ovaj salon.' }, { status: 400 })
+      }
+      patch.zaposleni_id = zaposleniId
     }
     if (body.napomena !== undefined) {
       patch.napomena = body.napomena === null ? null : String(body.napomena).trim() || null

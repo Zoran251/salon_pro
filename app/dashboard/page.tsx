@@ -17,6 +17,7 @@ type TerminRow = Database['public']['Tables']['termini']['Row'] & {
 }
 type CrnaListaRow = Database['public']['Tables']['kupci_crna_lista']['Row']
 type LojalnostRow = Database['public']['Tables']['lojalnost']['Row']
+type ZaposleniRow = Database['public']['Tables']['zaposleni']['Row']
 type LojalnostForm = Pick<LojalnostRow, 'aktivan' | 'tip' | 'svaki_koji' | 'vrijednost'> &
   Partial<Pick<LojalnostRow, 'id' | 'salon_id' | 'created_at'>>
 type UslugaLagerConsumption = {
@@ -51,6 +52,10 @@ type ProfilForm = {
   grad: string
   radno_od: string
   radno_do: string
+  radni_dani_od: string
+  radni_dani_do: string
+  vikend_od: string
+  vikend_do: string
   logo: string
   boja_primarna: string
 }
@@ -116,6 +121,7 @@ const navItems = [
   { id: 'analitika', icon: '📊', label: 'Analitika' },
   { id: 'profil', icon: '👤', label: 'Profil' },
   { id: 'usluge', icon: '💈', label: 'Usluge' },
+  { id: 'zaposleni', icon: '✂️', label: 'Zaposleni' },
   { id: 'lager', icon: '📦', label: 'Lager' },
   { id: 'termini', icon: '📅', label: 'Termini' },
   { id: 'stranica', icon: '🔗', label: 'Moja stranica' },
@@ -164,8 +170,13 @@ export default function Dashboard() {
   const [sauvano, setSacuvano] = useState('')
   const [profil, setProfil] = useState<ProfilForm>({
     naziv: '', opis: '', telefon: '', adresa: '', grad: '',
-    radno_od: '09:00', radno_do: '20:00', logo: '', boja_primarna: '#d4af37'
+    radno_od: '', radno_do: '', radni_dani_od: '', radni_dani_do: '', vikend_od: '', vikend_do: '',
+    logo: '', boja_primarna: '#d4af37'
   })
+  const [zaposleni, setZaposleni] = useState<ZaposleniRow[]>([])
+  const [noviZaposleni, setNoviZaposleni] = useState({ ime: '', uloga: '' })
+  const [showNoviZaposleni, setShowNoviZaposleni] = useState(false)
+  const [zaposleniGreska, setZaposleniGreska] = useState('')
 
   const gold = '#d4af37'
   const goldFaint = 'rgba(212,175,55,.12)'
@@ -306,8 +317,12 @@ export default function Dashboard() {
         telefon: salonData.telefon || '',
         adresa: salonData.adresa || '',
         grad: salonData.grad || '',
-        radno_od: salonData.radno_od || '09:00',
-        radno_do: salonData.radno_do || '20:00',
+        radno_od: salonData.radno_od || '',
+        radno_do: salonData.radno_do || '',
+        radni_dani_od: salonData.radni_dani_od || salonData.radno_od || '',
+        radni_dani_do: salonData.radni_dani_do || salonData.radno_do || '',
+        vikend_od: salonData.vikend_od || '',
+        vikend_do: salonData.vikend_do || '',
         logo: salonData.logo_url || '',
         boja_primarna: salonData.boja_primarna || '#d4af37'
       })
@@ -323,6 +338,24 @@ export default function Dashboard() {
         console.error('[dashboard] Usluge:', uslugeErr.message, uslugeErr)
       }
       setUsluge(uslugeData || [])
+
+      const { data: zaposleniData, error: zaposleniErr } = await supabase
+        .from('zaposleni')
+        .select('*')
+        .eq('salon_id', userId)
+        .order('created_at', { ascending: true })
+
+      if (zaposleniErr) {
+        const missingTable = /relation .*zaposleni.* does not exist|schema cache/i.test(zaposleniErr.message)
+        if (missingTable) {
+          console.warn('[dashboard] Pokreni migraciju 2026-05-13_salon_hours_staff_booking.sql za zaposlene.')
+        } else {
+          console.error('[dashboard] Zaposleni:', zaposleniErr.message, zaposleniErr)
+        }
+        setZaposleni([])
+      } else {
+        setZaposleni(zaposleniData || [])
+      }
 
       // Učitaj lager
       const { data: lagerData, error: lagerErr } = await supabase
@@ -506,14 +539,22 @@ export default function Dashboard() {
         return
       }
 
+      const radniDaniOd = profil.radni_dani_od.trim() || null
+      const radniDaniDo = profil.radni_dani_do.trim() || null
+      const vikendOd = profil.vikend_od.trim() || null
+      const vikendDo = profil.vikend_do.trim() || null
       const updateData = {
         naziv: profil.naziv,
         opis: profil.opis,
         telefon: profil.telefon,
         adresa: profil.adresa,
         grad: profil.grad,
-        radno_od: profil.radno_od,
-        radno_do: profil.radno_do,
+        radno_od: radniDaniOd,
+        radno_do: radniDaniDo,
+        radni_dani_od: radniDaniOd,
+        radni_dani_do: radniDaniDo,
+        vikend_od: vikendOd,
+        vikend_do: vikendDo,
         logo_url: profil.logo,
         boja_primarna: profil.boja_primarna,
       }
@@ -638,6 +679,54 @@ export default function Dashboard() {
     await supabase.from('usluge').delete().eq('id', id)
     setUsluge(usluge.filter(u => u.id !== id))
     setUslugaLager((prev) => prev.filter((p) => p.usluga_id !== id))
+  }
+
+  const dodajZaposlenog = async () => {
+    const ime = noviZaposleni.ime.trim()
+    const uloga = noviZaposleni.uloga.trim()
+    setZaposleniGreska('')
+    if (!ime) {
+      setZaposleniGreska('Unesite ime zaposlenog.')
+      return
+    }
+    if (!salon?.id) {
+      setZaposleniGreska('Salon nije učitan. Osvežite stranicu.')
+      return
+    }
+    const { data, error } = await supabase
+      .from('zaposleni')
+      .insert({ salon_id: salon.id, ime, uloga: uloga || null, aktivan: true })
+      .select()
+      .single()
+    if (error) {
+      setZaposleniGreska(
+        /zaposleni|schema cache|does not exist/i.test(error.message)
+          ? 'U Supabase pokrenite migraciju 2026-05-13_salon_hours_staff_booking.sql, pa pokušajte ponovo.'
+          : error.message,
+      )
+      return
+    }
+    setZaposleni((prev) => [...prev, data])
+    setNoviZaposleni({ ime: '', uloga: '' })
+    setShowNoviZaposleni(false)
+  }
+
+  const podesiAktivnostZaposlenog = async (id: string, aktivan: boolean) => {
+    const { error } = await supabase.from('zaposleni').update({ aktivan }).eq('id', id)
+    if (error) {
+      setZaposleniGreska(error.message)
+      return
+    }
+    setZaposleni((prev) => prev.map((z) => (z.id === id ? { ...z, aktivan } : z)))
+  }
+
+  const obrisiZaposlenog = async (id: string) => {
+    const { error } = await supabase.from('zaposleni').delete().eq('id', id)
+    if (error) {
+      setZaposleniGreska(error.message)
+      return
+    }
+    setZaposleni((prev) => prev.filter((z) => z.id !== id))
   }
 
   const dodajLager = async () => {
@@ -1001,14 +1090,25 @@ export default function Dashboard() {
 
       <div style={cardStyle}>
         <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '20px' }}>Radno vreme</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+        <p style={{ fontSize: '12px', color: muted, lineHeight: 1.6, marginBottom: '14px' }}>
+          Polja su opciona. Ako vikendom radiš skraćeno, unesi posebno vreme za vikend.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '14px' }}>
           <div>
-            <label style={labelStyle}>RADI OD</label>
-            <input style={inputStyle} type="time" value={profil.radno_od} onChange={e => setProfil({ ...profil, radno_od: e.target.value })} />
+            <label style={labelStyle}>RADNI DANI OD</label>
+            <input style={inputStyle} type="time" value={profil.radni_dani_od} onChange={e => setProfil({ ...profil, radni_dani_od: e.target.value })} />
           </div>
           <div>
-            <label style={labelStyle}>RADI DO</label>
-            <input style={inputStyle} type="time" value={profil.radno_do} onChange={e => setProfil({ ...profil, radno_do: e.target.value })} />
+            <label style={labelStyle}>RADNI DANI DO</label>
+            <input style={inputStyle} type="time" value={profil.radni_dani_do} onChange={e => setProfil({ ...profil, radni_dani_do: e.target.value })} />
+          </div>
+          <div>
+            <label style={labelStyle}>VIKEND OD</label>
+            <input style={inputStyle} type="time" value={profil.vikend_od} onChange={e => setProfil({ ...profil, vikend_od: e.target.value })} />
+          </div>
+          <div>
+            <label style={labelStyle}>VIKEND DO</label>
+            <input style={inputStyle} type="time" value={profil.vikend_do} onChange={e => setProfil({ ...profil, vikend_do: e.target.value })} />
           </div>
         </div>
       </div>
@@ -1136,6 +1236,65 @@ export default function Dashboard() {
       ) : (
         <button style={{ ...btnGold, padding: '14px', borderRadius: '12px', fontSize: '14px', width: '100%' }} onClick={() => { setShowNovaUsluga(true); setUslugaGreska('') }}>
           + Dodaj novu uslugu
+        </button>
+      )}
+    </div>
+  )
+
+  const renderZaposleni = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <div style={cardStyle}>
+        <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '8px' }}>Zaposleni</h3>
+        <p style={{ fontSize: '12px', color: muted, lineHeight: 1.6 }}>
+          Ako salon ima više zaposlenih, kupac će pri zakazivanju izabrati kod koga želi termin.
+        </p>
+      </div>
+      {zaposleniGreska && (
+        <div style={{ background: 'rgba(220,50,50,.1)', border: '0.5px solid rgba(220,50,50,.3)', borderRadius: '10px', padding: '10px 12px', fontSize: '12px', color: '#ff6b6b' }}>
+          ⚠️ {zaposleniGreska}
+        </div>
+      )}
+      {zaposleni.length === 0 && !showNoviZaposleni && (
+        <div style={{ ...cardStyle, textAlign: 'center', padding: '34px' }}>
+          <div style={{ fontSize: '30px', marginBottom: '10px' }}>✂️</div>
+          <p style={{ fontSize: '14px', color: muted }}>Dodaj zaposlene da bi kupci mogli da biraju osobu za termin.</p>
+        </div>
+      )}
+      {zaposleni.map((z) => (
+        <div key={z.id} style={{ ...cardStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', opacity: z.aktivan ? 1 : 0.58 }}>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: 500, color: text }}>{z.ime}</div>
+            <div style={{ fontSize: '12px', color: muted, marginTop: '3px' }}>{z.uloga || 'Zaposleni'} · {z.aktivan ? 'aktivan' : 'sakriven za kupce'}</div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button style={btnOutline} onClick={() => void podesiAktivnostZaposlenog(z.id, !z.aktivan)}>
+              {z.aktivan ? 'Sakrij' : 'Aktiviraj'}
+            </button>
+            <button style={btnOutline} onClick={() => void obrisiZaposlenog(z.id)}>Obriši</button>
+          </div>
+        </div>
+      ))}
+      {showNoviZaposleni ? (
+        <div style={cardStyle}>
+          <h3 style={{ fontSize: '14px', fontWeight: 500, color: text, marginBottom: '16px' }}>Novi zaposleni</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '12px', marginBottom: '14px' }}>
+            <div>
+              <label style={labelStyle}>IME</label>
+              <input style={inputStyle} placeholder="Ana Marković" value={noviZaposleni.ime} onChange={e => setNoviZaposleni({ ...noviZaposleni, ime: e.target.value })} />
+            </div>
+            <div>
+              <label style={labelStyle}>ULOGA</label>
+              <input style={inputStyle} placeholder="Frizer, barber, kozmetičar..." value={noviZaposleni.uloga} onChange={e => setNoviZaposleni({ ...noviZaposleni, uloga: e.target.value })} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <button style={btnGold} onClick={() => void dodajZaposlenog()}>Dodaj zaposlenog</button>
+            <button style={btnOutline} onClick={() => { setShowNoviZaposleni(false); setZaposleniGreska('') }}>Odustani</button>
+          </div>
+        </div>
+      ) : (
+        <button style={{ ...btnGold, padding: '14px', borderRadius: '12px', fontSize: '14px', width: '100%' }} onClick={() => { setShowNoviZaposleni(true); setZaposleniGreska('') }}>
+          + Dodaj zaposlenog
         </button>
       )}
     </div>
@@ -1317,6 +1476,11 @@ export default function Dashboard() {
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: '14px', fontWeight: 600, color: text }}>{t.ime_klijenta}</div>
                         <div style={{ fontSize: '12px', color: muted, marginTop: 3 }}>{t.usluge?.naziv || 'Bez usluge'}</div>
+                        {t.zaposleni_id && (
+                          <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.45)', marginTop: 3 }}>
+                            Kod: {zaposleni.find((z) => z.id === t.zaposleni_id)?.ime || 'zaposleni'}
+                          </div>
+                        )}
                         <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.35)', marginTop: 3 }}>{t.telefon_klijenta}</div>
                       </div>
                     </div>
@@ -1779,7 +1943,7 @@ export default function Dashboard() {
 
   const sections: Record<string, () => React.ReactElement> = {
     pregled: renderPregled, analitika: renderAnalitika, profil: renderProfil, usluge: renderUsluge,
-    lager: renderLager, termini: renderTermini, stranica: renderStranica, lojalnost: renderLojalnost
+    zaposleni: renderZaposleni, lager: renderLager, termini: renderTermini, stranica: renderStranica, lojalnost: renderLojalnost
   }
 
   // Ako nije autentifikovan - loading screen
