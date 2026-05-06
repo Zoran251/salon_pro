@@ -54,8 +54,11 @@ type ProfilForm = {
   radno_do: string
   radni_dani_od: string
   radni_dani_do: string
-  vikend_od: string
-  vikend_do: string
+  subota_od: string
+  subota_do: string
+  nedelja_od: string
+  nedelja_do: string
+  nedelja_zatvoreno: boolean
   logo: string
   boja_primarna: string
 }
@@ -170,7 +173,8 @@ export default function Dashboard() {
   const [sauvano, setSacuvano] = useState('')
   const [profil, setProfil] = useState<ProfilForm>({
     naziv: '', opis: '', telefon: '', adresa: '', grad: '',
-    radno_od: '', radno_do: '', radni_dani_od: '', radni_dani_do: '', vikend_od: '', vikend_do: '',
+    radno_od: '', radno_do: '', radni_dani_od: '', radni_dani_do: '',
+    subota_od: '', subota_do: '', nedelja_od: '', nedelja_do: '', nedelja_zatvoreno: false,
     logo: '', boja_primarna: '#d4af37'
   })
   const [zaposleni, setZaposleni] = useState<ZaposleniRow[]>([])
@@ -321,8 +325,11 @@ export default function Dashboard() {
         radno_do: salonData.radno_do || '',
         radni_dani_od: salonData.radni_dani_od || salonData.radno_od || '',
         radni_dani_do: salonData.radni_dani_do || salonData.radno_do || '',
-        vikend_od: salonData.vikend_od || '',
-        vikend_do: salonData.vikend_do || '',
+        subota_od: salonData.subota_od || '',
+        subota_do: salonData.subota_do || '',
+        nedelja_od: salonData.nedelja_od || '',
+        nedelja_do: salonData.nedelja_do || '',
+        nedelja_zatvoreno: Boolean(salonData.nedelja_zatvoreno),
         logo: salonData.logo_url || '',
         boja_primarna: salonData.boja_primarna || '#d4af37'
       })
@@ -541,8 +548,10 @@ export default function Dashboard() {
 
       const radniDaniOd = profil.radni_dani_od.trim() || null
       const radniDaniDo = profil.radni_dani_do.trim() || null
-      const vikendOd = profil.vikend_od.trim() || null
-      const vikendDo = profil.vikend_do.trim() || null
+      const subotaOd = profil.subota_od.trim() || null
+      const subotaDo = profil.subota_do.trim() || null
+      const nedeljaOd = profil.nedelja_zatvoreno ? null : profil.nedelja_od.trim() || null
+      const nedeljaDo = profil.nedelja_zatvoreno ? null : profil.nedelja_do.trim() || null
       const updateData = {
         naziv: profil.naziv,
         opis: profil.opis,
@@ -553,8 +562,11 @@ export default function Dashboard() {
         radno_do: radniDaniDo,
         radni_dani_od: radniDaniOd,
         radni_dani_do: radniDaniDo,
-        vikend_od: vikendOd,
-        vikend_do: vikendDo,
+        subota_od: subotaOd,
+        subota_do: subotaDo,
+        nedelja_od: nedeljaOd,
+        nedelja_do: nedeljaDo,
+        nedelja_zatvoreno: profil.nedelja_zatvoreno,
         logo_url: profil.logo,
         boja_primarna: profil.boja_primarna,
       }
@@ -1091,25 +1103,45 @@ export default function Dashboard() {
       <div style={cardStyle}>
         <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '20px' }}>Radno vreme</h3>
         <p style={{ fontSize: '12px', color: muted, lineHeight: 1.6, marginBottom: '14px' }}>
-          Polja su opciona. Ako vikendom radiš skraćeno, unesi posebno vreme za vikend.
+          Polja su opciona. Unesi ponedeljak-petak, subotu posebno, a za nedelju izaberi vreme ili označi da ne radiš.
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '14px' }}>
           <div>
-            <label style={labelStyle}>RADNI DANI OD</label>
+            <label style={labelStyle}>PON-PET OD</label>
             <input style={inputStyle} type="time" value={profil.radni_dani_od} onChange={e => setProfil({ ...profil, radni_dani_od: e.target.value })} />
           </div>
           <div>
-            <label style={labelStyle}>RADNI DANI DO</label>
+            <label style={labelStyle}>PON-PET DO</label>
             <input style={inputStyle} type="time" value={profil.radni_dani_do} onChange={e => setProfil({ ...profil, radni_dani_do: e.target.value })} />
           </div>
           <div>
-            <label style={labelStyle}>VIKEND OD</label>
-            <input style={inputStyle} type="time" value={profil.vikend_od} onChange={e => setProfil({ ...profil, vikend_od: e.target.value })} />
+            <label style={labelStyle}>SUBOTA OD</label>
+            <input style={inputStyle} type="time" value={profil.subota_od} onChange={e => setProfil({ ...profil, subota_od: e.target.value })} />
           </div>
           <div>
-            <label style={labelStyle}>VIKEND DO</label>
-            <input style={inputStyle} type="time" value={profil.vikend_do} onChange={e => setProfil({ ...profil, vikend_do: e.target.value })} />
+            <label style={labelStyle}>SUBOTA DO</label>
+            <input style={inputStyle} type="time" value={profil.subota_do} onChange={e => setProfil({ ...profil, subota_do: e.target.value })} />
           </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', gridColumn: '1/-1', color: text, fontSize: '13px' }}>
+            <input
+              type="checkbox"
+              checked={profil.nedelja_zatvoreno}
+              onChange={e => setProfil({ ...profil, nedelja_zatvoreno: e.target.checked })}
+            />
+            Nedeljom ne radimo
+          </label>
+          {!profil.nedelja_zatvoreno && (
+            <>
+              <div>
+                <label style={labelStyle}>NEDELJA OD</label>
+                <input style={inputStyle} type="time" value={profil.nedelja_od} onChange={e => setProfil({ ...profil, nedelja_od: e.target.value })} />
+              </div>
+              <div>
+                <label style={labelStyle}>NEDELJA DO</label>
+                <input style={inputStyle} type="time" value={profil.nedelja_do} onChange={e => setProfil({ ...profil, nedelja_do: e.target.value })} />
+              </div>
+            </>
+          )}
         </div>
       </div>
 

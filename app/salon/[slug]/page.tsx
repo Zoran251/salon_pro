@@ -32,8 +32,11 @@ interface Salon {
   radno_do?: string
   radni_dani_od?: string
   radni_dani_do?: string
-  vikend_od?: string
-  vikend_do?: string
+  subota_od?: string
+  subota_do?: string
+  nedelja_od?: string
+  nedelja_do?: string
+  nedelja_zatvoreno?: boolean | null
 }
 
 interface Zaposleni {
@@ -139,11 +142,18 @@ function mapsSearchUrl(locationQuery: string): string {
 function formatSalonHours(salon: Salon): string[] {
   const radniOd = salon.radni_dani_od || salon.radno_od || ''
   const radniDo = salon.radni_dani_do || salon.radno_do || ''
-  const vikendOd = salon.vikend_od || ''
-  const vikendDo = salon.vikend_do || ''
+  const subotaOd = salon.subota_od || ''
+  const subotaDo = salon.subota_do || ''
+  const nedeljaOd = salon.nedelja_od || ''
+  const nedeljaDo = salon.nedelja_do || ''
   return [
-    radniOd && radniDo ? `Radni dani ${radniOd} — ${radniDo}` : '',
-    vikendOd && vikendDo ? `Vikend ${vikendOd} — ${vikendDo}` : '',
+    radniOd && radniDo ? `Pon-pet ${radniOd} — ${radniDo}` : '',
+    subotaOd && subotaDo ? `Subota ${subotaOd} — ${subotaDo}` : '',
+    salon.nedelja_zatvoreno
+      ? 'Nedelja ne radimo'
+      : nedeljaOd && nedeljaDo
+        ? `Nedelja ${nedeljaOd} — ${nedeljaDo}`
+        : '',
   ].filter(Boolean)
 }
 

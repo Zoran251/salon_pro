@@ -23,8 +23,11 @@ export type Database = {
           radno_do: string | null
           radni_dani_od: string | null
           radni_dani_do: string | null
-          vikend_od: string | null
-          vikend_do: string | null
+          subota_od: string | null
+          subota_do: string | null
+          nedelja_od: string | null
+          nedelja_do: string | null
+          nedelja_zatvoreno: boolean | null
           logo_url: string | null
           boja_primarna: string | null
           landing_page: string | null
@@ -45,8 +48,11 @@ export type Database = {
           radno_do?: string | null
           radni_dani_od?: string | null
           radni_dani_do?: string | null
-          vikend_od?: string | null
-          vikend_do?: string | null
+          subota_od?: string | null
+          subota_do?: string | null
+          nedelja_od?: string | null
+          nedelja_do?: string | null
+          nedelja_zatvoreno?: boolean | null
           logo_url?: string | null
           boja_primarna?: string | null
           landing_page?: string | null

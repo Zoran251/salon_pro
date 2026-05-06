@@ -5,8 +5,11 @@ begin;
 alter table public.saloni
   add column if not exists radni_dani_od text,
   add column if not exists radni_dani_do text,
-  add column if not exists vikend_od text,
-  add column if not exists vikend_do text;
+  add column if not exists subota_od text,
+  add column if not exists subota_do text,
+  add column if not exists nedelja_od text,
+  add column if not exists nedelja_do text,
+  add column if not exists nedelja_zatvoreno boolean not null default false;
 
 update public.saloni
 set
@@ -14,6 +17,26 @@ set
   radni_dani_do = coalesce(radni_dani_do, radno_do)
 where (radni_dani_od is null or radni_dani_do is null)
   and (radno_od is not null or radno_do is not null);
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns c
+    where c.table_schema = 'public'
+      and c.table_name = 'saloni'
+      and c.column_name = 'vikend_od'
+  ) then
+    execute '
+      update public.saloni
+      set
+        subota_od = coalesce(subota_od, vikend_od),
+        subota_do = coalesce(subota_do, vikend_do),
+        nedelja_od = coalesce(nedelja_od, vikend_od),
+        nedelja_do = coalesce(nedelja_do, vikend_do)
+    ';
+  end if;
+end $$;
 
 create table if not exists public.zaposleni (
   id uuid primary key default gen_random_uuid(),
