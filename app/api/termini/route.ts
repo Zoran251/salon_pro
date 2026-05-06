@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { salon_id, usluga_id, ime_klijenta, telefon_klijenta, datum_vrijeme, napomena, email } = body
+    const { salon_id, usluga_id, zaposleni_id, ime_klijenta, telefon_klijenta, datum_vrijeme, napomena, email } = body
 
     if (!salon_id || !ime_klijenta || !telefon_klijenta || !datum_vrijeme) {
       return NextResponse.json({ error: 'Nedostaju obavezni podaci' }, { status: 400 })
@@ -145,19 +145,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Neuspešno povezivanje kupca sa salonom.' }, { status: 500 })
     }
 
-    const { data: rpcBookingId, error: bookingRpcError } = await userClient.rpc('create_authenticated_booking', {
+    const bookingPayload = {
       p_salon_id: salon_id,
       p_client_id: clientId,
       p_usluga_id: usluga_id || null,
+      p_zaposleni_id: zaposleni_id || null,
       p_ime: imeKlijenta,
       p_telefon: telefonKlijenta,
       p_datum_vrijeme: datum_vrijeme,
       p_napomena: napomena || null,
-    })
+    }
+    const { data: rpcBookingId, error: bookingRpcError } = await userClient.rpc('create_authenticated_booking', bookingPayload)
 
     if (!bookingRpcError) {
       const terminIdOut = typeof rpcBookingId === 'string' ? rpcBookingId : null
       return NextResponse.json({ success: true, termin_id: terminIdOut })
+    }
+
+    if (isMissingRpcFunction(bookingRpcError.message) && !zaposleni_id) {
+      const { data: legacyBookingId, error: legacyBookingError } = await userClient.rpc('create_authenticated_booking', {
+        p_salon_id: salon_id,
+        p_client_id: clientId,
+        p_usluga_id: usluga_id || null,
+        p_ime: imeKlijenta,
+        p_telefon: telefonKlijenta,
+        p_datum_vrijeme: datum_vrijeme,
+        p_napomena: napomena || null,
+      })
+      if (!legacyBookingError) {
+        const terminIdOut = typeof legacyBookingId === 'string' ? legacyBookingId : null
+        return NextResponse.json({ success: true, termin_id: terminIdOut })
+      }
     }
 
     console.error('[termini] booking RPC error:', bookingRpcError.message)

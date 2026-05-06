@@ -21,6 +21,13 @@ export type Database = {
           adresa: string | null
           radno_od: string | null
           radno_do: string | null
+          radni_dani_od: string | null
+          radni_dani_do: string | null
+          subota_od: string | null
+          subota_do: string | null
+          nedelja_od: string | null
+          nedelja_do: string | null
+          nedelja_zatvoreno: boolean | null
           logo_url: string | null
           boja_primarna: string | null
           landing_page: string | null
@@ -39,6 +46,13 @@ export type Database = {
           adresa?: string | null
           radno_od?: string | null
           radno_do?: string | null
+          radni_dani_od?: string | null
+          radni_dani_do?: string | null
+          subota_od?: string | null
+          subota_do?: string | null
+          nedelja_od?: string | null
+          nedelja_do?: string | null
+          nedelja_zatvoreno?: boolean | null
           logo_url?: string | null
           boja_primarna?: string | null
           landing_page?: string | null
@@ -122,6 +136,7 @@ export type Database = {
           id: string
           salon_id: string
           client_id: string | null
+          zaposleni_id: string | null
           usluga_id: string | null
           ime_klijenta: string
           telefon_klijenta: string
@@ -134,6 +149,7 @@ export type Database = {
           id?: string
           salon_id: string
           client_id?: string | null
+          zaposleni_id?: string | null
           usluga_id?: string | null
           ime_klijenta: string
           telefon_klijenta: string
@@ -143,6 +159,28 @@ export type Database = {
           created_at?: string | null
         }
         Update: Partial<Database['public']['Tables']['termini']['Insert']>
+        Relationships: []
+      }
+      zaposleni: {
+        Row: {
+          id: string
+          salon_id: string
+          ime: string
+          uloga: string | null
+          foto_url: string | null
+          aktivan: boolean
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          salon_id: string
+          ime: string
+          uloga?: string | null
+          foto_url?: string | null
+          aktivan?: boolean
+          created_at?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['zaposleni']['Insert']>
         Relationships: []
       }
       lojalnost: {

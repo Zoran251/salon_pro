@@ -8,6 +8,12 @@ import "./globals.css";
 
 export const dynamic = "force-dynamic";
 
+const siteUrl = (
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
+  "http://localhost:3000"
+).replace(/\/$/, "");
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -19,8 +25,29 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Salon Pro",
   description: "SaaS platforma za salone, online zakazivanje i portal kupaca.",
+  openGraph: {
+    title: "Salon Pro",
+    description: "SaaS platforma za salone, online zakazivanje i portal kupaca.",
+    siteName: "Salon Pro",
+    type: "website",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "Salon Pro logo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Salon Pro",
+    description: "SaaS platforma za salone, online zakazivanje i portal kupaca.",
+    images: ["/twitter-image"],
+  },
 };
 
 export default async function RootLayout({

@@ -30,6 +30,22 @@ interface Salon {
   tip?: string
   radno_od?: string
   radno_do?: string
+  radni_dani_od?: string
+  radni_dani_do?: string
+  subota_od?: string
+  subota_do?: string
+  nedelja_od?: string
+  nedelja_do?: string
+  nedelja_zatvoreno?: boolean | null
+}
+
+interface Zaposleni {
+  id: string
+  salon_id: string
+  ime: string
+  uloga?: string | null
+  foto_url?: string | null
+  aktivan: boolean
 }
 
 interface Lojalnost {
@@ -84,8 +100,10 @@ interface ClientSummary {
     ime_klijenta?: string
     telefon_klijenta?: string | null
     usluga_id?: string | null
+    zaposleni_id?: string | null
     napomena?: string | null
     usluge?: { naziv?: string } | null
+    zaposleni?: { ime?: string; foto_url?: string | null } | null
   }>
   notifications?: ClientNotification[]
 }
@@ -122,6 +140,33 @@ function mapsSearchUrl(locationQuery: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}`
 }
 
+function formatSalonHours(salon: Salon): string[] {
+  const radniOd = salon.radni_dani_od || salon.radno_od || ''
+  const radniDo = salon.radni_dani_do || salon.radno_do || ''
+  const subotaOd = salon.subota_od || ''
+  const subotaDo = salon.subota_do || ''
+  const nedeljaOd = salon.nedelja_od || ''
+  const nedeljaDo = salon.nedelja_do || ''
+  return [
+    radniOd && radniDo ? `Pon-pet ${radniOd} — ${radniDo}` : '',
+    subotaOd && subotaDo ? `Subota ${subotaOd} — ${subotaDo}` : '',
+    salon.nedelja_zatvoreno
+      ? 'Nedelja ne radimo'
+      : nedeljaOd && nedeljaDo
+        ? `Nedelja ${nedeljaOd} — ${nedeljaDo}`
+        : '',
+  ].filter(Boolean)
+}
+
+function employeeInitials(name: string | null | undefined): string {
+  const parts = (name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+  const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase()).join('')
+  return initials || 'SP'
+}
+
 function skratiTekst(s: string, n: number): string {
   const t = s.trim()
   if (t.length <= n) return t
@@ -133,6 +178,7 @@ export default function SalonLanding() {
   const slug = typeof params?.slug === 'string' ? params.slug : ''
   const [salon, setSalon] = useState<Salon | null>(null)
   const [usluge, setUsluge] = useState<Usluga[]>([])
+  const [zaposleni, setZaposleni] = useState<Zaposleni[]>([])
   const [lojalnost, setLojalnost] = useState<Lojalnost | null>(null)
   const [pageLoading, setPageLoading] = useState(true)
   const [showForma, setShowForma] = useState(false)
@@ -151,7 +197,7 @@ export default function SalonLanding() {
   const [summaryLoading, setSummaryLoading] = useState(false)
   /** Poslednja greška GET /api/clients/me (npr. nalog nije povezan sa salonom). */
   const [clientMeError, setClientMeError] = useState('')
-  const [forma, setForma] = useState({ ime: '', telefon: '', datum: '', vrijeme: '', napomena: '' })
+  const [forma, setForma] = useState({ ime: '', telefon: '', datum: '', vrijeme: '', zaposleni_id: '', napomena: '' })
   const [profilUredi, setProfilUredi] = useState(false)
   const [profilEdit, setProfilEdit] = useState({ ime: '', telefon: '', email: '' })
   const [profilSnimiLoading, setProfilSnimiLoading] = useState(false)
@@ -159,6 +205,7 @@ export default function SalonLanding() {
   const [profilGreska, setProfilGreska] = useState('')
   const prevShowFormaRef = useRef(false)
   const [notifPanelOpen, setNotifPanelOpen] = useState(false)
+  const [prikaziSvaObavestenja, setPrikaziSvaObavestenja] = useState(false)
   const [inAppToast, setInAppToast] = useState<{ title: string; body: string } | null>(null)
   const notifBellRef = useRef<HTMLDivElement | null>(null)
   const knownNotifIdsRef = useRef<Set<string>>(new Set())
@@ -176,6 +223,7 @@ export default function SalonLanding() {
     datum: string
     vrijeme: string
     usluga_id: string
+    zaposleni_id: string
     napomena: string
   } | null>(null)
   const [terminEditLoading, setTerminEditLoading] = useState(false)
@@ -191,6 +239,19 @@ export default function SalonLanding() {
     () => usluge.filter((u) => (u.kategorija?.trim() ? u.kategorija.trim() : 'Ostalo') === bookingPickerKategorija),
     [usluge, bookingPickerKategorija]
   )
+  const aktivniZaposleni = useMemo(() => zaposleni.filter((z) => z.aktivan), [zaposleni])
+
+  useEffect(() => {
+    setForma((f) => {
+      if (aktivniZaposleni.length === 1) {
+        return f.zaposleni_id === aktivniZaposleni[0].id ? f : { ...f, zaposleni_id: aktivniZaposleni[0].id }
+      }
+      if (f.zaposleni_id && !aktivniZaposleni.some((z) => z.id === f.zaposleni_id)) {
+        return { ...f, zaposleni_id: '' }
+      }
+      return f
+    })
+  }, [aktivniZaposleni])
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)')
@@ -257,6 +318,21 @@ export default function SalonLanding() {
           .eq('salon_id', salonData.id)
 
         setUsluge((uslugeData || []) as Usluga[])
+
+        const { data: zaposleniData, error: zaposleniError } = await supabase
+          .from('zaposleni')
+          .select('*')
+          .eq('salon_id', salonData.id)
+          .eq('aktivan', true)
+          .order('created_at', { ascending: true })
+
+        if (zaposleniError) {
+          const missingTable = /relation .*zaposleni.* does not exist|schema cache/i.test(zaposleniError.message)
+          if (!missingTable) console.error('Greška pri učitavanju zaposlenih:', zaposleniError.message)
+          setZaposleni([])
+        } else {
+          setZaposleni((zaposleniData || []) as Zaposleni[])
+        }
 
         // Učitaj lojalnost
         const { data: lojalnostData } = await supabase
@@ -347,6 +423,7 @@ export default function SalonLanding() {
       }
 
       const params = new URLSearchParams({ auth_token: token, salon_id: salon.id })
+      if (prikaziSvaObavestenja) params.set('notifications', 'all')
       const res = await fetch(`/api/clients/me?${params.toString()}`, { cache: 'no-store' })
       const data = (await res.json()) as { error?: string } & Partial<ClientSummary>
       if (!res.ok || data.error) {
@@ -359,7 +436,7 @@ export default function SalonLanding() {
     } finally {
       if (!silent) setSummaryLoading(false)
     }
-  }, [salon?.id])
+  }, [salon?.id, prikaziSvaObavestenja])
 
   useEffect(() => {
     if (!klijentUlogovan || !salon?.id) return
@@ -651,8 +728,19 @@ export default function SalonLanding() {
   const goldFaint = 'rgba(212,175,55,.12)'
   const goldBorder = 'rgba(212,175,55,.25)'
   const kupacReturnEnc = encodeURIComponent(`/salon/${slug}`)
+  const salonHours = formatSalonHours(salon)
   const neprocitaneObavestenja =
     clientSummary?.notifications?.filter((n) => !n.read_at).length ?? 0
+  const obavestenja = (clientSummary?.notifications ?? []).slice().sort((a, b) => b.created_at.localeCompare(a.created_at))
+  const prikazanaObavestenja = prikaziSvaObavestenja ? obavestenja : obavestenja.slice(0, 3)
+  const loyaltyRewardLabel = lojalnost?.aktivan
+    ? lojalnost.tip === 'popust'
+      ? `${lojalnost.vrijednost}% popusta`
+      : lojalnost.tip === 'vaučer'
+        ? `vaučer ${lojalnost.vrijednost} RSD`
+        : 'besplatna usluga'
+    : ''
+  const loyaltyStepPercent = lojalnost?.aktivan ? Math.round(100 / Math.max(lojalnost.svaki_koji || 1, 1)) : 0
   const modalBackdropStyle: React.CSSProperties = {
     position: 'fixed',
     inset: 0,
@@ -730,6 +818,34 @@ export default function SalonLanding() {
     marginLeft: 'auto',
     marginBottom: 12,
   }
+  const renderEmployeeAvatar = (z: Pick<Zaposleni, 'ime' | 'foto_url'>, size = 42) =>
+    z.foto_url ? (
+      <img
+        src={z.foto_url}
+        alt={z.ime}
+        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: `1px solid ${goldBorder}`, flexShrink: 0 }}
+      />
+    ) : (
+      <span
+        style={{
+          width: size,
+          height: size,
+          borderRadius: '50%',
+          flexShrink: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(212,175,55,.12)',
+          border: `1px solid ${goldBorder}`,
+          color: gold,
+          fontSize: Math.max(11, Math.round(size * 0.32)),
+          fontWeight: 700,
+          letterSpacing: -1,
+        }}
+      >
+        {employeeInitials(z.ime)}
+      </span>
+    )
 
   const locationQuery = salon ? buildLocationQuery(salon) : ''
   const mapsUrl = locationQuery ? buildMapsEmbedSrc(locationQuery) : ''
@@ -752,6 +868,10 @@ export default function SalonLanding() {
       setGreska('Izaberite kategoriju i uslugu pre slanja zahteva.')
       return
     }
+    if (aktivniZaposleni.length > 1 && !forma.zaposleni_id) {
+      setGreska('Izaberite zaposlenog kod kog želite termin.')
+      return
+    }
     setLoading(true)
     setGreska('')
     try {
@@ -772,6 +892,7 @@ export default function SalonLanding() {
         body: JSON.stringify({
           salon_id: salon.id,
           usluga_id: odabranaUsluga?.id || null,
+          zaposleni_id: forma.zaposleni_id || null,
           ime_klijenta: forma.ime,
           telefon_klijenta: forma.telefon,
           datum_vrijeme: datumVrijeme,
@@ -800,7 +921,7 @@ export default function SalonLanding() {
       window.setTimeout(() => void provjeriStatusTermina(), 4000)
       setUspjeh(true)
       setShowForma(false)
-      setForma({ ime: '', telefon: '', datum: '', vrijeme: '', napomena: '' })
+      setForma({ ime: '', telefon: '', datum: '', vrijeme: '', zaposleni_id: aktivniZaposleni.length === 1 ? aktivniZaposleni[0].id : '', napomena: '' })
       if (klijentUlogovan) void ucitajClientSummary()
     } catch {
       setGreska('Došlo je do greške. Pokušajte ponovo.')
@@ -888,6 +1009,7 @@ export default function SalonLanding() {
       datum: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
       vrijeme: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
       usluga_id: termin.usluga_id || '',
+      zaposleni_id: termin.zaposleni_id || '',
       napomena: termin.napomena || '',
     })
   }
@@ -907,6 +1029,7 @@ export default function SalonLanding() {
         body: JSON.stringify({
           datum_vrijeme: `${terminEdit.datum}T${terminEdit.vrijeme}:00`,
           usluga_id: terminEdit.usluga_id || null,
+          zaposleni_id: terminEdit.zaposleni_id || null,
           napomena: terminEdit.napomena || null,
         }),
       })
@@ -1245,7 +1368,7 @@ export default function SalonLanding() {
               )}
             </div>
 
-            {clientSummary && (clientSummary.notifications?.length ?? 0) > 0 && (
+            {clientSummary && obavestenja.length > 0 && (
               <div style={{ background: '#161616', border: `0.5px solid ${goldBorder}`, borderRadius: '18px', padding: '22px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
                   <h3 style={{ fontSize: '17px', fontWeight: 600, color: '#f5f0e8' }}>🔔 Obaveštenja</h3>
@@ -1256,7 +1379,7 @@ export default function SalonLanding() {
                   ) : null}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {(clientSummary.notifications ?? []).map((n) => (
+                  {prikazanaObavestenja.map((n) => (
                     <div
                       key={n.id}
                       style={{
@@ -1296,6 +1419,26 @@ export default function SalonLanding() {
                     </div>
                   ))}
                 </div>
+                {obavestenja.length > 3 ? (
+                  <button
+                    type="button"
+                    onClick={() => setPrikaziSvaObavestenja((v) => !v)}
+                    style={{
+                      width: '100%',
+                      marginTop: '12px',
+                      background: 'transparent',
+                      color: gold,
+                      border: `0.5px solid ${goldBorder}`,
+                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {prikaziSvaObavestenja ? 'Prikaži samo najnovija obaveštenja' : `Prikaži ceo istorijat (${obavestenja.length})`}
+                  </button>
+                ) : null}
               </div>
             )}
 
@@ -1364,9 +1507,19 @@ export default function SalonLanding() {
                       <div style={{ fontSize: '22px', color: gold }}>{clientSummary.loyalty.progress_percent}%</div>
                     </div>
                   </div>
-                  <div style={{ marginBottom: '14px', fontSize: '13px', color: 'rgba(245,240,232,.7)' }}>
+                  <div style={{ marginBottom: '14px', fontSize: '13px', color: 'rgba(245,240,232,.7)', lineHeight: 1.55 }}>
                     Posete: {clientSummary.loyalty.visits_count} · Nagrada: {clientSummary.loyalty.reward_ready ? 'spremna' : 'nije spremna'}
+                    {lojalnost?.aktivan ? (
+                      <span>
+                        {' '}· Svaki dolazak dodaje oko {loyaltyStepPercent}% do nagrade ({loyaltyRewardLabel} na svaki {lojalnost.svaki_koji}. dolazak).
+                      </span>
+                    ) : null}
                   </div>
+                  {lojalnost?.aktivan ? (
+                    <div style={{ height: 8, background: 'rgba(255,255,255,.08)', borderRadius: 8, overflow: 'hidden', marginBottom: '14px' }}>
+                      <div style={{ width: `${clientSummary.loyalty.progress_percent}%`, height: '100%', background: `linear-gradient(90deg,${gold},#f5e17a)` }} />
+                    </div>
+                  ) : null}
                   <p style={{ marginBottom: '14px', fontSize: '11px', color: 'rgba(245,240,232,.38)', lineHeight: 1.5 }}>
                     Napredak važi samo za {salon?.naziv ?? 'ovaj salon'}. Kod drugog salona imate poseban brojač, iako je nalog isti.
                   </p>
@@ -1442,6 +1595,31 @@ export default function SalonLanding() {
                           ))}
                         </select>
                       </div>
+                      {aktivniZaposleni.length > 0 ? (
+                        <div style={{ marginBottom: '10px' }}>
+                          <label style={{ fontSize: '10px', color: 'rgba(245,240,232,.45)', display: 'block', marginBottom: '4px' }}>ZAPOSLENI</label>
+                          <select
+                            value={terminEdit.zaposleni_id}
+                            onChange={(e) => setTerminEdit({ ...terminEdit, zaposleni_id: e.target.value })}
+                            style={{
+                              width: '100%',
+                              padding: '8px 10px',
+                              borderRadius: '8px',
+                              border: `0.5px solid ${goldBorder}`,
+                              background: '#1a1a1a',
+                              color: '#f5f0e8',
+                              fontSize: '13px',
+                            }}
+                          >
+                            <option value="">Bez izbora</option>
+                            {aktivniZaposleni.map((z) => (
+                              <option key={z.id} value={z.id}>
+                                {z.ime}{z.uloga ? ` - ${z.uloga}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : null}
                       <div style={{ marginBottom: '12px' }}>
                         <label style={{ fontSize: '10px', color: 'rgba(245,240,232,.45)', display: 'block', marginBottom: '4px' }}>NAPOMENA</label>
                         <textarea
@@ -1530,6 +1708,18 @@ export default function SalonLanding() {
                             <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.45)', marginTop: '2px' }}>
                               {termin.usluge?.naziv || 'Usluga'}
                             </div>
+                            {(termin.zaposleni?.ime || termin.zaposleni_id) ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'rgba(245,240,232,.38)', marginTop: '4px' }}>
+                                {renderEmployeeAvatar(
+                                  {
+                                    ime: termin.zaposleni?.ime || aktivniZaposleni.find((z) => z.id === termin.zaposleni_id)?.ime || 'Zaposleni',
+                                    foto_url: termin.zaposleni?.foto_url || aktivniZaposleni.find((z) => z.id === termin.zaposleni_id)?.foto_url || null,
+                                  },
+                                  22,
+                                )}
+                                <span>Kod: {termin.zaposleni?.ime || aktivniZaposleni.find((z) => z.id === termin.zaposleni_id)?.ime || 'zaposleni'}</span>
+                              </div>
+                            ) : null}
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
                             <span style={{ fontSize: '11px', color: statusBoja }}>{termin.status}</span>
@@ -1744,6 +1934,45 @@ export default function SalonLanding() {
                   />
                 </div>
               ))}
+              {aktivniZaposleni.length > 0 && (
+                <div style={{ gridColumn: '1/-1' }}>
+                  <label style={{ fontSize: '11px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '5px', letterSpacing: '.3px' }}>
+                    ZAPOSLENI {aktivniZaposleni.length > 1 ? '*' : ''}
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '10px' }}>
+                    {aktivniZaposleni.map((z) => {
+                      const selected = forma.zaposleni_id === z.id
+                      return (
+                        <button
+                          key={z.id}
+                          type="button"
+                          onClick={() => setForma({ ...forma, zaposleni_id: z.id })}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            textAlign: 'left',
+                            background: selected ? 'rgba(212,175,55,.12)' : '#1a1a1a',
+                            border: `0.5px solid ${selected ? gold : 'rgba(212,175,55,.2)'}`,
+                            borderRadius: '12px',
+                            padding: '12px',
+                            cursor: 'pointer',
+                            color: '#f5f0e8',
+                          }}
+                        >
+                          {renderEmployeeAvatar(z, 42)}
+                          <span>
+                            <span style={{ display: 'block', fontSize: '13px', fontWeight: 600 }}>{z.ime}</span>
+                            <span style={{ display: 'block', fontSize: '11px', color: 'rgba(245,240,232,.45)', marginTop: 2 }}>
+                              {z.uloga || 'Zaposleni'}
+                            </span>
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
               <div style={{ gridColumn: '1/-1' }}>
                 <label style={{ fontSize: '11px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '5px', letterSpacing: '.3px' }}>NAPOMENA</label>
                 <textarea
@@ -1865,13 +2094,16 @@ export default function SalonLanding() {
                     ? `vaučer ${lojalnost.vrijednost} RSD`
                     : 'besplatna usluga'}
               </div>
+              <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.58)', marginTop: '8px', lineHeight: 1.55 }}>
+                Svaki potvrđeni dolazak dodaje oko {loyaltyStepPercent}% napretka. Na prvom dolasku kupac vidi {loyaltyStepPercent}% lojalnosti.
+              </div>
             </div>
           </div>
         )}
 
         {activeView === 'booking' && mapsUrl && locationQuery && (
           <div style={{ marginTop: '48px' }}>
-            <h2 style={{ fontSize: '22px', fontWeight: 500, color: '#f5f0e8', marginBottom: '8px' }}>Gdje se nalazimo</h2>
+            <h2 style={{ fontSize: '22px', fontWeight: 500, color: '#f5f0e8', marginBottom: '8px' }}>Gde se nalazimo</h2>
             <p style={{ fontSize: '13px', color: 'rgba(245,240,232,.4)', marginBottom: '20px' }}>
               📍 {locationQuery}
             </p>
@@ -2451,7 +2683,9 @@ export default function SalonLanding() {
         <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap', fontSize: '13px', color: 'rgba(245,240,232,.45)' }}>
           {salon.grad && <span>📍 {salon.adresa ? `${salon.adresa}, ` : ''}{salon.grad}</span>}
           {salon.telefon && <span>📞 {salon.telefon}</span>}
-          {salon.radno_od && salon.radno_do && <span>🕐 {salon.radno_od} — {salon.radno_do}</span>}
+          {salonHours.map((hours) => (
+            <span key={hours}>🕐 {hours}</span>
+          ))}
         </div>
       </div>
 
