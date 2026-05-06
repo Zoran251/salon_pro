@@ -43,7 +43,7 @@ type AppointmentRow = {
   zaposleni_id?: string | null
   napomena?: string | null
   usluge?: { naziv?: string | null } | { naziv?: string | null }[] | null
-  zaposleni?: { ime?: string | null } | { ime?: string | null }[] | null
+  zaposleni?: { ime?: string | null; foto_url?: string | null } | { ime?: string | null; foto_url?: string | null }[] | null
 }
 
 function firstEmbed<T>(value: T | T[] | null | undefined): T | null {
@@ -91,7 +91,7 @@ export async function GET(request: Request) {
 
     const appointmentsResult = await userClient
       .from('termini')
-      .select('id, datum_vrijeme, status, ime_klijenta, telefon_klijenta, usluga_id, zaposleni_id, napomena, usluge(naziv), zaposleni(ime)')
+      .select('id, datum_vrijeme, status, ime_klijenta, telefon_klijenta, usluga_id, zaposleni_id, napomena, usluge(naziv), zaposleni(ime, foto_url)')
       .eq('salon_id', salonId)
       .eq('client_id', clientData.id)
       .order('datum_vrijeme', { ascending: false })

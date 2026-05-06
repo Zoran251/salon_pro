@@ -167,6 +167,7 @@ export type Database = {
           salon_id: string
           ime: string
           uloga: string | null
+          foto_url: string | null
           aktivan: boolean
           created_at: string | null
         }
@@ -175,6 +176,7 @@ export type Database = {
           salon_id: string
           ime: string
           uloga?: string | null
+          foto_url?: string | null
           aktivan?: boolean
           created_at?: string | null
         }

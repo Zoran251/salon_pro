@@ -43,9 +43,13 @@ create table if not exists public.zaposleni (
   salon_id uuid not null references public.saloni(id) on delete cascade,
   ime text not null,
   uloga text,
+  foto_url text,
   aktivan boolean not null default true,
   created_at timestamptz default now()
 );
+
+alter table public.zaposleni
+  add column if not exists foto_url text;
 
 create index if not exists zaposleni_salon_id_idx on public.zaposleni(salon_id);
 create index if not exists zaposleni_public_idx on public.zaposleni(salon_id, aktivan);

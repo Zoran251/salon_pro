@@ -119,6 +119,15 @@ function formatDateLabel(dateKey: string): string {
   })
 }
 
+function employeeInitials(name: string | null | undefined): string {
+  const parts = (name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+  const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase()).join('')
+  return initials || 'SP'
+}
+
 const navItems = [
   { id: 'pregled', icon: '🏠', label: 'Pregled' },
   { id: 'analitika', icon: '📊', label: 'Analitika' },
@@ -178,7 +187,7 @@ export default function Dashboard() {
     logo: '', boja_primarna: '#d4af37'
   })
   const [zaposleni, setZaposleni] = useState<ZaposleniRow[]>([])
-  const [noviZaposleni, setNoviZaposleni] = useState({ ime: '', uloga: '' })
+  const [noviZaposleni, setNoviZaposleni] = useState({ ime: '', uloga: '', foto_url: '' })
   const [showNoviZaposleni, setShowNoviZaposleni] = useState(false)
   const [zaposleniGreska, setZaposleniGreska] = useState('')
 
@@ -707,7 +716,7 @@ export default function Dashboard() {
     }
     const { data, error } = await supabase
       .from('zaposleni')
-      .insert({ salon_id: salon.id, ime, uloga: uloga || null, aktivan: true })
+      .insert({ salon_id: salon.id, ime, uloga: uloga || null, foto_url: noviZaposleni.foto_url || null, aktivan: true })
       .select()
       .single()
     if (error) {
@@ -719,7 +728,7 @@ export default function Dashboard() {
       return
     }
     setZaposleni((prev) => [...prev, data])
-    setNoviZaposleni({ ime: '', uloga: '' })
+    setNoviZaposleni({ ime: '', uloga: '', foto_url: '' })
     setShowNoviZaposleni(false)
   }
 
@@ -909,6 +918,22 @@ export default function Dashboard() {
     }
   }
 
+  const handleZaposleniFotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) {
+      setZaposleniGreska('Fotografija je prevelika. Maksimalno 2MB.')
+      e.target.value = ''
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = ev => {
+      setNoviZaposleni((prev) => ({ ...prev, foto_url: String(ev.target?.result || '') }))
+      setZaposleniGreska('')
+    }
+    reader.readAsDataURL(file)
+  }
+
   const handleOdjava = async () => {
     await supabase.auth.signOut()
     router.push('/')
@@ -936,6 +961,36 @@ export default function Dashboard() {
     padding: '10px 20px', borderRadius: '10px', fontSize: '13px',
     cursor: 'pointer', fontFamily: 'sans-serif'
   }
+
+  const renderEmployeeAvatar = (z: Pick<ZaposleniRow, 'ime' | 'foto_url'>, size = 46) => (
+    z.foto_url ? (
+      <img
+        src={z.foto_url}
+        alt={z.ime}
+        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: `1px solid ${goldBorder}`, flexShrink: 0 }}
+      />
+    ) : (
+      <div
+        style={{
+          width: size,
+          height: size,
+          borderRadius: '50%',
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: `linear-gradient(135deg,${goldFaint},rgba(212,175,55,.04))`,
+          border: `1px solid ${goldBorder}`,
+          color: gold,
+          fontSize: Math.max(12, Math.round(size * 0.32)),
+          fontWeight: 700,
+          letterSpacing: -1,
+        }}
+      >
+        {employeeInitials(z.ime)}
+      </div>
+    )
+  )
 
   // Render funkcije ostaju identične...
   const renderPregled = () => (
@@ -1277,8 +1332,8 @@ export default function Dashboard() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
       <div style={cardStyle}>
         <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '8px' }}>Zaposleni</h3>
-        <p style={{ fontSize: '12px', color: muted, lineHeight: 1.6 }}>
-          Ako salon ima više zaposlenih, kupac će pri zakazivanju izabrati kod koga želi termin.
+          <p style={{ fontSize: '12px', color: muted, lineHeight: 1.6 }}>
+          Ako salon ima više zaposlenih, kupac će pri zakazivanju izabrati kod koga želi termin. Fotografija je opciona; bez nje se prikazuje avatar sa inicijalima.
         </p>
       </div>
       {zaposleniGreska && (
@@ -1294,9 +1349,12 @@ export default function Dashboard() {
       )}
       {zaposleni.map((z) => (
         <div key={z.id} style={{ ...cardStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', opacity: z.aktivan ? 1 : 0.58 }}>
-          <div>
-            <div style={{ fontSize: '15px', fontWeight: 500, color: text }}>{z.ime}</div>
-            <div style={{ fontSize: '12px', color: muted, marginTop: '3px' }}>{z.uloga || 'Zaposleni'} · {z.aktivan ? 'aktivan' : 'sakriven za kupce'}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+            {renderEmployeeAvatar(z, 46)}
+            <div>
+              <div style={{ fontSize: '15px', fontWeight: 500, color: text }}>{z.ime}</div>
+              <div style={{ fontSize: '12px', color: muted, marginTop: '3px' }}>{z.uloga || 'Zaposleni'} · {z.aktivan ? 'aktivan' : 'sakriven za kupce'}</div>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button style={btnOutline} onClick={() => void podesiAktivnostZaposlenog(z.id, !z.aktivan)}>
@@ -1317,6 +1375,17 @@ export default function Dashboard() {
             <div>
               <label style={labelStyle}>ULOGA</label>
               <input style={inputStyle} placeholder="Frizer, barber, kozmetičar..." value={noviZaposleni.uloga} onChange={e => setNoviZaposleni({ ...noviZaposleni, uloga: e.target.value })} />
+            </div>
+            <div style={{ gridColumn: '1/-1' }}>
+              <label style={labelStyle}>FOTOGRAFIJA (OPCIONO)</label>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {renderEmployeeAvatar({ ime: noviZaposleni.ime || 'Zaposleni', foto_url: noviZaposleni.foto_url } as ZaposleniRow, 58)}
+                <input id="zaposleni-photo-upload" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleZaposleniFotoUpload} />
+                <button style={btnOutline} onClick={() => document.getElementById('zaposleni-photo-upload')?.click()}>Učitaj fotografiju</button>
+                {noviZaposleni.foto_url && (
+                  <button style={btnOutline} onClick={() => setNoviZaposleni({ ...noviZaposleni, foto_url: '' })}>Ukloni</button>
+                )}
+              </div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>

@@ -44,6 +44,7 @@ interface Zaposleni {
   salon_id: string
   ime: string
   uloga?: string | null
+  foto_url?: string | null
   aktivan: boolean
 }
 
@@ -102,7 +103,7 @@ interface ClientSummary {
     zaposleni_id?: string | null
     napomena?: string | null
     usluge?: { naziv?: string } | null
-    zaposleni?: { ime?: string } | null
+    zaposleni?: { ime?: string; foto_url?: string | null } | null
   }>
   notifications?: ClientNotification[]
 }
@@ -155,6 +156,15 @@ function formatSalonHours(salon: Salon): string[] {
         ? `Nedelja ${nedeljaOd} — ${nedeljaDo}`
         : '',
   ].filter(Boolean)
+}
+
+function employeeInitials(name: string | null | undefined): string {
+  const parts = (name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+  const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase()).join('')
+  return initials || 'SP'
 }
 
 function skratiTekst(s: string, n: number): string {
@@ -808,6 +818,34 @@ export default function SalonLanding() {
     marginLeft: 'auto',
     marginBottom: 12,
   }
+  const renderEmployeeAvatar = (z: Pick<Zaposleni, 'ime' | 'foto_url'>, size = 42) =>
+    z.foto_url ? (
+      <img
+        src={z.foto_url}
+        alt={z.ime}
+        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: `1px solid ${goldBorder}`, flexShrink: 0 }}
+      />
+    ) : (
+      <span
+        style={{
+          width: size,
+          height: size,
+          borderRadius: '50%',
+          flexShrink: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(212,175,55,.12)',
+          border: `1px solid ${goldBorder}`,
+          color: gold,
+          fontSize: Math.max(11, Math.round(size * 0.32)),
+          fontWeight: 700,
+          letterSpacing: -1,
+        }}
+      >
+        {employeeInitials(z.ime)}
+      </span>
+    )
 
   const locationQuery = salon ? buildLocationQuery(salon) : ''
   const mapsUrl = locationQuery ? buildMapsEmbedSrc(locationQuery) : ''
@@ -1671,8 +1709,15 @@ export default function SalonLanding() {
                               {termin.usluge?.naziv || 'Usluga'}
                             </div>
                             {(termin.zaposleni?.ime || termin.zaposleni_id) ? (
-                              <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.38)', marginTop: '2px' }}>
-                                Kod: {termin.zaposleni?.ime || aktivniZaposleni.find((z) => z.id === termin.zaposleni_id)?.ime || 'zaposleni'}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'rgba(245,240,232,.38)', marginTop: '4px' }}>
+                                {renderEmployeeAvatar(
+                                  {
+                                    ime: termin.zaposleni?.ime || aktivniZaposleni.find((z) => z.id === termin.zaposleni_id)?.ime || 'Zaposleni',
+                                    foto_url: termin.zaposleni?.foto_url || aktivniZaposleni.find((z) => z.id === termin.zaposleni_id)?.foto_url || null,
+                                  },
+                                  22,
+                                )}
+                                <span>Kod: {termin.zaposleni?.ime || aktivniZaposleni.find((z) => z.id === termin.zaposleni_id)?.ime || 'zaposleni'}</span>
                               </div>
                             ) : null}
                           </div>
@@ -1894,18 +1939,38 @@ export default function SalonLanding() {
                   <label style={{ fontSize: '11px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '5px', letterSpacing: '.3px' }}>
                     ZAPOSLENI {aktivniZaposleni.length > 1 ? '*' : ''}
                   </label>
-                  <select
-                    style={{ width: '100%', background: '#1a1a1a', border: '0.5px solid rgba(212,175,55,.2)', borderRadius: '10px', padding: '12px 14px', fontSize: '14px', color: '#f5f0e8' }}
-                    value={forma.zaposleni_id}
-                    onChange={(e) => setForma({ ...forma, zaposleni_id: e.target.value })}
-                  >
-                    {aktivniZaposleni.length > 1 && <option value="">Izaberite zaposlenog</option>}
-                    {aktivniZaposleni.map((z) => (
-                      <option key={z.id} value={z.id}>
-                        {z.ime}{z.uloga ? ` - ${z.uloga}` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '10px' }}>
+                    {aktivniZaposleni.map((z) => {
+                      const selected = forma.zaposleni_id === z.id
+                      return (
+                        <button
+                          key={z.id}
+                          type="button"
+                          onClick={() => setForma({ ...forma, zaposleni_id: z.id })}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            textAlign: 'left',
+                            background: selected ? 'rgba(212,175,55,.12)' : '#1a1a1a',
+                            border: `0.5px solid ${selected ? gold : 'rgba(212,175,55,.2)'}`,
+                            borderRadius: '12px',
+                            padding: '12px',
+                            cursor: 'pointer',
+                            color: '#f5f0e8',
+                          }}
+                        >
+                          {renderEmployeeAvatar(z, 42)}
+                          <span>
+                            <span style={{ display: 'block', fontSize: '13px', fontWeight: 600 }}>{z.ime}</span>
+                            <span style={{ display: 'block', fontSize: '11px', color: 'rgba(245,240,232,.45)', marginTop: 2 }}>
+                              {z.uloga || 'Zaposleni'}
+                            </span>
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
               <div style={{ gridColumn: '1/-1' }}>
