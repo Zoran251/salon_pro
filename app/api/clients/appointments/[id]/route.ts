@@ -291,9 +291,25 @@ export async function PATCH(request: Request, context: RouteCtx) {
       return NextResponse.json({ error: 'Nema podataka za izmenu.' }, { status: 400 })
     }
 
-    const { error: updErr } = await userClient.from('termini').update(patch).eq('id', terminId)
+    const { data: updated, error: updErr } = await userClient
+      .from('termini')
+      .update(patch)
+      .eq('id', terminId)
+      .eq('client_id', clientData.id)
+      .select('id')
+      .maybeSingle()
 
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
+    if (!updated) {
+      return NextResponse.json(
+        {
+          error:
+            'Izmena termina nije sačuvana (nema dozvole ili red nije pronađen). Osvežite stranicu i pokušajte ponovo.',
+        },
+        { status: 403 },
+      )
+    }
+
     return NextResponse.json({ success: true })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Greška servera.'

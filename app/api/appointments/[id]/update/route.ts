@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
-import { sendToTopic, sendPushNotification } from '@/lib/notifications/firebase-config'
+import { sendToTopic } from '@/lib/notifications/firebase-config'
 import {
   whatsappTemplates,
   formatters,
@@ -59,7 +59,7 @@ export async function PATCH(
       )
     }
 
-    const { url, anonKey, ok } = getPublicSupabaseEnv()
+    const { ok } = getPublicSupabaseEnv()
     if (!ok) {
       return NextResponse.json(
         { error: 'Server nije konfigurisan' },
