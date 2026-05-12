@@ -144,6 +144,8 @@ export type Database = {
           napomena: string | null
           status: string | null
           created_at: string | null
+          /** true kada je kupac poslednji menjao potvrđen termin — salon vidi upozorenje u dashboardu */
+          last_updated_by_client?: boolean | null
         }
         Insert: {
           id?: string
@@ -157,6 +159,7 @@ export type Database = {
           napomena?: string | null
           status?: string | null
           created_at?: string | null
+          last_updated_by_client?: boolean | null
         }
         Update: Partial<Database['public']['Tables']['termini']['Insert']>
         Relationships: []
