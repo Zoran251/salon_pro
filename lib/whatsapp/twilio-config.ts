@@ -1,155 +1,60 @@
 // lib/whatsapp/twilio-config.ts
+//
+// WhatsApp/SMS preko Twilio-a — dodaje se posebno (npm install twilio + TWILIO_* u Vercel okruženju).
+// Ovaj modul ne importuje `twilio` da bi `next build` prolazio bez tog paketa.
 
-import twilio from 'twilio'
+export type ChannelSendResult =
+  | { success: true; messageSid?: string; status?: string }
+  | { success: false; skipped: true; reason: 'whatsapp_not_integrated' }
 
-let twilioClient: ReturnType<typeof twilio> | null = null
-
-/**
- * Inicijalizuj Twilio klijent
- */
-function getTwilioClient() {
-  if (twilioClient) {
-    return twilioClient
-  }
-
-  const accountSid = process.env.TWILIO_ACCOUNT_SID
-  const authToken = process.env.TWILIO_AUTH_TOKEN
-
-  if (!accountSid || !authToken) {
-    throw new Error(
-      'TWILIO_ACCOUNT_SID i TWILIO_AUTH_TOKEN nisu postavljeni u environment varijablama'
-    )
-  }
-
-  twilioClient = twilio(accountSid, authToken)
-  return twilioClient
+function logSkipped(context: string) {
+  console.info(
+    `[WhatsApp/Twilio] ${context}: preskočeno — integracija nije uključena. ` +
+      'Kada budete spremni: npm install twilio, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER.',
+  )
 }
 
 /**
- * Pošalji WhatsApp poruku
+ * Pošalji WhatsApp poruku (Twilio) — stub dok se ne doda paket i ključevi.
  */
 export async function sendWhatsAppMessage(
   toPhoneNumber: string,
   messageBody: string,
-  mediaUrl?: string
-) {
-  const client = getTwilioClient()
-  const fromNumber = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155552671'
-
-  // Validacija broja telefona
-  if (!toPhoneNumber.startsWith('+')) {
-    throw new Error(
-      'Broj telefona mora biti u internacionalnom formatu (npr: +381601234567)'
-    )
-  }
-
-  try {
-    const messageData: any = {
-      from: fromNumber,
-      to: `whatsapp:${toPhoneNumber}`,
-      body: messageBody,
-    }
-
-    if (mediaUrl) {
-      messageData.mediaUrl = mediaUrl
-    }
-
-    const message = await client.messages.create(messageData)
-
-    console.log('[Twilio] WhatsApp poruka poslata:', {
-      sid: message.sid,
-      to: message.to,
-      status: message.status,
-    })
-
-    return {
-      success: true,
-      messageSid: message.sid,
-      status: message.status,
-    }
-  } catch (error) {
-    console.error('[Twilio] Greška pri slanju WhatsApp poruke:', error)
-    throw error
-  }
+  mediaUrl?: string,
+): Promise<ChannelSendResult> {
+  void toPhoneNumber
+  void messageBody
+  void mediaUrl
+  logSkipped('sendWhatsAppMessage')
+  return { success: false, skipped: true, reason: 'whatsapp_not_integrated' }
 }
 
 /**
- * Pošalji SMS kao fallback (ako WhatsApp ne radi)
+ * Pošalji SMS (Twilio) — stub.
  */
-export async function sendSMS(
-  toPhoneNumber: string,
-  messageBody: string
-) {
-  const client = getTwilioClient()
-  const fromNumber = process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_WHATSAPP_NUMBER
-
-  if (!fromNumber) {
-    throw new Error('TWILIO_PHONE_NUMBER nije postavljen')
-  }
-
-  if (!toPhoneNumber.startsWith('+')) {
-    throw new Error(
-      'Broj telefona mora biti u internacionalnom formatu (npr: +381601234567)'
-    )
-  }
-
-  try {
-    const message = await client.messages.create({
-      from: fromNumber,
-      to: toPhoneNumber,
-      body: messageBody,
-    })
-
-    console.log('[Twilio] SMS poruka poslata:', {
-      sid: message.sid,
-      to: message.to,
-      status: message.status,
-    })
-
-    return {
-      success: true,
-      messageSid: message.sid,
-      status: message.status,
-    }
-  } catch (error) {
-    console.error('[Twilio] Greška pri slanju SMS-a:', error)
-    throw error
-  }
+export async function sendSMS(toPhoneNumber: string, messageBody: string): Promise<ChannelSendResult> {
+  void toPhoneNumber
+  void messageBody
+  logSkipped('sendSMS')
+  return { success: false, skipped: true, reason: 'whatsapp_not_integrated' }
 }
 
 /**
- * Provjeri status poruke
+ * Provjeri status poruke — stub.
  */
 export async function getMessageStatus(messageSid: string) {
-  const client = getTwilioClient()
-
-  try {
-    const message = await client.messages(messageSid).fetch()
-
-    return {
-      status: message.status,
-      dateCreated: message.dateCreated,
-      dateSent: message.dateSent,
-      dateUpdated: message.dateUpdated,
-      errorCode: message.errorCode,
-      errorMessage: message.errorMessage,
-    }
-  } catch (error) {
-    console.error('[Twilio] Greška pri provjeri statusa poruke:', error)
-    throw error
-  }
+  void messageSid
+  logSkipped('getMessageStatus')
+  return null
 }
 
 /**
- * Validiraj broj telefona
+ * Validiraj / normalizuj broj telefona (bez mrežnog poziva).
  */
 export function formatPhoneNumber(phoneNumber: string): string {
-  // Ukloni sve znakove osim brojeva i +
   let cleaned = phoneNumber.replace(/[^\d+]/g, '')
 
-  // Ako nema +, dodaj ga
   if (!cleaned.startsWith('+')) {
-    // Pretpostavi +381 za Srbiju ako nema koda
     if (cleaned.startsWith('0')) {
       cleaned = '+381' + cleaned.substring(1)
     } else {
@@ -161,56 +66,29 @@ export function formatPhoneNumber(phoneNumber: string): string {
 }
 
 /**
- * Pošalji notifikaciju korisnikу (WhatsApp ili SMS)
+ * Pošalji notifikaciju korisniku (WhatsApp ili SMS) — stub.
  */
 export async function sendNotificationToUser(
   phoneNumber: string,
   message: string,
-  preferWhatsApp: boolean = true
-) {
-  const formattedPhone = formatPhoneNumber(phoneNumber)
-
-  try {
-    if (preferWhatsApp) {
-      // Prvo pokušaj WhatsApp
-      return await sendWhatsAppMessage(formattedPhone, message)
-    } else {
-      // Ako ne želi WhatsApp, pošalji SMS
-      return await sendSMS(formattedPhone, message)
-    }
-  } catch (error) {
-    console.error('[Twilio] Greška pri slanju notifikacije:', error)
-    // Ako WhatsApp ne radi, pokušaj sa SMS-om
-    if (preferWhatsApp) {
-      try {
-        console.log('[Twilio] Padback na SMS...')
-        return await sendSMS(formattedPhone, message)
-      } catch (smsError) {
-        console.error('[Twilio] SMS fallback nije radio:', smsError)
-        throw smsError
-      }
-    }
-    throw error
-  }
+  preferWhatsApp: boolean = true,
+): Promise<ChannelSendResult> {
+  void formatPhoneNumber(phoneNumber)
+  void message
+  void preferWhatsApp
+  logSkipped('sendNotificationToUser')
+  return { success: false, skipped: true, reason: 'whatsapp_not_integrated' }
 }
 
 /**
- * Pošalji notifikaciju salonu sa visokim prioritetom
+ * Hitna notifikacija salonu — stub.
  */
 export async function sendUrgentSalonNotification(
   phoneNumber: string,
-  message: string
-) {
-  const formattedPhone = formatPhoneNumber(phoneNumber)
-
-  // Za salon, uvek koristi WhatsApp jer je brže
-  try {
-    return await sendWhatsAppMessage(
-      formattedPhone,
-      '🚨 ' + message // Dodaj emoji za hitan slučaj
-    )
-  } catch (error) {
-    console.error('[Twilio] Greška pri slanju hitne notifikacije salonu:', error)
-    throw error
-  }
+  message: string,
+): Promise<ChannelSendResult> {
+  void formatPhoneNumber(phoneNumber)
+  void message
+  logSkipped('sendUrgentSalonNotification')
+  return { success: false, skipped: true, reason: 'whatsapp_not_integrated' }
 }
