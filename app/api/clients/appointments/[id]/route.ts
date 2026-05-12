@@ -97,37 +97,54 @@ export async function DELETE(request: Request, context: RouteCtx) {
         const status = /nije pronađen|nije povezan|ne pripada/i.test(cancelRpcError.message) ? 404 : 500
         return NextResponse.json({ error: cancelRpcError.message }, { status })
       }
+    } else {
+      type RpcPayload = { success?: boolean; tier?: string; message?: string }
+      const rpc = cancelledRaw as RpcPayload | null
+      if (rpc?.tier === 'already_cancelled') {
+        return NextResponse.json({
+          success: true,
+          tier: 'already_cancelled',
+          message: rpc.message || 'Termin je već otkazan.',
+        })
+      }
+      if (rpc && rpc.success === false) {
+        return NextResponse.json(
+          { error: rpc.message || 'Otkazivanje nije moguće.' },
+          { status: 400 },
+        )
+      }
+      if (rpc?.tier) {
+        return NextResponse.json({
+          success: true,
+          tier: rpc.tier,
+          message: rpc.message || 'Termin je otkazan.',
+        })
+      }
     }
 
-    const cancelled = !cancelRpcError ? (cancelledRaw as { status?: string | null; datum_vrijeme?: string | null } | null) : null
+    const { data: termin, error: terminError } = await userClient
+      .from('termini')
+      .select('id, salon_id, client_id, datum_vrijeme, status')
+      .eq('id', terminId)
+      .eq('salon_id', salonId)
+      .eq('client_id', clientData.id)
+      .maybeSingle()
 
-    if (cancelled?.status === 'already_cancelled') {
+    if (terminError) return NextResponse.json({ error: terminError.message }, { status: 500 })
+    if (!termin) {
+      return NextResponse.json({ error: 'Termin nije pronađen.' }, { status: 404 })
+    }
+    if (termin.status === 'otkazan') {
       return NextResponse.json({ success: true, tier: 'already_cancelled', message: 'Termin je već otkazan.' })
     }
-
-    const service = getServerSupabaseClient()
-    if (!service) {
-      return NextResponse.json({ error: 'Server nije konfigurisan.' }, { status: 500 })
+    if (termin.status === 'nije_dosao') {
+      return NextResponse.json(
+        { error: 'Termin je označen kao nedolazak; otkazivanje nije moguće.' },
+        { status: 400 },
+      )
     }
 
-    let datumVrijeme = typeof cancelled?.datum_vrijeme === 'string' ? cancelled.datum_vrijeme : ''
-    if (!datumVrijeme) {
-      const { data: termin, error: terminError } = await service
-        .from('termini')
-        .select('id, salon_id, client_id, datum_vrijeme, status')
-        .eq('id', terminId)
-        .maybeSingle()
-
-      if (terminError) return NextResponse.json({ error: terminError.message }, { status: 500 })
-      if (!termin || termin.salon_id !== salonId || termin.client_id !== clientData.id) {
-        return NextResponse.json({ error: 'Termin nije pronađen.' }, { status: 404 })
-      }
-      if (termin.status === 'otkazan') {
-        return NextResponse.json({ success: true, tier: 'already_cancelled', message: 'Termin je već otkazan.' })
-      }
-      datumVrijeme = termin.datum_vrijeme as string
-    }
-
+    const datumVrijeme = termin.datum_vrijeme as string
     const minutesBefore = minutesUntilStart(datumVrijeme)
 
     let tier: 'no_penalty' | 'late_warning' | 'blacklist' = 'no_penalty'
@@ -143,11 +160,12 @@ export async function DELETE(request: Request, context: RouteCtx) {
           error:
             'Kasno otkazivanje zahteva administratorski ključ na serveru (SUPABASE_SERVICE_ROLE_KEY). Kontaktirajte podršku.',
         },
-        { status: 503 }
+        { status: 503 },
       )
     }
 
-    if (tier === 'blacklist') {
+    const service = getServerSupabaseClient()
+    if (tier === 'blacklist' && service) {
       const { error: blErr } = await service.from('kupci_crna_lista').upsert(
         {
           auth_user_id: userData.user.id,
@@ -158,15 +176,31 @@ export async function DELETE(request: Request, context: RouteCtx) {
           salon_id: salonId,
           termin_id: terminId,
         },
-        { onConflict: 'auth_user_id' }
+        { onConflict: 'auth_user_id' },
       )
 
       if (blErr) {
         return NextResponse.json(
-          { error: `Termin je otkazan, ali zapis u crnoj listi nije uspeo: ${blErr.message}` },
-          { status: 500 }
+          { error: `Otkazivanje nije završeno: crna lista nije uspela (${blErr.message}).` },
+          { status: 500 },
         )
       }
+    }
+
+    const { data: upd, error: updErr } = await userClient
+      .from('termini')
+      .update({ status: 'otkazan' })
+      .eq('id', terminId)
+      .eq('client_id', clientData.id)
+      .select('id')
+      .maybeSingle()
+
+    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
+    if (!upd) {
+      return NextResponse.json(
+        { error: 'Otkazivanje nije sačuvano (nema dozvole ili red nije pronađen).' },
+        { status: 403 },
+      )
     }
 
     const messages: Record<string, string> = {

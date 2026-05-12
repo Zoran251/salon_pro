@@ -95,6 +95,7 @@ export async function GET(request: Request) {
       .eq('salon_id', salonId)
       .eq('client_id', clientData.id)
       .order('datum_vrijeme', { ascending: false })
+      .limit(200)
     let appointments = appointmentsResult.data as AppointmentRow[] | null
     let appointmentsError = appointmentsResult.error
 
@@ -105,6 +106,7 @@ export async function GET(request: Request) {
         .eq('salon_id', salonId)
         .eq('client_id', clientData.id)
         .order('datum_vrijeme', { ascending: false })
+        .limit(200)
       appointments = retry.data as AppointmentRow[] | null
       appointmentsError = retry.error
     }
@@ -162,7 +164,7 @@ export async function GET(request: Request) {
         loyaltyData && !loyaltyError
           ? loyaltyData
           : { visits_count: 0, progress_percent: 0, reward_ready: false },
-      appointments: allAppointments.slice(0, 6),
+      appointments: allAppointments,
       notifications: notifRows || [],
     })
   } catch (error) {
