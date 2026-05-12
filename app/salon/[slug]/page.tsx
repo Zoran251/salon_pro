@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { waitForClientSession } from '@/lib/wait-client-session'
 import { getAppRole } from '@/lib/user-role'
+import { lokalnoDatumVrijemeKaIsoUtc } from '@/lib/lokalno-datum-vrijeme-iso'
 import { isTerminOtkazan, isTerminPotvrdjen, storageTerminStatus } from '@/lib/termin-status'
 
 interface Usluga {
@@ -875,7 +876,14 @@ export default function SalonLanding() {
     setLoading(true)
     setGreska('')
     try {
-      const datumVrijeme = `${forma.datum}T${forma.vrijeme}:00`
+      let datumVrijeme: string
+      try {
+        datumVrijeme = lokalnoDatumVrijemeKaIsoUtc(forma.datum, forma.vrijeme)
+      } catch {
+        setGreska('Neispravan datum ili vreme.')
+        setLoading(false)
+        return
+      }
       const emailZaTermin =
         klijentUlogovan && clientSummary?.client?.email ? String(clientSummary.client.email).trim() : undefined
 
@@ -1023,11 +1031,17 @@ export default function SalonLanding() {
       const token = sessionData.session?.access_token
       if (!token) throw new Error('Nema sesije.')
       const params = new URLSearchParams({ auth_token: token, salon_id: salon.id })
+      let datumVrijemeIso: string
+      try {
+        datumVrijemeIso = lokalnoDatumVrijemeKaIsoUtc(terminEdit.datum, terminEdit.vrijeme)
+      } catch {
+        throw new Error('Neispravan datum ili vreme.')
+      }
       const res = await fetch(`/api/clients/appointments/${terminEdit.id}?${params.toString()}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          datum_vrijeme: `${terminEdit.datum}T${terminEdit.vrijeme}:00`,
+          datum_vrijeme: datumVrijemeIso,
           usluga_id: terminEdit.usluga_id || null,
           zaposleni_id: terminEdit.zaposleni_id || null,
           napomena: terminEdit.napomena || null,
