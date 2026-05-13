@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -150,6 +150,8 @@ export default function Dashboard() {
   const [lager, setLager] = useState<LagerRow[]>([])
   const [termini, setTermini] = useState<TerminRow[]>([])
   const [salonNotifications, setSalonNotifications] = useState<SalonNotification[]>([])
+  const [notifMenuOpen, setNotifMenuOpen] = useState(false)
+  const notifMenuRef = useRef<HTMLDivElement>(null)
   const [crnaLista, setCrnaLista] = useState<CrnaListaRow[]>([])
   const [crnaRučnoTelefon, setCrnaRučnoTelefon] = useState('')
   const [crnaRučnoIme, setCrnaRučnoIme] = useState('')
@@ -224,7 +226,22 @@ export default function Dashboard() {
           : terminFilter === 'prosli'
             ? 'Prošli termini'
             : 'Svi termini'
-  const neprocitaniTermini = termini.filter(t => t.status !== 'potvrđen' && t.status !== 'otkazan').length
+  const kupacIzmijenioPotvrdjen = termini.filter(
+    (t) => t.status === 'potvrđen' && Boolean((t as { last_updated_by_client?: boolean }).last_updated_by_client),
+  ).length
+  const neprocitaniTermini =
+    termini.filter((t) => t.status !== 'potvrđen' && t.status !== 'otkazan').length + kupacIzmijenioPotvrdjen
+  const zvonacBroj = Math.max(neprocitaniTermini, salonNotifications.length)
+
+  useEffect(() => {
+    if (!notifMenuOpen) return
+    const close = (e: MouseEvent) => {
+      const el = notifMenuRef.current
+      if (el && !el.contains(e.target as Node)) setNotifMenuOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [notifMenuOpen])
 
   // getSession() pri prvom renderu često vrati null dok Supabase ne učita sesiju iz localStorage.
   // onAuthStateChange + kratki retry sprječavaju lažni redirect na /login nakon uspješne prijave.
@@ -436,7 +453,7 @@ export default function Dashboard() {
         .select('id, title, body, created_at, appointment_id')
         .eq('salon_id', userId)
         .order('created_at', { ascending: false })
-        .limit(5)
+        .limit(25)
 
       if (salonNotifErr) {
         const missingTable = /relation .*salon_notifications.* does not exist/i.test(salonNotifErr.message)
@@ -995,21 +1012,6 @@ export default function Dashboard() {
   // Render funkcije ostaju identične...
   const renderPregled = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {salonNotifications.length > 0 && (
-        <div style={{ ...cardStyle, borderColor: 'rgba(220,100,100,.35)', background: 'rgba(120,45,45,.12)' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#ffb3b3', marginBottom: '12px' }}>Nova obaveštenja</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {salonNotifications.map((n) => (
-              <div key={n.id} style={{ borderBottom: '0.5px solid rgba(255,255,255,.08)', paddingBottom: '10px' }}>
-                <div style={{ fontSize: '13px', color: text, fontWeight: 600 }}>{n.title}</div>
-                <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.7)', lineHeight: 1.5, marginTop: '4px' }}>{n.body}</div>
-                <div style={{ fontSize: '11px', color: muted, marginTop: '4px' }}>{new Date(n.created_at).toLocaleString('sr')}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: '12px' }}>
         {[
           { label: 'Termini danas', value: danasnjiTermini.length.toString(), icon: '📅' },
@@ -2085,18 +2087,127 @@ export default function Dashboard() {
           SalonPro
         </Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button
-            onClick={() => setAktivan('termini')}
-            style={{ width: '36px', height: '36px', borderRadius: '50%', border: `0.5px solid ${goldBorder}`, background: '#111', color: text, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}
-            title="Notifikacije termina"
-          >
-            🔔
-            {neprocitaniTermini > 0 && (
-              <span style={{ position: 'absolute', top: '-4px', right: '-4px', minWidth: '18px', height: '18px', borderRadius: '9px', background: '#d4af37', color: '#0a0a0a', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>
-                {neprocitaniTermini}
-              </span>
+          <div ref={notifMenuRef} style={{ position: 'relative' }}>
+            <button
+              type="button"
+              aria-expanded={notifMenuOpen}
+              aria-haspopup="true"
+              aria-label="Obaveštenja"
+              onClick={() => setNotifMenuOpen((o) => !o)}
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                border: `0.5px solid ${goldBorder}`,
+                background: notifMenuOpen ? 'rgba(212,175,55,.12)' : '#111',
+                color: text,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                position: 'relative',
+              }}
+              title="Obaveštenja"
+            >
+              🔔
+              {zvonacBroj > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    minWidth: '18px',
+                    height: '18px',
+                    borderRadius: '9px',
+                    background: '#d4af37',
+                    color: '#0a0a0a',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0 4px',
+                  }}
+                >
+                  {zvonacBroj > 99 ? '99+' : zvonacBroj}
+                </span>
+              )}
+            </button>
+            {notifMenuOpen && (
+              <div
+                role="menu"
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  right: 0,
+                  width: 'min(360px, calc(100vw - 32px))',
+                  maxHeight: 'min(420px, 70vh)',
+                  overflowY: 'auto',
+                  background: '#141414',
+                  border: `0.5px solid ${goldBorder}`,
+                  borderRadius: '14px',
+                  boxShadow: '0 16px 48px rgba(0,0,0,.55)',
+                  zIndex: 200,
+                  padding: '12px 0',
+                }}
+              >
+                <div style={{ padding: '0 14px 10px', borderBottom: '0.5px solid rgba(255,255,255,.08)' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: text }}>Obaveštenja</div>
+                  <div style={{ fontSize: '11px', color: muted, marginTop: '4px' }}>Salon i aktivnosti na terminima</div>
+                </div>
+                {salonNotifications.length === 0 ? (
+                  <div style={{ padding: '16px 14px', fontSize: '13px', color: muted }}>Nema obaveštenja u listi.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {salonNotifications.map((n, idx) => (
+                      <div
+                        key={n.id}
+                        role="menuitem"
+                        style={{
+                          padding: '12px 14px',
+                          borderBottom: idx < salonNotifications.length - 1 ? '0.5px solid rgba(255,255,255,.06)' : 'none',
+                        }}
+                      >
+                        <div style={{ fontSize: '13px', color: text, fontWeight: 600 }}>{n.title}</div>
+                        <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.72)', lineHeight: 1.5, marginTop: '4px' }}>{n.body}</div>
+                        <div style={{ fontSize: '11px', color: muted, marginTop: '6px' }}>
+                          {new Date(n.created_at).toLocaleString('sr-Latn-RS')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {neprocitaniTermini > 0 && (
+                  <div style={{ padding: '10px 14px 4px', borderTop: '0.5px solid rgba(255,255,255,.08)' }}>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setNotifMenuOpen(false)
+                        setAktivan('termini')
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        border: `0.5px solid ${goldBorder}`,
+                        background: 'rgba(212,175,55,.08)',
+                        color: gold,
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        fontFamily: 'sans-serif',
+                      }}
+                    >
+                      Otvori termine za potvrdu / izmene
+                      <span style={{ opacity: 0.85, fontWeight: 700, marginLeft: 6 }}>({neprocitaniTermini})</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
-          </button>
+          </div>
           {profil.logo && <img src={profil.logo} alt="logo" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />}
           <span style={{ fontSize: '13px', color: muted }}>{salon?.naziv}</span>
           <div style={{ width: '36px', height: '36px', background: `linear-gradient(135deg,${gold},#b8960c)`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600, color: '#0a0a0a', cursor: 'pointer', flexShrink: 0 }}>
