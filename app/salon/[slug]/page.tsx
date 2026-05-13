@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { waitForClientSession } from '@/lib/wait-client-session'
 import { getAppRole } from '@/lib/user-role'
 import { isTerminOtkazan, isTerminPotvrdjen, storageTerminStatus } from '@/lib/termin-status'
+import { datumIVremeFormaIzIsoBelgrad, srbijaDatumVrijemeKaIsoUtc } from '@/lib/termin-srbija-vrijeme'
 
 interface Usluga {
   id: string
@@ -212,8 +213,8 @@ export default function SalonLanding() {
   const notifPrimedRef = useRef(false)
   const uslugeAnchorRef = useRef<HTMLDivElement | null>(null)
   const podaciAnchorRef = useRef<HTMLDivElement | null>(null)
-  const kupacMenuRef = useRef<HTMLDivElement | null>(null)
-  const [kupacMenuOpen, setKupacMenuOpen] = useState(false)
+  const korisnikMenuRef = useRef<HTMLDivElement | null>(null)
+  const [korisnikMenuOpen, setKorisnikMenuOpen] = useState(false)
   const [bookingPickerOpen, setBookingPickerOpen] = useState(false)
   const [bookingPickerKategorija, setBookingPickerKategorija] = useState('Ostalo')
   const [terminAkcijaPoruka, setTerminAkcijaPoruka] = useState('')
@@ -271,7 +272,7 @@ export default function SalonLanding() {
     }
     setActiveView('booking')
     setMobileMenuOpen(false)
-    setKupacMenuOpen(false)
+    setKorisnikMenuOpen(false)
     setNotifPanelOpen(false)
     setTerminAkcijaPoruka('')
     setTerminAkcijaGreska('')
@@ -375,7 +376,7 @@ export default function SalonLanding() {
         setKlijentUlogovan(true)
         return
       }
-      // Stari nalozi bez app_role: kupac ako nije vlasnik ovog salona
+      // Stari nalozi bez app_role: korisnik (klijent) ako nije vlasnik ovog salona
       setKlijentUlogovan(user.id !== salon.id)
     }
 
@@ -397,7 +398,7 @@ export default function SalonLanding() {
         return
       }
       // Ne postavljati „nije ulogovan” na session === null osim pri SIGNED_OUT.
-      // Supabase ponekad prosledi prazan session u toku osvežavanja tokena — to je skidalo kupcu profil, termine i izmene.
+      // Supabase ponekad prosledi prazan session u toku osvežavanja tokena — to je skidalo korisniku profil, termine i izmene.
       if (session?.user) {
         applyUser(session.user)
       }
@@ -422,9 +423,12 @@ export default function SalonLanding() {
         return
       }
 
-      const params = new URLSearchParams({ auth_token: token, salon_id: salon.id })
+      const params = new URLSearchParams({ salon_id: salon.id })
       if (prikaziSvaObavestenja) params.set('notifications', 'all')
-      const res = await fetch(`/api/clients/me?${params.toString()}`, { cache: 'no-store' })
+      const res = await fetch(`/api/clients/me?${params.toString()}`, {
+        cache: 'no-store',
+        headers: { Authorization: `Bearer ${token}` },
+      })
       const data = (await res.json()) as { error?: string } & Partial<ClientSummary>
       if (!res.ok || data.error) {
         setClientSummary(null)
@@ -453,7 +457,7 @@ export default function SalonLanding() {
       setClientSummary(null)
       setInAppToast({
         title: 'Pristup ograničen',
-        body: 'Vaš nalog je na crnoj listi. Sesija je zatvorena; prijava kao kupac nije moguća.',
+        body: 'Vaš nalog je na crnoj listi. Sesija je zatvorena; prijava kao korisnik nije moguća.',
       })
     })()
     return () => {
@@ -461,7 +465,7 @@ export default function SalonLanding() {
     }
   }, [klijentUlogovan, clientSummary?.booking_blocked])
 
-  // Automatsko ime/telefon iz profila kada je kupac ulogovan.
+  // Automatsko ime/telefon iz profila kada je korisnik ulogovan.
   // Ne sme se osloniti samo na prvi render: clientSummary često stigne posle otvaranja forme.
   useEffect(() => {
     if (!showForma) {
@@ -490,7 +494,7 @@ export default function SalonLanding() {
     }))
   }, [showForma, klijentUlogovan, clientSummary])
 
-  /** In-app obaveštenja: osvežavanje na celoj stranici dok je kupac ulogovan. */
+  /** In-app obaveštenja: osvežavanje na celoj stranici dok je korisnik ulogovan. */
   useEffect(() => {
     if (!klijentUlogovan || !salon?.id) return
     const id = window.setInterval(() => void ucitajClientSummary({ silent: true }), 30000)
@@ -541,14 +545,14 @@ export default function SalonLanding() {
   }, [notifPanelOpen])
 
   useEffect(() => {
-    if (!kupacMenuOpen) return
+    if (!korisnikMenuOpen) return
     const close = (e: MouseEvent) => {
-      if (kupacMenuRef.current && !kupacMenuRef.current.contains(e.target as Node)) {
-        setKupacMenuOpen(false)
+      if (korisnikMenuRef.current && !korisnikMenuRef.current.contains(e.target as Node)) {
+        setKorisnikMenuOpen(false)
       }
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setKupacMenuOpen(false)
+      if (e.key === 'Escape') setKorisnikMenuOpen(false)
     }
     document.addEventListener('mousedown', close)
     window.addEventListener('keydown', onKey)
@@ -556,7 +560,7 @@ export default function SalonLanding() {
       document.removeEventListener('mousedown', close)
       window.removeEventListener('keydown', onKey)
     }
-  }, [kupacMenuOpen])
+  }, [korisnikMenuOpen])
 
   useEffect(() => {
     if (!inAppToast) return
@@ -727,7 +731,7 @@ export default function SalonLanding() {
   const gold = salon.boja_primarna || '#d4af37'
   const goldFaint = 'rgba(212,175,55,.12)'
   const goldBorder = 'rgba(212,175,55,.25)'
-  const kupacReturnEnc = encodeURIComponent(`/salon/${slug}`)
+  const korisnikPovratakEnc = encodeURIComponent(`/salon/${slug}`)
   const salonHours = formatSalonHours(salon)
   const neprocitaneObavestenja =
     clientSummary?.notifications?.filter((n) => !n.read_at).length ?? 0
@@ -757,7 +761,7 @@ export default function SalonLanding() {
     boxShadow: '0 24px 70px rgba(0,0,0,.65)',
     padding: '16px 16px 14px',
   }
-  const customerPanelStyle: React.CSSProperties = isMobileHeader
+  const korisnikPanelStyle: React.CSSProperties = isMobileHeader
     ? {
         ...modalPanelStyle,
         position: 'fixed',
@@ -875,27 +879,39 @@ export default function SalonLanding() {
     setLoading(true)
     setGreska('')
     try {
-      const datumVrijeme = `${forma.datum}T${forma.vrijeme}:00`
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData.session?.access_token
+      if (!accessToken) {
+        setGreska(
+          'Morate biti prijavljeni kao korisnik da biste zakazali termin. Otvorite meni profila (gore desno) i prijavite se.',
+        )
+        return
+      }
+
+      let datumVrijemeIso: string
+      try {
+        datumVrijemeIso = srbijaDatumVrijemeKaIsoUtc(forma.datum, forma.vrijeme)
+      } catch {
+        setGreska('Neispravan datum ili vreme.')
+        return
+      }
+
       const emailZaTermin =
         klijentUlogovan && clientSummary?.client?.email ? String(clientSummary.client.email).trim() : undefined
 
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (klijentUlogovan) {
-        const { data: sessionData } = await supabase.auth.getSession()
-        const token = sessionData.session?.access_token
-        if (token) headers.Authorization = `Bearer ${token}`
-      }
-
       const res = await fetch('/api/termini', {
         method: 'POST',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
         body: JSON.stringify({
           salon_id: salon.id,
           usluga_id: odabranaUsluga?.id || null,
           zaposleni_id: forma.zaposleni_id || null,
           ime_klijenta: forma.ime,
           telefon_klijenta: forma.telefon,
-          datum_vrijeme: datumVrijeme,
+          datum_vrijeme: datumVrijemeIso,
           napomena: forma.napomena,
           ...(emailZaTermin ? { email: emailZaTermin } : {}),
         }),
@@ -903,14 +919,13 @@ export default function SalonLanding() {
       const data = (await res.json()) as { error?: string; success?: boolean; termin_id?: string | null }
       if (data.error) {
         setGreska(data.error)
-        setLoading(false)
         return
       }
       const nextNotif: BookingNotification = {
         salon_id: salon.id,
         ime: forma.ime,
         telefon: forma.telefon,
-        datum_vrijeme: datumVrijeme,
+        datum_vrijeme: datumVrijemeIso,
         status: 'ceka',
         ...(typeof data.termin_id === 'string' && data.termin_id ? { termin_id: data.termin_id } : {}),
       }
@@ -921,12 +936,20 @@ export default function SalonLanding() {
       window.setTimeout(() => void provjeriStatusTermina(), 4000)
       setUspjeh(true)
       setShowForma(false)
-      setForma({ ime: '', telefon: '', datum: '', vrijeme: '', zaposleni_id: aktivniZaposleni.length === 1 ? aktivniZaposleni[0].id : '', napomena: '' })
+      setForma({
+        ime: '',
+        telefon: '',
+        datum: '',
+        vrijeme: '',
+        zaposleni_id: aktivniZaposleni.length === 1 ? aktivniZaposleni[0].id : '',
+        napomena: '',
+      })
       if (klijentUlogovan) void ucitajClientSummary()
     } catch {
       setGreska('Došlo je do greške. Pokušajte ponovo.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const handleClientLogout = async () => {
@@ -934,7 +957,7 @@ export default function SalonLanding() {
     setKlijentUlogovan(false)
     setClientSummary(null)
     setProfilUredi(false)
-    setKupacMenuOpen(false)
+    setKorisnikMenuOpen(false)
     setClientAuthSuccess('Odjavljeni ste.')
   }
 
@@ -950,7 +973,7 @@ export default function SalonLanding() {
     setProfilPoruka('')
   }
 
-  const snimiProfilKupca = async () => {
+  const snimiProfilKorisnika = async () => {
     if (!salon?.id) return
     setProfilSnimiLoading(true)
     setProfilGreska('')
@@ -959,10 +982,13 @@ export default function SalonLanding() {
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData.session?.access_token
       if (!token) throw new Error('Nema sesije.')
-      const params = new URLSearchParams({ auth_token: token, salon_id: salon.id })
+      const params = new URLSearchParams({ salon_id: salon.id })
       const res = await fetch(`/api/clients/me?${params.toString()}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           ime: profilEdit.ime.trim(),
           telefon: profilEdit.telefon.trim(),
@@ -987,10 +1013,13 @@ export default function SalonLanding() {
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData.session?.access_token
       if (!token) return
-      const params = new URLSearchParams({ auth_token: token, salon_id: salon.id })
+      const params = new URLSearchParams({ salon_id: salon.id })
       const res = await fetch(`/api/clients/me?${params.toString()}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ mark_notification_read: notificationId }),
       })
       if (res.ok) await ucitajClientSummary()
@@ -1002,12 +1031,11 @@ export default function SalonLanding() {
   const otvoriTerminZaEdit = (termin: TerminPregled) => {
     setTerminAkcijaPoruka('')
     setTerminAkcijaGreska('')
-    const d = new Date(termin.datum_vrijeme)
-    const pad = (n: number) => String(n).padStart(2, '0')
+    const { datum, vrijeme } = datumIVremeFormaIzIsoBelgrad(termin.datum_vrijeme)
     setTerminEdit({
       id: termin.id,
-      datum: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-      vrijeme: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+      datum,
+      vrijeme,
       usluga_id: termin.usluga_id || '',
       zaposleni_id: termin.zaposleni_id || '',
       napomena: termin.napomena || '',
@@ -1022,12 +1050,21 @@ export default function SalonLanding() {
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData.session?.access_token
       if (!token) throw new Error('Nema sesije.')
-      const params = new URLSearchParams({ auth_token: token, salon_id: salon.id })
+      const params = new URLSearchParams({ salon_id: salon.id })
+      let datumVrijemeIso: string
+      try {
+        datumVrijemeIso = srbijaDatumVrijemeKaIsoUtc(terminEdit.datum, terminEdit.vrijeme)
+      } catch {
+        throw new Error('Neispravan datum ili vreme.')
+      }
       const res = await fetch(`/api/clients/appointments/${terminEdit.id}?${params.toString()}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
-          datum_vrijeme: `${terminEdit.datum}T${terminEdit.vrijeme}:00`,
+          datum_vrijeme: datumVrijemeIso,
           usluga_id: terminEdit.usluga_id || null,
           zaposleni_id: terminEdit.zaposleni_id || null,
           napomena: terminEdit.napomena || null,
@@ -1055,9 +1092,10 @@ export default function SalonLanding() {
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData.session?.access_token
       if (!token) throw new Error('Nema sesije.')
-      const params = new URLSearchParams({ auth_token: token, salon_id: salon.id })
+      const params = new URLSearchParams({ salon_id: salon.id })
       const res = await fetch(`/api/clients/appointments/${terminId}?${params.toString()}`, {
         method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
       })
       const data = (await res.json()) as { error?: string; message?: string }
       if (!res.ok) throw new Error(data.error || 'Otkazivanje nije uspelo.')
@@ -1086,7 +1124,7 @@ export default function SalonLanding() {
     setActiveView('booking')
     setMobileMenuOpen(false)
     setNotifPanelOpen(false)
-    setKupacMenuOpen(false)
+    setKorisnikMenuOpen(false)
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         uslugeAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -1098,7 +1136,7 @@ export default function SalonLanding() {
     setActiveView('profile')
     setMobileMenuOpen(false)
     setNotifPanelOpen(false)
-    setKupacMenuOpen(false)
+    setKorisnikMenuOpen(false)
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         podaciAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -1148,11 +1186,11 @@ export default function SalonLanding() {
           >
             <h3 style={{ fontSize: '17px', fontWeight: 600, color: '#f5f0e8', marginBottom: '10px' }}>Tvoji podaci</h3>
             <p style={{ fontSize: '13px', color: 'rgba(245,240,232,.55)', lineHeight: 1.6, marginBottom: '16px' }}>
-              Prijavite se ili registrujte kao kupac (zlatna ikonica profila u meniju) da biste videli podatke, obaveštenja o terminima i lojalnost za ovaj salon. Isti nalog možete koristiti i kod drugih salona; program lojalnosti i broj dolazaka uvek su vezani samo za salon u kom zakazujete.
+              Prijavite se ili registrujte kao korisnik (zlatna ikonica profila u meniju) da biste videli podatke, obaveštenja o terminima i lojalnost za ovaj salon. Isti nalog možete koristiti i kod drugih salona; program lojalnosti i broj dolazaka uvek su vezani samo za salon u kom zakazujete.
             </p>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <Link
-                href={`/kupac/registracija?next=${kupacReturnEnc}`}
+                href={`/kupac/registracija?next=${korisnikPovratakEnc}`}
                 style={{
                   flex: '1 1 140px',
                   textAlign: 'center',
@@ -1168,7 +1206,7 @@ export default function SalonLanding() {
                 Registracija
               </Link>
               <Link
-                href={`/kupac/prijava?next=${kupacReturnEnc}`}
+                href={`/kupac/prijava?next=${korisnikPovratakEnc}`}
                 style={{
                   flex: '1 1 140px',
                   textAlign: 'center',
@@ -1236,7 +1274,7 @@ export default function SalonLanding() {
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button
                       type="button"
-                      onClick={() => void snimiProfilKupca()}
+                      onClick={() => void snimiProfilKorisnika()}
                       disabled={profilSnimiLoading}
                       style={{
                         background: `linear-gradient(135deg,${gold},#b8960c)`,
@@ -1333,7 +1371,7 @@ export default function SalonLanding() {
                     clientMeError.includes('telefona') ||
                     clientMeError.includes('profil')) && (
                     <p style={{ marginBottom: '12px', color: 'rgba(245,240,232,.55)' }}>
-                      Ako ste se tek prijavili, proverite da li su ime i telefon sačuvani u profilu kupca (meni profila), pa pokušajte ponovo.
+                      Ako ste se tek prijavili, proverite da li su ime i telefon sačuvani u profilu korisnika (meni profila), pa pokušajte ponovo.
                     </p>
                   )}
                   <button
@@ -1913,7 +1951,7 @@ export default function SalonLanding() {
             <p style={{ fontSize: '13px', color: 'rgba(245,240,232,.4)', marginBottom: '24px' }}>
               {klijentUlogovan && clientSummary?.client
                 ? 'Ime i telefon su preuzeti iz vašeg profila za ovaj salon.'
-                : 'Prijavite se kao kupac da biste zakazali termin.'}
+                : 'Prijavite se kao korisnik da biste zakazali termin.'}
             </p>
             <div className="forma-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
               {[
@@ -2095,7 +2133,7 @@ export default function SalonLanding() {
                     : 'besplatna usluga'}
               </div>
               <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.58)', marginTop: '8px', lineHeight: 1.55 }}>
-                Svaki potvrđeni dolazak dodaje oko {loyaltyStepPercent}% napretka. Na prvom dolasku kupac vidi {loyaltyStepPercent}% lojalnosti.
+                Svaki potvrđeni dolazak dodaje oko {loyaltyStepPercent}% napretka. Na prvom dolasku korisnik vidi {loyaltyStepPercent}% lojalnosti.
               </div>
             </div>
           </div>
@@ -2263,18 +2301,18 @@ export default function SalonLanding() {
           </div>
 
           <div className="salon-nav-actions">
-            <div ref={kupacMenuRef} style={{ position: 'relative' }}>
+            <div ref={korisnikMenuRef} style={{ position: 'relative' }}>
               <button
                 type="button"
                 aria-haspopup="menu"
-                aria-expanded={kupacMenuOpen}
-                aria-label="Kupac — nalog, prijava ili registracija"
+                aria-expanded={korisnikMenuOpen}
+                aria-label="Korisnik — nalog, prijava ili registracija"
                 onClick={() => {
                   setNotifPanelOpen(false)
-                  setKupacMenuOpen((o) => !o)
+                  setKorisnikMenuOpen((o) => !o)
                 }}
                 style={{
-                  background: kupacMenuOpen
+                  background: korisnikMenuOpen
                     ? `linear-gradient(160deg, rgba(212,175,55,.22), rgba(212,175,55,.06))`
                     : `linear-gradient(160deg, rgba(212,175,55,.14), rgba(212,175,55,.04))`,
                   border: `1px solid ${gold}`,
@@ -2285,7 +2323,7 @@ export default function SalonLanding() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: kupacMenuOpen ? `0 0 0 1px rgba(212,175,55,.25)` : 'none',
+                  boxShadow: korisnikMenuOpen ? `0 0 0 1px rgba(212,175,55,.25)` : 'none',
                 }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -2299,17 +2337,17 @@ export default function SalonLanding() {
                   <circle cx="12" cy="7" r="4" stroke={gold} strokeWidth="1.75" />
                 </svg>
               </button>
-              {kupacMenuOpen && (
+              {korisnikMenuOpen && (
                 <>
-                  {isMobileHeader && <div style={modalBackdropStyle} onClick={() => setKupacMenuOpen(false)} />}
+                  {isMobileHeader && <div style={modalBackdropStyle} onClick={() => setKorisnikMenuOpen(false)} />}
                   <div
                     role="menu"
-                    style={customerPanelStyle}
+                    style={korisnikPanelStyle}
                   >
                   {isMobileHeader && (
                     <button
                       type="button"
-                      onClick={() => setKupacMenuOpen(false)}
+                      onClick={() => setKorisnikMenuOpen(false)}
                       style={modalCloseStyle}
                     >
                       Zatvori
@@ -2319,11 +2357,11 @@ export default function SalonLanding() {
                   {!klijentUlogovan ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       <p style={{ fontSize: 12, color: 'rgba(245,240,232,.65)', lineHeight: 1.5 }}>
-                        Za zakazivanje termina potrebno je da se prijavite ili registrujete kao kupac.
+                        Za zakazivanje termina potrebno je da se prijavite ili registrujete kao korisnik.
                       </p>
                       <Link
-                        href={`/kupac/registracija?next=${kupacReturnEnc}`}
-                        onClick={() => setKupacMenuOpen(false)}
+                        href={`/kupac/registracija?next=${korisnikPovratakEnc}`}
+                        onClick={() => setKorisnikMenuOpen(false)}
                         style={{
                           textAlign: 'center',
                           background: `linear-gradient(135deg,${gold},#b8960c)`,
@@ -2335,11 +2373,11 @@ export default function SalonLanding() {
                           textDecoration: 'none',
                         }}
                       >
-                        Registracija kupca
+                        Registracija korisnika
                       </Link>
                       <Link
-                        href={`/kupac/prijava?next=${kupacReturnEnc}`}
-                        onClick={() => setKupacMenuOpen(false)}
+                        href={`/kupac/prijava?next=${korisnikPovratakEnc}`}
+                        onClick={() => setKorisnikMenuOpen(false)}
                         style={{
                           textAlign: 'center',
                           background: 'transparent',
@@ -2352,12 +2390,12 @@ export default function SalonLanding() {
                           textDecoration: 'none',
                         }}
                       >
-                        Prijava kupca
+                        Prijava korisnika
                       </Link>
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <p style={{ fontSize: 12, color: 'rgba(245,240,232,.65)', lineHeight: 1.5 }}>Prijavljeni ste kao kupac ovog salona.</p>
+                      <p style={{ fontSize: 12, color: 'rgba(245,240,232,.65)', lineHeight: 1.5 }}>Prijavljeni ste kao korisnik ovog salona.</p>
                       <button
                         type="button"
                         onClick={() => void handleClientLogout()}
@@ -2392,7 +2430,7 @@ export default function SalonLanding() {
                   aria-expanded={notifPanelOpen}
                   aria-label="Obaveštenja u aplikaciji"
                   onClick={() => {
-                    setKupacMenuOpen(false)
+                    setKorisnikMenuOpen(false)
                     setNotifPanelOpen((o) => !o)
                   }}
                   style={{
