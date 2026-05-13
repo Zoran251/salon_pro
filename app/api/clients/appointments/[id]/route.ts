@@ -37,6 +37,11 @@ function isMissingRpcFunction(message: string): boolean {
   return /function .* does not exist|Could not find the function/i.test(message)
 }
 
+/** RPC cancel_customer_appointment zahteva tabelu iz 2026-05-09 / 2026-05-12 migracije. */
+function isMissingCustomerCancelWarningsTable(message: string): boolean {
+  return /customer_cancel_warnings/i.test(message) && /does not exist/i.test(message)
+}
+
 type CancelRpcPayload = { success?: boolean; tier?: string; message?: string }
 
 /** PostgREST / supabase-js ponekad vraća jsonb kao string ili kao element niza. */
@@ -165,6 +170,16 @@ export async function DELETE(request: Request, context: RouteCtx) {
     })
 
     if (cancelRpcError) {
+      if (isMissingCustomerCancelWarningsTable(cancelRpcError.message)) {
+        console.error('[clients/appointments] DELETE cancel RPC — nedostaje tabela:', cancelRpcError.message)
+        return NextResponse.json(
+          {
+            error:
+              'U bazi nedostaje tabela za upozorenja pri otkazivanju. U Supabase: SQL Editor → pokreni ceo sadržaj fajla db/migrations/2026-05-12_customer_cancel_warnings_if_missing.sql (ili db/migrations/2026-05-09_cancellation_warning_rules.sql ako još nije).',
+          },
+          { status: 503 },
+        )
+      }
       if (!isMissingRpcFunction(cancelRpcError.message)) {
         const status = /nije pronađen|nije povezan|ne pripada/i.test(cancelRpcError.message) ? 404 : 500
         return NextResponse.json({ error: cancelRpcError.message }, { status })
