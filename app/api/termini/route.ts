@@ -52,7 +52,7 @@ function getUserSupabaseClient(authToken: string) {
 
 export async function POST(request: Request) {
   try {
-    const rl = rateLimitByIp(request, 'termini-booking', { maxRequests: 25, windowMs: 60_000 })
+    const rl = rateLimitByIp(request, 'termini-booking', { maxRequests: 45, windowMs: 60_000 })
     if (!rl.ok) {
       return NextResponse.json({ error: 'Previše zahteva za zakazivanje. Pokušajte ponovo za minut.' }, { status: 429 })
     }

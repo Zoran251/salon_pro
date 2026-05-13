@@ -881,6 +881,14 @@ export default function SalonLanding() {
     setLoading(true)
     setGreska('')
     try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData.session?.access_token
+      if (!accessToken) {
+        setGreska('Morate biti prijavljeni kao kupac da biste zakazali termin. Kliknite na ikonicu profila u meniju i prijavite se.')
+        setLoading(false)
+        return
+      }
+
       let datumVrijeme: string
       try {
         datumVrijeme = srbijaDatumVrijemeKaIsoUtc(forma.datum, forma.vrijeme)
@@ -892,11 +900,9 @@ export default function SalonLanding() {
       const emailZaTermin =
         klijentUlogovan && clientSummary?.client?.email ? String(clientSummary.client.email).trim() : undefined
 
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (klijentUlogovan) {
-        const { data: sessionData } = await supabase.auth.getSession()
-        const token = sessionData.session?.access_token
-        if (token) headers.Authorization = `Bearer ${token}`
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
       }
 
       const res = await fetch('/api/termini', {
