@@ -169,6 +169,26 @@ export async function DELETE(request: Request, context: RouteCtx) {
       }
     }
 
+    // 🔔 SLANJE WHATSAPP NOTIFIKACIJE SALONU
+    try {
+      const adminPhone = process.env.SALON_ADMIN_WHATSAPP_NUMBER
+      if (adminPhone && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+        // Dinamički import za izbegavanje circular dependency
+        const { sendNotificationToUser } = await import('@/lib/whatsapp/twilio-config')
+        
+        const warningEmoji = tier === 'blacklist' ? '🚨' : tier === 'late_warning' ? '⚠️' : '❌'
+        const message = `${warningEmoji} TERMIN OTKAZAN\n\nKlijent: ${clientData.ime}\nVreme: ${new Date(datumVrijeme).toLocaleString('sr-RS')}\nTip: ${tier}\n\nProverite dashboard!`
+        
+        await sendNotificationToUser(adminPhone, message, true).catch((err) => {
+          console.error('[appointments] WhatsApp cancellation notification failed:', err)
+          // Ne prekini izvršavanje ako notifikacija ne radi
+        })
+      }
+    } catch (notifErr) {
+      console.error('[appointments] Cancellation notification error:', notifErr)
+      // Ne prekini izvršavanje ako notifikacija ne radi
+    }
+
     const messages: Record<string, string> = {
       no_penalty:
         'Termin je otkazan. Hvala što ste nas obavestili na vreme.',
@@ -294,6 +314,28 @@ export async function PATCH(request: Request, context: RouteCtx) {
     const { error: updErr } = await userClient.from('termini').update(patch).eq('id', terminId)
 
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
+    
+    // 🔔 SLANJE WHATSAPP NOTIFIKACIJE SALONU - PROMENA VREMENA
+    if (typeof body.datum_vrijeme === 'string' && body.datum_vrijeme.trim()) {
+      try {
+        const oldTime = termin.datum_vrijeme as string
+        const newTime = body.datum_vrijeme.trim()
+        
+        const adminPhone = process.env.SALON_ADMIN_WHATSAPP_NUMBER
+        if (adminPhone && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+          const { sendNotificationToUser } = await import('@/lib/whatsapp/twilio-config')
+          
+          const message = `🔄 PROMENA VREMENA TERMINA\n\nKlijent: ${clientData.ime}\nStaro vreme: ${new Date(oldTime).toLocaleString('sr-RS')}\nNovo vreme: ${new Date(newTime).toLocaleString('sr-RS')}\n\nProverite dashboard!`
+          
+          await sendNotificationToUser(adminPhone, message, true).catch((err) => {
+            console.error('[appointments] WhatsApp reschedule notification failed:', err)
+          })
+        }
+      } catch (notifErr) {
+        console.error('[appointments] Reschedule notification error:', notifErr)
+      }
+    }
+    
     return NextResponse.json({ success: true })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Greška servera.'
