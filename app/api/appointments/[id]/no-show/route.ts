@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
+import { rateLimitByIp } from '@/lib/rate-limit'
 import { getServerSupabaseClient } from '@/lib/server-supabase'
 
 type RouteCtx = { params: Promise<{ id: string }> }
@@ -14,6 +15,11 @@ function getAuthHeaderToken(request: Request): string | null {
 
 export async function POST(request: Request, context: RouteCtx) {
   try {
+    const rl = rateLimitByIp(request, 'appointments-no-show', { maxRequests: 30, windowMs: 60_000 })
+    if (!rl.ok) {
+      return NextResponse.json({ error: 'Previše zahteva.' }, { status: 429 })
+    }
+
     const terminId = (await context.params).id
     if (!terminId) {
       return NextResponse.json({ error: 'Nedostaje id termina.' }, { status: 400 })

@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
+import { rateLimitByIp } from '@/lib/rate-limit'
 import { getAuthCookiesFromRequest, setAuthCookies } from '@/lib/auth-cookies'
 
 /**
@@ -9,6 +10,11 @@ import { getAuthCookiesFromRequest, setAuthCookies } from '@/lib/auth-cookies'
  * Refreshes the session if the access token is expired but refresh token is valid.
  */
 export async function GET(request: Request) {
+  const rl = rateLimitByIp(request, 'auth-session-get', { maxRequests: 120, windowMs: 60_000 })
+  if (!rl.ok) {
+    return NextResponse.json({ error: 'Previše zahteva.' }, { status: 429 })
+  }
+
   const { accessToken, refreshToken } = getAuthCookiesFromRequest(request)
 
   if (!accessToken || !refreshToken) {

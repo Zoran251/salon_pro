@@ -2,7 +2,9 @@
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getBearerTokenFromRequest } from '@/lib/bearer-auth'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
+import { rateLimitByIp } from '@/lib/rate-limit'
 import { subscribeToTopic, unsubscribeFromTopic } from '@/lib/notifications/firebase-config'
 
 export const dynamic = 'force-dynamic'
@@ -40,6 +42,11 @@ function getAnonClient() {
  */
 export async function POST(request: Request) {
   try {
+    const rl = rateLimitByIp(request, 'notifications-subscribe', { maxRequests: 40, windowMs: 60_000 })
+    if (!rl.ok) {
+      return NextResponse.json({ error: 'Previše zahteva.' }, { status: 429 })
+    }
+
     const body: SubscribeBody = await request.json()
     const {
       deviceToken,
@@ -65,16 +72,12 @@ export async function POST(request: Request) {
       )
     }
 
-    // Dobij auth token iz headera
-    const authHeader = request.headers.get('authorization')
-    const authToken = authHeader?.startsWith('Bearer ') 
-      ? authHeader.slice(7).trim()
-      : null
+    const authToken = getBearerTokenFromRequest(request)
 
     if (!authToken) {
       return NextResponse.json(
-        { error: 'Nedostaje authorization header' },
-        { status: 401 }
+        { error: 'Nedostaje autorizacija: zaglavlje Authorization: Bearer <token>.' },
+        { status: 401 },
       )
     }
 

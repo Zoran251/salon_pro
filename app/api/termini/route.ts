@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getBearerTokenFromRequest } from '@/lib/bearer-auth'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
+import { rateLimitByIp } from '@/lib/rate-limit'
 import { storageTerminStatus } from '@/lib/termin-status'
 
 export const dynamic = 'force-dynamic'
@@ -29,13 +31,6 @@ function isMissingRpcFunction(message: string): boolean {
   return /function .* does not exist|Could not find the function/i.test(message)
 }
 
-function getAuthHeaderToken(request: Request): string | null {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader?.toLowerCase().startsWith('bearer ')) return null
-  const token = authHeader.slice(7).trim()
-  return token || null
-}
-
 function getAnonSupabaseClient() {
   const { url, anonKey, ok } = getPublicSupabaseEnv()
   if (!ok) return null
@@ -57,6 +52,11 @@ function getUserSupabaseClient(authToken: string) {
 
 export async function POST(request: Request) {
   try {
+    const rl = rateLimitByIp(request, 'termini-booking', { maxRequests: 25, windowMs: 60_000 })
+    if (!rl.ok) {
+      return NextResponse.json({ error: 'Previše zahteva za zakazivanje. Pokušajte ponovo za minut.' }, { status: 429 })
+    }
+
     const anonClient = getAnonSupabaseClient()
     if (!anonClient) {
       return NextResponse.json(
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     const imeKlijenta = String(ime_klijenta).trim()
     const telefonKlijenta = String(telefon_klijenta).trim()
 
-    const authToken = getAuthHeaderToken(request)
+    const authToken = getBearerTokenFromRequest(request)
     if (!authToken) {
       return NextResponse.json(
         { error: 'Za zakazivanje termina morate biti prijavljeni kao kupac.' },

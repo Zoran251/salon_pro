@@ -1,7 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { getBearerTokenFromRequest } from '@/lib/bearer-auth'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
 import { ensureSalonClientForCustomer } from '@/lib/ensure-customer-salon-client'
+import { isValidUuid } from '@/lib/is-valid-uuid'
+import { rateLimitByIp } from '@/lib/rate-limit'
 import { SUPABASE_PUBLIC_ENV_MISSING } from '@/lib/supabase-service-role-hint'
 
 function getAnonClient() {
@@ -21,16 +24,6 @@ function getUserClient(authToken: string) {
       headers: { Authorization: `Bearer ${authToken}` },
     },
   })
-}
-
-function getAuthToken(request: Request): string | null {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader?.toLowerCase().startsWith('bearer ')) {
-    const token = authHeader.slice(7).trim()
-    if (token) return token
-  }
-  const { searchParams } = new URL(request.url)
-  return searchParams.get('auth_token')
 }
 
 type AppointmentRow = {
@@ -56,6 +49,11 @@ function firstEmbed<T>(value: T | T[] | null | undefined): T | null {
  */
 export async function GET(request: Request) {
   try {
+    const rl = rateLimitByIp(request, 'clients-me-get', { maxRequests: 120, windowMs: 60_000 })
+    if (!rl.ok) {
+      return NextResponse.json({ error: 'Previše zahteva. Pokušajte ponovo za minut.' }, { status: 429 })
+    }
+
     const { ok: envOk } = getPublicSupabaseEnv()
     if (!envOk) {
       return NextResponse.json({ error: SUPABASE_PUBLIC_ENV_MISSING }, { status: 500 })
@@ -67,10 +65,16 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const authToken = getAuthToken(request)
+    const authToken = getBearerTokenFromRequest(request)
     const salonId = searchParams.get('salon_id')
-    if (!authToken || !salonId) {
-      return NextResponse.json({ error: 'Nedostaju auth token ili salon_id.' }, { status: 400 })
+    if (!authToken) {
+      return NextResponse.json(
+        { error: 'Nedostaje autorizacija: zaglavlje Authorization: Bearer <token>.' },
+        { status: 401 },
+      )
+    }
+    if (!salonId || !isValidUuid(salonId)) {
+      return NextResponse.json({ error: 'Nedostaje ili je neispravan salon_id (UUID).' }, { status: 400 })
     }
 
     const { data: userData, error: userError } = await anonClient.auth.getUser(authToken)
@@ -111,7 +115,10 @@ export async function GET(request: Request) {
       appointmentsError = retry.error
     }
 
-    if (appointmentsError) return NextResponse.json({ error: appointmentsError.message }, { status: 500 })
+    if (appointmentsError) {
+      console.error('[clients/me] termini:', appointmentsError.message)
+      return NextResponse.json({ error: 'Greška pri učitavanju termina.' }, { status: 500 })
+    }
 
     const { data: loyaltyData, error: loyaltyError } = await userClient
       .from('loyalty_accounts')
@@ -124,7 +131,8 @@ export async function GET(request: Request) {
       loyaltyError &&
       /loyalty_accounts|schema cache|does not exist/i.test(loyaltyError.message)
     if (loyaltyError && !loyaltyMissing) {
-      return NextResponse.json({ error: loyaltyError.message }, { status: 500 })
+      console.error('[clients/me] loyalty:', loyaltyError.message)
+      return NextResponse.json({ error: 'Greška pri učitavanju lojalnosti.' }, { status: 500 })
     }
 
     const includeAllNotifications = searchParams.get('notifications') === 'all'
@@ -138,7 +146,10 @@ export async function GET(request: Request) {
     }
     const { data: notifRows, error: notifErr } = await notifQuery
 
-    if (notifErr) return NextResponse.json({ error: notifErr.message }, { status: 500 })
+    if (notifErr) {
+      console.error('[clients/me] notifications:', notifErr.message)
+      return NextResponse.json({ error: 'Greška pri učitavanju obaveštenja.' }, { status: 500 })
+    }
 
     const allAppointments = (appointments || []).map((appointment) => ({
       ...appointment,
@@ -168,8 +179,8 @@ export async function GET(request: Request) {
       notifications: notifRows || [],
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Greška servera.'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('[clients/me] GET:', error)
+    return NextResponse.json({ error: 'Greška servera.' }, { status: 500 })
   }
 }
 
@@ -178,6 +189,11 @@ export async function GET(request: Request) {
  */
 export async function PATCH(request: Request) {
   try {
+    const rl = rateLimitByIp(request, 'clients-me-patch', { maxRequests: 40, windowMs: 60_000 })
+    if (!rl.ok) {
+      return NextResponse.json({ error: 'Previše zahteva. Pokušajte ponovo za minut.' }, { status: 429 })
+    }
+
     const { ok: envOk } = getPublicSupabaseEnv()
     if (!envOk) {
       return NextResponse.json({ error: SUPABASE_PUBLIC_ENV_MISSING }, { status: 500 })
@@ -188,11 +204,17 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: SUPABASE_PUBLIC_ENV_MISSING }, { status: 500 })
     }
 
-    const authToken = getAuthToken(request)
+    const authToken = getBearerTokenFromRequest(request)
     const url = new URL(request.url)
     const salonId = url.searchParams.get('salon_id')
-    if (!authToken || !salonId) {
-      return NextResponse.json({ error: 'Nedostaju auth token ili salon_id.' }, { status: 400 })
+    if (!authToken) {
+      return NextResponse.json(
+        { error: 'Nedostaje autorizacija: zaglavlje Authorization: Bearer <token>.' },
+        { status: 401 },
+      )
+    }
+    if (!salonId || !isValidUuid(salonId)) {
+      return NextResponse.json({ error: 'Nedostaje ili je neispravan salon_id (UUID).' }, { status: 400 })
     }
 
     const { data: userData, error: userError } = await anonClient.auth.getUser(authToken)
@@ -220,13 +242,19 @@ export async function PATCH(request: Request) {
 
     if (typeof body.mark_notification_read === 'string' && body.mark_notification_read.trim()) {
       const nid = body.mark_notification_read.trim()
+      if (!isValidUuid(nid)) {
+        return NextResponse.json({ error: 'Neispravan ID obaveštenja.' }, { status: 400 })
+      }
       const { error: upErr } = await userClient
         .from('notifications')
         .update({ read_at: new Date().toISOString() })
         .eq('id', nid)
         .eq('client_id', clientData.id)
 
-      if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
+      if (upErr) {
+        console.error('[clients/me] mark read:', upErr.message)
+        return NextResponse.json({ error: 'Ažuriranje obaveštenja nije uspelo.' }, { status: 500 })
+      }
       return NextResponse.json({ success: true })
     }
 
@@ -256,10 +284,13 @@ export async function PATCH(request: Request) {
 
     const { error: updErr } = await userClient.from('salon_clients').update(patch).eq('id', clientData.id)
 
-    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
+    if (updErr) {
+      console.error('[clients/me] salon_clients update:', updErr.message)
+      return NextResponse.json({ error: 'Snimanje profila nije uspelo.' }, { status: 500 })
+    }
     return NextResponse.json({ success: true })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Greška servera.'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('[clients/me] PATCH:', error)
+    return NextResponse.json({ error: 'Greška servera.' }, { status: 500 })
   }
 }

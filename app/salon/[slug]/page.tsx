@@ -5,7 +5,12 @@ import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { waitForClientSession } from '@/lib/wait-client-session'
 import { getAppRole } from '@/lib/user-role'
-import { lokalnoDatumVrijemeKaIsoUtc } from '@/lib/lokalno-datum-vrijeme-iso'
+import {
+  datumIVremeFormaIzIsoBelgrad,
+  formatDatumVrijemeBelgrad,
+  srbijaDatumVrijemeKaIsoUtc,
+  terminMinutKljučUtc,
+} from '@/lib/termin-srbija-vrijeme'
 import { isTerminOtkazan, isTerminPotvrdjen, storageTerminStatus } from '@/lib/termin-status'
 
 interface Usluga {
@@ -423,9 +428,12 @@ export default function SalonLanding() {
         return
       }
 
-      const params = new URLSearchParams({ auth_token: token, salon_id: salon.id })
+      const params = new URLSearchParams({ salon_id: salon.id })
       if (prikaziSvaObavestenja) params.set('notifications', 'all')
-      const res = await fetch(`/api/clients/me?${params.toString()}`, { cache: 'no-store' })
+      const res = await fetch(`/api/clients/me?${params.toString()}`, {
+        cache: 'no-store',
+        headers: { Authorization: `Bearer ${token}` },
+      })
       const data = (await res.json()) as { error?: string } & Partial<ClientSummary>
       if (!res.ok || data.error) {
         setClientSummary(null)
@@ -660,10 +668,7 @@ export default function SalonLanding() {
     const pending = bookingNotifRef.current
     if (!pending || isTerminPotvrdjen(pending.status) || isTerminOtkazan(pending.status)) return
 
-    const normDatum = (iso: string) => {
-      const t = iso.replace(' ', 'T').replace(/(\.\d{3})?Z?$/, '').replace(/\+00:00$/, '')
-      return t.length >= 16 ? t.slice(0, 16) : t
-    }
+    const kMin = (iso: string) => terminMinutKljučUtc(iso)
 
     if (clientSummary?.notifications?.length && pending.termin_id) {
       const confirmed = clientSummary.notifications.some(
@@ -689,7 +694,7 @@ export default function SalonLanding() {
     const row = pending.termin_id
       ? clientSummary.appointments.find((a) => a.id === pending.termin_id)
       : clientSummary.appointments.find((a) => {
-          const sameTime = normDatum(a.datum_vrijeme) === normDatum(pending.datum_vrijeme)
+          const sameTime = kMin(a.datum_vrijeme) === kMin(pending.datum_vrijeme)
           const sameIme = (a.ime_klijenta || '').trim() === pending.ime.trim()
           const aTel = normTel((a.telefon_klijenta || '').trim())
           const samePhone = !aTel || aTel === pendTel
@@ -878,7 +883,7 @@ export default function SalonLanding() {
     try {
       let datumVrijeme: string
       try {
-        datumVrijeme = lokalnoDatumVrijemeKaIsoUtc(forma.datum, forma.vrijeme)
+        datumVrijeme = srbijaDatumVrijemeKaIsoUtc(forma.datum, forma.vrijeme)
       } catch {
         setGreska('Neispravan datum ili vreme.')
         setLoading(false)
@@ -967,10 +972,13 @@ export default function SalonLanding() {
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData.session?.access_token
       if (!token) throw new Error('Nema sesije.')
-      const params = new URLSearchParams({ auth_token: token, salon_id: salon.id })
+      const params = new URLSearchParams({ salon_id: salon.id })
       const res = await fetch(`/api/clients/me?${params.toString()}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           ime: profilEdit.ime.trim(),
           telefon: profilEdit.telefon.trim(),
@@ -995,10 +1003,13 @@ export default function SalonLanding() {
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData.session?.access_token
       if (!token) return
-      const params = new URLSearchParams({ auth_token: token, salon_id: salon.id })
+      const params = new URLSearchParams({ salon_id: salon.id })
       const res = await fetch(`/api/clients/me?${params.toString()}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ mark_notification_read: notificationId }),
       })
       if (res.ok) await ucitajClientSummary()
@@ -1010,12 +1021,11 @@ export default function SalonLanding() {
   const otvoriTerminZaEdit = (termin: TerminPregled) => {
     setTerminAkcijaPoruka('')
     setTerminAkcijaGreska('')
-    const d = new Date(termin.datum_vrijeme)
-    const pad = (n: number) => String(n).padStart(2, '0')
+    const { datum, vrijeme } = datumIVremeFormaIzIsoBelgrad(termin.datum_vrijeme)
     setTerminEdit({
       id: termin.id,
-      datum: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-      vrijeme: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+      datum,
+      vrijeme,
       usluga_id: termin.usluga_id || '',
       zaposleni_id: termin.zaposleni_id || '',
       napomena: termin.napomena || '',
@@ -1030,16 +1040,19 @@ export default function SalonLanding() {
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData.session?.access_token
       if (!token) throw new Error('Nema sesije.')
-      const params = new URLSearchParams({ auth_token: token, salon_id: salon.id })
+      const params = new URLSearchParams({ salon_id: salon.id })
       let datumVrijemeIso: string
       try {
-        datumVrijemeIso = lokalnoDatumVrijemeKaIsoUtc(terminEdit.datum, terminEdit.vrijeme)
+        datumVrijemeIso = srbijaDatumVrijemeKaIsoUtc(terminEdit.datum, terminEdit.vrijeme)
       } catch {
         throw new Error('Neispravan datum ili vreme.')
       }
       const res = await fetch(`/api/clients/appointments/${terminEdit.id}?${params.toString()}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           datum_vrijeme: datumVrijemeIso,
           usluga_id: terminEdit.usluga_id || null,
@@ -1069,9 +1082,10 @@ export default function SalonLanding() {
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData.session?.access_token
       if (!token) throw new Error('Nema sesije.')
-      const params = new URLSearchParams({ auth_token: token, salon_id: salon.id })
+      const params = new URLSearchParams({ salon_id: salon.id })
       const res = await fetch(`/api/clients/appointments/${terminId}?${params.toString()}`, {
         method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
       })
       const data = (await res.json()) as { error?: string; message?: string }
       if (!res.ok) throw new Error(data.error || 'Otkazivanje nije uspelo.')
@@ -1717,7 +1731,7 @@ export default function SalonLanding() {
                         >
                           <div style={{ flex: '1 1 160px' }}>
                             <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.85)' }}>
-                              {new Date(termin.datum_vrijeme).toLocaleString('sr')}
+                              {formatDatumVrijemeBelgrad(termin.datum_vrijeme)}
                             </div>
                             <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.45)', marginTop: '2px' }}>
                               {termin.usluge?.naziv || 'Usluga'}
@@ -1886,6 +1900,24 @@ export default function SalonLanding() {
             <div style={{ fontSize: '32px', marginBottom: '8px' }}>🎉</div>
             <div style={{ fontSize: '16px', fontWeight: 500, color: '#4caf81', marginBottom: '4px' }}>Termin je zakazan!</div>
             <div style={{ fontSize: '13px', color: 'rgba(245,240,232,.5)' }}>Salon će vas kontaktirati za potvrdu.</div>
+            <div
+              style={{
+                marginTop: '14px',
+                paddingTop: '14px',
+                borderTop: '0.5px solid rgba(50,200,100,.25)',
+                fontSize: '12px',
+                lineHeight: 1.55,
+                color: 'rgba(245,240,232,.72)',
+                textAlign: 'left',
+                maxWidth: '420px',
+                marginLeft: 'auto',
+                marginRight: 'auto',
+              }}
+            >
+              <strong style={{ color: '#e8c96b' }}>Otkazivanje i crna lista:</strong> ako budete morali da otkažete, uradite to što ranije — idealno najmanje{' '}
+              <strong>24 sata</strong> pre termina. Otkazivanje u poslednjim satima (npr. manje od <strong>3 sata</strong> pre početka) može doneti upozorenje, a vrlo kasno otkazivanje (npr. u poslednjih{' '}
+              <strong>30 minuta</strong>) može rezultirati stavljanjem na crnu listu ovog salona. Hvala na razumevanju.
+            </div>
           </div>
         )}
 

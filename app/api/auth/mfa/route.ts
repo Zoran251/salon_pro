@@ -1,13 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { getBearerTokenFromRequest } from '@/lib/bearer-auth'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
 import { rateLimitByIp } from '@/lib/rate-limit'
-
-function getAuthToken(request: Request): string | null {
-  const h = request.headers.get('authorization')
-  if (h?.toLowerCase().startsWith('bearer ')) return h.slice(7).trim() || null
-  return null
-}
 
 function getUserClient(token: string) {
   const { url, anonKey, ok } = getPublicSupabaseEnv()
@@ -33,7 +28,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Previše zahteva.' }, { status: 429 })
   }
 
-  const authToken = getAuthToken(request)
+  const authToken = getBearerTokenFromRequest(request)
   if (!authToken) {
     return NextResponse.json({ error: 'Autentifikacija je obavezna.' }, { status: 401 })
   }

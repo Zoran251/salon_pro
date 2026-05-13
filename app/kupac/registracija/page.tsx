@@ -23,9 +23,11 @@ async function linkKupacNaSalon(params: {
 
   const res = await fetch('/api/clients/link', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify({
-      auth_token: token,
       salon_id: params.salonId,
       ime: params.ime,
       telefon: params.telefon,

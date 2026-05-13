@@ -2,7 +2,10 @@
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getBearerTokenFromRequest } from '@/lib/bearer-auth'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
+import { isValidUuid } from '@/lib/is-valid-uuid'
+import { rateLimitByIp } from '@/lib/rate-limit'
 import { sendToTopic } from '@/lib/notifications/firebase-config'
 import {
   whatsappTemplates,
@@ -16,7 +19,8 @@ interface UpdateAppointmentBody {
   nova_vrijeme: string
   napomena?: string
   salon_id: string
-  auth_token: string
+  /** @deprecated Koristite zaglavlje Authorization: Bearer */
+  auth_token?: string
 }
 
 function getAnonClient() {
@@ -46,15 +50,35 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const rl = rateLimitByIp(request, 'appointments-update', { maxRequests: 40, windowMs: 60_000 })
+    if (!rl.ok) {
+      return NextResponse.json({ error: 'Previše zahteva.' }, { status: 429 })
+    }
+
     const appointmentId = (await context.params).id
+    if (!appointmentId || !isValidUuid(appointmentId)) {
+      return NextResponse.json({ error: 'Nevažeći format ID-a termina.' }, { status: 400 })
+    }
+
     const body: UpdateAppointmentBody = await request.json()
 
-    const { nova_vrijeme, napomena, salon_id, auth_token } = body
+    const { nova_vrijeme, napomena, salon_id } = body
+
+    const authToken =
+      getBearerTokenFromRequest(request) ||
+      (typeof body.auth_token === 'string' ? body.auth_token.trim() : null)
+
+    if (!authToken) {
+      return NextResponse.json(
+        { error: 'Nedostaje autorizacija: zaglavlje Authorization: Bearer <token>.' },
+        { status: 401 },
+      )
+    }
 
     // Validacija
-    if (!appointmentId || !nova_vrijeme || !salon_id || !auth_token) {
+    if (!nova_vrijeme || !salon_id || !isValidUuid(String(salon_id))) {
       return NextResponse.json(
-        { error: 'Nedostaju obavezni podaci (id, nova_vrijeme, salon_id, auth_token)' },
+        { error: 'Nedostaju obavezni podaci (nova_vrijeme, salon_id kao UUID).' },
         { status: 400 }
       )
     }
@@ -76,7 +100,7 @@ export async function PATCH(
       )
     }
 
-    const { data: userData, error: userError } = await anonClient.auth.getUser(auth_token)
+    const { data: userData, error: userError } = await anonClient.auth.getUser(authToken)
     if (userError || !userData.user) {
       return NextResponse.json(
         { error: 'Nevažeća sesija. Prijavite se ponovo.' },
@@ -84,7 +108,7 @@ export async function PATCH(
       )
     }
 
-    const userClient = getUserClient(auth_token)
+    const userClient = getUserClient(authToken)
     if (!userClient) {
       return NextResponse.json(
         { error: 'Server nije konfigurisan' },

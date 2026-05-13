@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { getBearerTokenFromRequest } from '@/lib/bearer-auth'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
+import { isValidUuid } from '@/lib/is-valid-uuid'
+import { rateLimitByIp } from '@/lib/rate-limit'
 import { SUPABASE_PUBLIC_ENV_MISSING } from '@/lib/supabase-service-role-hint'
 
 function getAnonClient() {
@@ -28,6 +31,11 @@ function getUserClient(authToken: string) {
  */
 export async function POST(request: Request) {
   try {
+    const rl = rateLimitByIp(request, 'clients-link', { maxRequests: 20, windowMs: 60_000 })
+    if (!rl.ok) {
+      return NextResponse.json({ error: 'Previše zahteva. Pokušajte ponovo za minut.' }, { status: 429 })
+    }
+
     const { ok: envOk } = getPublicSupabaseEnv()
     if (!envOk) {
       return NextResponse.json({ error: SUPABASE_PUBLIC_ENV_MISSING }, { status: 500 })
@@ -39,13 +47,34 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { auth_token, salon_id, ime, telefon, email } = body
+    const { salon_id, ime, telefon, email } = body as {
+      salon_id?: string
+      ime?: string
+      telefon?: string
+      email?: string
+      auth_token?: string
+    }
 
-    if (!auth_token || !salon_id || !telefon) {
+    const authToken =
+      getBearerTokenFromRequest(request) ||
+      (typeof body.auth_token === 'string' ? body.auth_token.trim() : null)
+
+    if (!authToken) {
+      return NextResponse.json(
+        { error: 'Nedostaje autorizacija: zaglavlje Authorization: Bearer <token>.' },
+        { status: 401 },
+      )
+    }
+
+    if (!salon_id || !isValidUuid(String(salon_id))) {
+      return NextResponse.json({ error: 'Nedostaje ili je neispravan salon_id (UUID).' }, { status: 400 })
+    }
+
+    if (!telefon) {
       return NextResponse.json({ error: 'Nedostaju obavezni podaci.' }, { status: 400 })
     }
 
-    const { data: authData, error: authError } = await anonClient.auth.getUser(auth_token)
+    const { data: authData, error: authError } = await anonClient.auth.getUser(authToken)
     if (authError || !authData.user) {
       return NextResponse.json({ error: 'Nevažeća sesija klijenta.' }, { status: 401 })
     }
@@ -54,7 +83,7 @@ export async function POST(request: Request) {
     const telefonValue = String(telefon).trim()
     const emailValue = typeof email === 'string' && email.trim() ? email.trim() : authData.user.email || ''
 
-    const userClient = getUserClient(auth_token)
+    const userClient = getUserClient(authToken)
     if (!userClient) {
       return NextResponse.json({ error: SUPABASE_PUBLIC_ENV_MISSING }, { status: 500 })
     }
@@ -69,11 +98,12 @@ export async function POST(request: Request) {
     if (rpcError) {
       const msg = rpcError.message || 'Povezivanje nije uspelo.'
       const isMissingFn = /function public\.link_salon_client|link_salon_client/i.test(msg) && /does not exist/i.test(msg)
+      console.error('[clients/link] rpc:', msg)
       return NextResponse.json(
         {
           error: isMissingFn
             ? 'U Supabase SQL Editor pokreni migraciju db/migrations/2026-04-20_link_salon_client_rpc.sql (funkcija link_salon_client).'
-            : msg,
+            : 'Povezivanje sa salonom nije uspelo.',
         },
         { status: 400 },
       )
@@ -85,7 +115,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, client_id: clientId })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Greška servera.'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('[clients/link]', error)
+    return NextResponse.json({ error: 'Greška servera.' }, { status: 500 })
   }
 }

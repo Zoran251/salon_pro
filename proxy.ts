@@ -15,6 +15,9 @@ function buildCspHeader(nonce: string): string {
     "form-action 'self'",
     "frame-ancestors 'none'",
   ]
+  if (process.env.NODE_ENV === 'production') {
+    directives.push('upgrade-insecure-requests')
+  }
   return directives.join('; ')
 }
 
@@ -28,6 +31,13 @@ export function proxy(request: NextRequest) {
   const response = NextResponse.next({
     request: { headers: requestHeaders },
   })
+
+  const path = request.nextUrl.pathname
+  if (path.startsWith('/api/')) {
+    response.headers.set('Cache-Control', 'no-store, private, must-revalidate, max-age=0')
+    response.headers.set('Pragma', 'no-cache')
+    response.headers.set('Vary', 'Cookie, Authorization')
+  }
 
   if (process.env.NODE_ENV === 'production') {
     response.headers.set('Content-Security-Policy', cspHeader)

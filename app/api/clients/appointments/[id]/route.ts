@@ -1,7 +1,10 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { getBearerTokenFromRequest } from '@/lib/bearer-auth'
 import { ensureSalonClientForCustomer } from '@/lib/ensure-customer-salon-client'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
+import { isValidUuid } from '@/lib/is-valid-uuid'
+import { rateLimitByIp } from '@/lib/rate-limit'
 import { SUPABASE_PUBLIC_ENV_MISSING } from '@/lib/supabase-service-role-hint'
 import { getServerSupabaseClient, hasServiceRoleKey } from '@/lib/server-supabase'
 
@@ -20,16 +23,6 @@ function getUserClient(authToken: string) {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { Authorization: `Bearer ${authToken}` } },
   })
-}
-
-function getAuthToken(request: Request): string | null {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader?.toLowerCase().startsWith('bearer ')) {
-    const token = authHeader.slice(7).trim()
-    if (token) return token
-  }
-  const { searchParams } = new URL(request.url)
-  return searchParams.get('auth_token')
 }
 
 const MINUTES_WARN = 180
@@ -117,21 +110,32 @@ type RouteCtx = { params: Promise<{ id: string }> }
 /** Otkazivanje termina od strane kupca (bez posledica ≥3h, upozorenje <3h, crna lista za ponavljanje ili ≤30 min). */
 export async function DELETE(request: Request, context: RouteCtx) {
   try {
+    const rl = rateLimitByIp(request, 'clients-appointments-delete', { maxRequests: 30, windowMs: 60_000 })
+    if (!rl.ok) {
+      return NextResponse.json({ error: 'Previše zahteva. Pokušajte ponovo za minut.' }, { status: 429 })
+    }
+
     const { ok: envOk } = getPublicSupabaseEnv()
     if (!envOk) {
       return NextResponse.json({ error: SUPABASE_PUBLIC_ENV_MISSING }, { status: 500 })
     }
 
     const terminId = (await context.params).id
-    if (!terminId) {
-      return NextResponse.json({ error: 'Nedostaje id termina.' }, { status: 400 })
+    if (!terminId || !isValidUuid(terminId)) {
+      return NextResponse.json({ error: 'Nedostaje ili je neispravan id termina (UUID).' }, { status: 400 })
     }
 
-    const authToken = getAuthToken(request)
+    const authToken = getBearerTokenFromRequest(request)
     const url = new URL(request.url)
     const salonId = url.searchParams.get('salon_id')
-    if (!authToken || !salonId) {
-      return NextResponse.json({ error: 'Nedostaju auth token ili salon_id.' }, { status: 400 })
+    if (!authToken) {
+      return NextResponse.json(
+        { error: 'Nedostaje autorizacija: zaglavlje Authorization: Bearer <token>.' },
+        { status: 401 },
+      )
+    }
+    if (!salonId || !isValidUuid(salonId)) {
+      return NextResponse.json({ error: 'Nedostaje ili je neispravan salon_id (UUID).' }, { status: 400 })
     }
 
     const anonClient = getAnonClient()
@@ -202,7 +206,10 @@ export async function DELETE(request: Request, context: RouteCtx) {
       .eq('client_id', clientData.id)
       .maybeSingle()
 
-    if (terminError) return NextResponse.json({ error: terminError.message }, { status: 500 })
+    if (terminError) {
+      console.error('[clients/appointments] DELETE select termin:', terminError.message)
+      return NextResponse.json({ error: 'Greška pri učitavanju termina.' }, { status: 500 })
+    }
     if (!termin) {
       return NextResponse.json({ error: 'Termin nije pronađen.' }, { status: 404 })
     }
@@ -267,7 +274,10 @@ export async function DELETE(request: Request, context: RouteCtx) {
       .select('id')
       .maybeSingle()
 
-    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
+    if (updErr) {
+      console.error('[clients/appointments] DELETE update status:', updErr.message)
+      return NextResponse.json({ error: 'Otkazivanje nije sačuvano.' }, { status: 500 })
+    }
     if (!upd) {
       return NextResponse.json(
         { error: 'Otkazivanje nije sačuvano (nema dozvole ili red nije pronađen).' },
@@ -290,29 +300,40 @@ export async function DELETE(request: Request, context: RouteCtx) {
       message: messages[tier] ?? 'Termin je otkazan.',
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Greška servera.'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('[clients/appointments] DELETE:', error)
+    return NextResponse.json({ error: 'Greška servera.' }, { status: 500 })
   }
 }
 
 /** Izmena datuma/vremena, usluge ili napomene (samo ako je preostalo više od 30 min do termina). */
 export async function PATCH(request: Request, context: RouteCtx) {
   try {
+    const rl = rateLimitByIp(request, 'clients-appointments-patch', { maxRequests: 40, windowMs: 60_000 })
+    if (!rl.ok) {
+      return NextResponse.json({ error: 'Previše zahteva. Pokušajte ponovo za minut.' }, { status: 429 })
+    }
+
     const { ok: envOk } = getPublicSupabaseEnv()
     if (!envOk) {
       return NextResponse.json({ error: SUPABASE_PUBLIC_ENV_MISSING }, { status: 500 })
     }
 
     const terminId = (await context.params).id
-    if (!terminId) {
-      return NextResponse.json({ error: 'Nedostaje id termina.' }, { status: 400 })
+    if (!terminId || !isValidUuid(terminId)) {
+      return NextResponse.json({ error: 'Nedostaje ili je neispravan id termina (UUID).' }, { status: 400 })
     }
 
-    const authToken = getAuthToken(request)
+    const authToken = getBearerTokenFromRequest(request)
     const url = new URL(request.url)
     const salonId = url.searchParams.get('salon_id')
-    if (!authToken || !salonId) {
-      return NextResponse.json({ error: 'Nedostaju auth token ili salon_id.' }, { status: 400 })
+    if (!authToken) {
+      return NextResponse.json(
+        { error: 'Nedostaje autorizacija: zaglavlje Authorization: Bearer <token>.' },
+        { status: 401 },
+      )
+    }
+    if (!salonId || !isValidUuid(salonId)) {
+      return NextResponse.json({ error: 'Nedostaje ili je neispravan salon_id (UUID).' }, { status: 400 })
     }
 
     const anonClient = getAnonClient()
@@ -351,7 +372,10 @@ export async function PATCH(request: Request, context: RouteCtx) {
       .eq('client_id', clientData.id)
       .maybeSingle()
 
-    if (terminError) return NextResponse.json({ error: terminError.message }, { status: 500 })
+    if (terminError) {
+      console.error('[clients/appointments] PATCH select termin:', terminError.message)
+      return NextResponse.json({ error: 'Greška pri učitavanju termina.' }, { status: 500 })
+    }
     if (!termin) {
       return NextResponse.json({ error: 'Termin nije pronađen.' }, { status: 404 })
     }
@@ -384,7 +408,10 @@ export async function PATCH(request: Request, context: RouteCtx) {
           .eq('salon_id', salonId)
           .eq('aktivan', true)
           .maybeSingle()
-        if (zaposleniError) return NextResponse.json({ error: zaposleniError.message }, { status: 500 })
+        if (zaposleniError) {
+          console.error('[clients/appointments] PATCH zaposleni:', zaposleniError.message)
+          return NextResponse.json({ error: 'Greška pri proveri zaposlenog.' }, { status: 500 })
+        }
         if (!zaposleni) return NextResponse.json({ error: 'Zaposleni nije pronađen za ovaj salon.' }, { status: 400 })
       }
       patch.zaposleni_id = zaposleniId
@@ -405,7 +432,10 @@ export async function PATCH(request: Request, context: RouteCtx) {
       .select('id')
       .maybeSingle()
 
-    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
+    if (updErr) {
+      console.error('[clients/appointments] PATCH update termin:', updErr.message)
+      return NextResponse.json({ error: 'Snimanje izmene nije uspelo.' }, { status: 500 })
+    }
     if (!updated) {
       return NextResponse.json(
         {
@@ -418,7 +448,7 @@ export async function PATCH(request: Request, context: RouteCtx) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Greška servera.'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('[clients/appointments] PATCH:', error)
+    return NextResponse.json({ error: 'Greška servera.' }, { status: 500 })
   }
 }
