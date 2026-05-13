@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -99,13 +99,6 @@ function getLocalDateKey(value: Date | string): string {
   if (Number.isNaN(d.getTime())) return ''
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-function addDaysToDateKey(dateKey: string, days: number): string {
-  const base = dateKey ? new Date(`${dateKey}T12:00:00`) : new Date()
-  if (Number.isNaN(base.getTime())) return getLocalDateKey(new Date())
-  base.setDate(base.getDate() + days)
-  return getLocalDateKey(base)
 }
 
 function formatDateLabel(dateKey: string): string {
@@ -295,6 +288,7 @@ export default function Dashboard() {
       cancelled = true
       subscription.unsubscribe()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- jednokratan auth bootstrap; ucitajPodatke je definisan ispod i ne sme u dependency
   }, [router])
 
   const ucitajPodatke = async (userId: string) => {
@@ -981,6 +975,7 @@ export default function Dashboard() {
 
   const renderEmployeeAvatar = (z: Pick<ZaposleniRow, 'ime' | 'foto_url'>, size = 46) => (
     z.foto_url ? (
+      // eslint-disable-next-line @next/next/no-img-element -- spoljni URL zaposlenog; Image zahteva konfiguraciju domena
       <img
         src={z.foto_url}
         alt={z.ime}
@@ -1113,6 +1108,7 @@ export default function Dashboard() {
           <div style={{ width: '100px', height: '100px', borderRadius: '16px', background: goldFaint, border: `0.5px dashed ${gold}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden', cursor: 'pointer' }}
             onClick={() => document.getElementById('logo-upload')?.click()}>
             {profil.logo
+              // eslint-disable-next-line @next/next/no-img-element -- logo kao data URL ili spoljni fajl
               ? <img src={profil.logo} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               : <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '28px', marginBottom: '4px' }}>📷</div>
@@ -1669,6 +1665,7 @@ export default function Dashboard() {
             ) : qrError ? (
               <span style={{ fontSize: 11, color: '#ff8a8a', textAlign: 'center', padding: 4 }}>{qrError}</span>
             ) : qrDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- generisan QR kao data URL
               <img src={qrDataUrl} alt={`QR kod za ${resolvedSlug}`} width={120} height={120} style={{ display: 'block' }} />
             ) : (
               <span style={{ fontSize: 12, color: muted }}>Nema sluga</span>
@@ -2208,7 +2205,10 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-          {profil.logo && <img src={profil.logo} alt="logo" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />}
+          {profil.logo && (
+            // eslint-disable-next-line @next/next/no-img-element -- mali logo u headeru
+            <img src={profil.logo} alt="logo" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
+          )}
           <span style={{ fontSize: '13px', color: muted }}>{salon?.naziv}</span>
           <div style={{ width: '36px', height: '36px', background: `linear-gradient(135deg,${gold},#b8960c)`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600, color: '#0a0a0a', cursor: 'pointer', flexShrink: 0 }}>
             {salon?.naziv?.charAt(0)}

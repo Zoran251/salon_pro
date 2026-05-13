@@ -820,6 +820,7 @@ export default function SalonLanding() {
   }
   const renderEmployeeAvatar = (z: Pick<Zaposleni, 'ime' | 'foto_url'>, size = 42) =>
     z.foto_url ? (
+      // eslint-disable-next-line @next/next/no-img-element -- spoljni URL avatara
       <img
         src={z.foto_url}
         alt={z.ime}
@@ -1075,18 +1076,6 @@ export default function SalonLanding() {
     setOdabranaUsluga(u)
     setBookingPickerOpen(false)
     setShowForma(true)
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        uslugeAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      })
-    })
-  }
-
-  const scrollToUsluge = () => {
-    setActiveView('booking')
-    setMobileMenuOpen(false)
-    setNotifPanelOpen(false)
-    setKupacMenuOpen(false)
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         uslugeAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -2184,6 +2173,7 @@ export default function SalonLanding() {
         <div className="salon-nav-inner">
           <div className="salon-nav-brand">
             {salon.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element -- logo salona sa CDN-a
               <img
                 src={salon.logo_url}
                 alt=""
@@ -2671,6 +2661,7 @@ export default function SalonLanding() {
       {/* Hero — podaci o salonu */}
       <div className="hero-section" style={{ background: 'linear-gradient(180deg,#0f0d08 0%,#111 32%,#1a1500 100%)', borderBottom: '0.5px solid rgba(212,175,55,.18)', padding: '52px 48px 56px', textAlign: 'center', animation: 'fadeUp .6s ease' }}>
         {salon.logo_url
+          // eslint-disable-next-line @next/next/no-img-element -- logo salona u hero sekciji
           ? <img src={salon.logo_url} alt={salon.naziv} style={{ width: '80px', height: '80px', borderRadius: '20px', objectFit: 'cover', margin: '0 auto 20px', display: 'block', border: '0.5px solid rgba(212,175,55,.3)' }} />
           : <div style={{ width: '80px', height: '80px', borderRadius: '20px', background: `linear-gradient(135deg,${gold},#b8960c)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: 600, color: '#0a0a0a', margin: '0 auto 20px' }}>
               {salon.naziv.charAt(0)}
