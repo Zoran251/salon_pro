@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { ensureSalonClientForCustomer } from '@/lib/ensure-customer-salon-client'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
@@ -42,6 +42,74 @@ function minutesUntilStart(iso: string): number {
 
 function isMissingRpcFunction(message: string): boolean {
   return /function .* does not exist|Could not find the function/i.test(message)
+}
+
+type CancelRpcPayload = { success?: boolean; tier?: string; message?: string }
+
+/** PostgREST / supabase-js ponekad vraća jsonb kao string ili kao element niza. */
+function parseCancelRpcResult(raw: unknown): CancelRpcPayload | null {
+  if (raw == null) return null
+  let obj: unknown = raw
+  if (typeof raw === 'string') {
+    try {
+      obj = JSON.parse(raw) as unknown
+    } catch {
+      return null
+    }
+  }
+  if (Array.isArray(obj) && obj.length > 0) obj = obj[0]
+  if (typeof obj !== 'object' || obj === null) return null
+  const o = obj as Record<string, unknown>
+  const successRaw = o.success
+  let success: boolean | undefined
+  if (typeof successRaw === 'boolean') success = successRaw
+  else if (successRaw === 'true') success = true
+  else if (successRaw === 'false') success = false
+  return {
+    success,
+    tier: typeof o.tier === 'string' ? o.tier : undefined,
+    message: typeof o.message === 'string' ? o.message : undefined,
+  }
+}
+
+function redJeOtkazan(status: string | null | undefined): boolean {
+  if (status == null) return false
+  const t = String(status).trim().toLowerCase()
+  return t === 'otkazan' || t.startsWith('otkaz')
+}
+
+/** Osigurava da je termin u bazi zaista `otkazan` (RPC + RLS update ako treba). */
+async function osigurajStatusOtkazan(
+  userClient: SupabaseClient,
+  terminId: string,
+  clientId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data: row, error: selErr } = await userClient
+    .from('termini')
+    .select('status')
+    .eq('id', terminId)
+    .eq('client_id', clientId)
+    .maybeSingle()
+
+  if (selErr) return { ok: false, error: selErr.message }
+  if (redJeOtkazan(row?.status as string | null | undefined)) return { ok: true }
+
+  const { data: upd, error: updErr } = await userClient
+    .from('termini')
+    .update({ status: 'otkazan' })
+    .eq('id', terminId)
+    .eq('client_id', clientId)
+    .select('id')
+    .maybeSingle()
+
+  if (updErr) return { ok: false, error: updErr.message }
+  if (!upd) {
+    return {
+      ok: false,
+      error: 'Otkazivanje nije sačuvano (nema dozvole ili red nije pronađen).',
+    }
+  }
+  return { ok: true }
 }
 
 type RouteCtx = { params: Promise<{ id: string }> }
@@ -98,8 +166,7 @@ export async function DELETE(request: Request, context: RouteCtx) {
         return NextResponse.json({ error: cancelRpcError.message }, { status })
       }
     } else {
-      type RpcPayload = { success?: boolean; tier?: string; message?: string }
-      const rpc = cancelledRaw as RpcPayload | null
+      const rpc = parseCancelRpcResult(cancelledRaw)
       if (rpc?.tier === 'already_cancelled') {
         return NextResponse.json({
           success: true,
@@ -114,6 +181,10 @@ export async function DELETE(request: Request, context: RouteCtx) {
         )
       }
       if (rpc?.tier) {
+        const ensured = await osigurajStatusOtkazan(userClient, terminId, clientData.id)
+        if (!ensured.ok) {
+          return NextResponse.json({ error: ensured.error }, { status: 500 })
+        }
         return NextResponse.json({
           success: true,
           tier: rpc.tier,
