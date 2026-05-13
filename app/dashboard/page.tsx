@@ -224,7 +224,11 @@ export default function Dashboard() {
           : terminFilter === 'prosli'
             ? 'Prošli termini'
             : 'Svi termini'
-  const neprocitaniTermini = termini.filter(t => t.status !== 'potvrđen' && t.status !== 'otkazan').length
+  const kupacIzmijenioPotvrdjen = termini.filter(
+    (t) => t.status === 'potvrđen' && Boolean(t.last_updated_by_client),
+  ).length
+  const neprocitaniTermini =
+    termini.filter((t) => t.status !== 'potvrđen' && t.status !== 'otkazan').length + kupacIzmijenioPotvrdjen
 
   // getSession() pri prvom renderu često vrati null dok Supabase ne učita sesiju iz localStorage.
   // onAuthStateChange + kratki retry sprječavaju lažni redirect na /login nakon uspješne prijave.
@@ -821,6 +825,31 @@ export default function Dashboard() {
     if (refreshedLager) setLager(refreshedLager)
   }
 
+  const oznaciKupacIzmjenuPogledano = async (id: string) => {
+    setTerminiPotvrdaGreska('')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user?.id) {
+      setTerminiPotvrdaGreska('Sesija je istekla. Prijavi se ponovo.')
+      return
+    }
+    const sid = salon?.id ?? user.id
+    const { error } = await supabase
+      .from('termini')
+      .update({ last_updated_by_client: false })
+      .eq('id', id)
+      .eq('salon_id', sid)
+    if (error) {
+      setTerminiPotvrdaGreska(formatSalonFkErrorMessage(error.message))
+      return
+    }
+    setTermini((prev) =>
+      terminiSaUslugaNazivom(
+        prev.map((t) => (t.id === id ? { ...t, last_updated_by_client: false } : t)),
+        usluge,
+      ),
+    )
+  }
+
   const oznaciDaNijeDosao = async (id: string) => {
     setTerminiPotvrdaGreska('')
     if (!window.confirm('Označiti da se kupac nije pojavio? Nalog kupca biće stavljen na crnu listu.')) return
@@ -1052,7 +1081,23 @@ export default function Dashboard() {
                   {new Date(t.datum_vrijeme).toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' })}
                 </div>
                 <div>
-                  <div style={{ fontSize: '14px', color: text, fontWeight: 500 }}>{t.ime_klijenta}</div>
+                  <div style={{ fontSize: '14px', color: text, fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    {t.ime_klijenta}
+                    {t.status === 'potvrđen' && t.last_updated_by_client ? (
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          color: '#ffb347',
+                          border: '0.5px solid rgba(255,179,71,.35)',
+                          borderRadius: '6px',
+                          padding: '2px 6px',
+                        }}
+                      >
+                        izmena kupca
+                      </span>
+                    ) : null}
+                  </div>
                   <div style={{ fontSize: '12px', color: muted }}>{t.usluge?.naziv || 'Bez usluge'} · {new Date(t.datum_vrijeme).toLocaleDateString('sr-Latn-RS')}</div>
                 </div>
               </div>
@@ -1564,9 +1609,14 @@ export default function Dashboard() {
                       gap: '12px',
                       flexWrap: 'wrap',
                       padding: '14px',
-                      border: `0.5px solid ${goldBorder}`,
+                      border: `0.5px solid ${
+                        t.status === 'potvrđen' && t.last_updated_by_client ? 'rgba(255,179,71,.4)' : goldBorder
+                      }`,
                       borderRadius: '14px',
-                      background: 'rgba(255,255,255,.018)',
+                      background:
+                        t.status === 'potvrđen' && t.last_updated_by_client
+                          ? 'rgba(255,160,60,.07)'
+                          : 'rgba(255,255,255,.018)',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 220, flex: '1 1 260px' }}>
@@ -1583,6 +1633,20 @@ export default function Dashboard() {
                           </div>
                         )}
                         <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.35)', marginTop: 3 }}>{t.telefon_klijenta}</div>
+                        {t.status === 'potvrđen' && t.last_updated_by_client ? (
+                          <div style={{ fontSize: '11px', color: '#ffb347', marginTop: 8, lineHeight: 1.45 }}>
+                            Kupac je izmenio ovaj potvrđeni termin (vreme, usluga, osoba ili napomena).
+                            <div style={{ marginTop: 8 }}>
+                              <button
+                                type="button"
+                                style={{ ...btnOutline, padding: '6px 10px', fontSize: '11px' }}
+                                onClick={() => void oznaciKupacIzmjenuPogledano(t.id)}
+                              >
+                                Označi kao pogledano
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
 
@@ -2088,7 +2152,7 @@ export default function Dashboard() {
           <button
             onClick={() => setAktivan('termini')}
             style={{ width: '36px', height: '36px', borderRadius: '50%', border: `0.5px solid ${goldBorder}`, background: '#111', color: text, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}
-            title="Notifikacije termina"
+            title="Zahtevi za potvrdu i izmene kupca na potvrđenim terminima"
           >
             🔔
             {neprocitaniTermini > 0 && (

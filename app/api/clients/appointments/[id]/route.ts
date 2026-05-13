@@ -281,7 +281,7 @@ export async function PATCH(request: Request, context: RouteCtx) {
       )
     }
 
-    const patch: Record<string, string | null> = {}
+    const patch: Record<string, string | null | boolean> = {}
     if (typeof body.datum_vrijeme === 'string' && body.datum_vrijeme.trim()) {
       patch.datum_vrijeme = body.datum_vrijeme.trim()
     }
@@ -309,6 +309,10 @@ export async function PATCH(request: Request, context: RouteCtx) {
 
     if (Object.keys(patch).length === 0) {
       return NextResponse.json({ error: 'Nema podataka za izmenu.' }, { status: 400 })
+    }
+
+    if (termin.status === 'potvrđen') {
+      patch.last_updated_by_client = true
     }
 
     const { error: updErr } = await userClient.from('termini').update(patch).eq('id', terminId)
