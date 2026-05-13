@@ -49,3 +49,8 @@ export function datumIVremeFormaIzIsoBelgrad(iso: string): { datum: string; vrij
     vrijeme: `${String(p.h).padStart(2, '0')}:${String(p.mi).padStart(2, '0')}`,
   }
 }
+
+/** Kalendar dan u Beogradu za ISO UTC (npr. za RPC `p_dan`). */
+export function datumKljucBelgrad(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: TZ })
+}

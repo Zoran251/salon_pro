@@ -4,6 +4,7 @@ import { ensureSalonClientForCustomer } from '@/lib/ensure-customer-salon-client
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
 import { SUPABASE_PUBLIC_ENV_MISSING } from '@/lib/supabase-service-role-hint'
 import { getServerSupabaseClient, hasServiceRoleKey } from '@/lib/server-supabase'
+import { datumKljucBelgrad } from '@/lib/termin-srbija-vrijeme'
 
 function getAnonClient() {
   const { url: supabaseUrl, anonKey: supabaseAnonKey, ok } = getPublicSupabaseEnv()
@@ -42,6 +43,28 @@ function minutesUntilStart(iso: string): number {
 
 function isMissingRpcFunction(message: string): boolean {
   return /function .* does not exist|Could not find the function/i.test(message)
+}
+
+function normalizePredloziRpc(data: unknown): string[] {
+  if (data == null) return []
+  if (Array.isArray(data)) {
+    return data.map((x) => String(x)).filter(Boolean)
+  }
+  if (typeof data === 'string') {
+    try {
+      const j = JSON.parse(data) as unknown
+      return Array.isArray(j) ? j.map((x) => String(x)).filter(Boolean) : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+function isSlotZauzetDbError(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false
+  const c = (err.code || '').toUpperCase()
+  return c === 'P0001' || /SLOT_ZAUZET/i.test(err.message || '')
 }
 
 type RouteCtx = { params: Promise<{ id: string }> }
@@ -239,7 +262,7 @@ export async function PATCH(request: Request, context: RouteCtx) {
 
     const { data: termin, error: terminError } = await userClient
       .from('termini')
-      .select('id, salon_id, client_id, datum_vrijeme, status')
+      .select('id, salon_id, client_id, datum_vrijeme, status, usluga_id, zaposleni_id')
       .eq('id', terminId)
       .eq('salon_id', salonId)
       .eq('client_id', clientData.id)
@@ -297,7 +320,51 @@ export async function PATCH(request: Request, context: RouteCtx) {
 
     const { error: updErr } = await userClient.from('termini').update(patch).eq('id', terminId)
 
-    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
+    if (updErr) {
+      if (isSlotZauzetDbError(updErr)) {
+        const newIso =
+          typeof patch.datum_vrijeme === 'string' && patch.datum_vrijeme.trim()
+            ? patch.datum_vrijeme.trim()
+            : (termin.datum_vrijeme as string)
+        const pDan = datumKljucBelgrad(newIso)
+        const uslugaEff = (patch.usluga_id as string | undefined) ?? (termin.usluga_id as string | null)
+        let zapEff: string | null =
+          patch.zaposleni_id !== undefined ? (patch.zaposleni_id as string | null) : (termin.zaposleni_id as string | null)
+        if (zapEff === '') zapEff = null
+        if (!uslugaEff) {
+          return NextResponse.json(
+            {
+              error:
+                'Ovaj termin se preklapa sa drugim. Izaberite drugo vreme ili zaposlenog; za predloge slobodnih termina potrebna je usluga na terminu.',
+              code: 'SLOT_ZAUZET',
+              suggestions: [] as string[],
+            },
+            { status: 409 },
+          )
+        }
+        const { data: sugRaw, error: sugErr } = await anonClient.rpc('predlozi_slobodne_slotove', {
+          p_salon_id: salonId,
+          p_usluga_id: uslugaEff,
+          p_zaposleni_id: zapEff,
+          p_dan: pDan,
+          p_limit: 3,
+          p_exclude_termin_id: terminId,
+        })
+        const suggestions = !sugErr ? normalizePredloziRpc(sugRaw).slice(0, 3) : []
+        if (sugErr) {
+          console.error('[clients/appointments PATCH] predlozi_slobodne_slotove:', sugErr.message)
+        }
+        return NextResponse.json(
+          {
+            error: 'Žao nam je, ovaj termin je zauzet. Izaberite prvi slobodan koji vam odgovara.',
+            code: 'SLOT_ZAUZET',
+            suggestions,
+          },
+          { status: 409 },
+        )
+      }
+      return NextResponse.json({ error: updErr.message }, { status: 500 })
+    }
     return NextResponse.json({ success: true })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Greška servera.'

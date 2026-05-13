@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
+import { datumKljucBelgrad } from '@/lib/termin-srbija-vrijeme'
 import { storageTerminStatus } from '@/lib/termin-status'
 
 export const dynamic = 'force-dynamic'
@@ -27,6 +28,28 @@ function unwrapRpcText(raw: unknown): string | null {
 
 function isMissingRpcFunction(message: string): boolean {
   return /function .* does not exist|Could not find the function/i.test(message)
+}
+
+function normalizePredloziRpc(data: unknown): string[] {
+  if (data == null) return []
+  if (Array.isArray(data)) {
+    return data.map((x) => String(x)).filter(Boolean)
+  }
+  if (typeof data === 'string') {
+    try {
+      const j = JSON.parse(data) as unknown
+      return Array.isArray(j) ? j.map((x) => String(x)).filter(Boolean) : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+function isSlotZauzetRpcError(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false
+  const c = (err.code || '').toUpperCase()
+  return c === 'P0001' || /SLOT_ZAUZET/i.test(err.message || '')
 }
 
 function getAuthHeaderToken(request: Request): string | null {
@@ -160,6 +183,30 @@ export async function POST(request: Request) {
     if (!bookingRpcError) {
       const terminIdOut = typeof rpcBookingId === 'string' ? rpcBookingId : null
       return NextResponse.json({ success: true, termin_id: terminIdOut })
+    }
+
+    if (isSlotZauzetRpcError(bookingRpcError)) {
+      const pDan = datumKljucBelgrad(String(datum_vrijeme))
+      const { data: sugRaw, error: sugErr } = await anonClient.rpc('predlozi_slobodne_slotove', {
+        p_salon_id: salon_id,
+        p_usluga_id: usluga_id || null,
+        p_zaposleni_id: zaposleni_id || null,
+        p_dan: pDan,
+        p_limit: 3,
+        p_exclude_termin_id: null,
+      })
+      const suggestions = !sugErr ? normalizePredloziRpc(sugRaw).slice(0, 3) : []
+      if (sugErr) {
+        console.error('[termini] predlozi_slobodne_slotove:', sugErr.message)
+      }
+      return NextResponse.json(
+        {
+          error: 'Žao nam je, ovaj termin je zauzet. Izaberite prvi slobodan koji vam odgovara.',
+          code: 'SLOT_ZAUZET',
+          suggestions,
+        },
+        { status: 409 },
+      )
     }
 
     if (isMissingRpcFunction(bookingRpcError.message) && !zaposleni_id) {

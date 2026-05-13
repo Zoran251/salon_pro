@@ -230,6 +230,15 @@ export default function SalonLanding() {
   const [terminEditLoading, setTerminEditLoading] = useState(false)
   const [terminCancelLoading, setTerminCancelLoading] = useState<string | null>(null)
   const [isMobileHeader, setIsMobileHeader] = useState(false)
+  /** Slobodna vremena (HH:mm, Beograd) za formu zakazivanja — mreža iz baze. */
+  const [bookingSlobodniVrijeme, setBookingSlobodniVrijeme] = useState<string[]>([])
+  const [bookingSlotoviUcitavanje, setBookingSlotoviUcitavanje] = useState(false)
+  const [terminEditSlobodniVrijeme, setTerminEditSlobodniVrijeme] = useState<string[]>([])
+  const [terminEditSlotoviUcitavanje, setTerminEditSlotoviUcitavanje] = useState(false)
+  const [slotKonfliktModal, setSlotKonfliktModal] = useState<{
+    suggestions: string[]
+    mode: 'booking' | 'edit'
+  } | null>(null)
 
   const uslugeKategorije = useMemo(() => {
     const s = new Set(usluge.map((u) => (u.kategorija?.trim() ? u.kategorija.trim() : 'Ostalo')))
@@ -242,6 +251,13 @@ export default function SalonLanding() {
   )
   const aktivniZaposleni = useMemo(() => zaposleni.filter((z) => z.aktivan), [zaposleni])
 
+  const terminEditVrijemeOpcije = useMemo(() => {
+    if (!terminEdit) return []
+    const base = [...terminEditSlobodniVrijeme]
+    if (terminEdit.vrijeme && !base.includes(terminEdit.vrijeme)) base.push(terminEdit.vrijeme)
+    return base.sort((a, b) => a.localeCompare(b, 'sr'))
+  }, [terminEdit, terminEditSlobodniVrijeme])
+
   useEffect(() => {
     setForma((f) => {
       if (aktivniZaposleni.length === 1) {
@@ -253,6 +269,108 @@ export default function SalonLanding() {
       return f
     })
   }, [aktivniZaposleni])
+
+  useEffect(() => {
+    if (!showForma || !salon?.id || !odabranaUsluga?.id || !forma.datum) {
+      setBookingSlobodniVrijeme([])
+      setBookingSlotoviUcitavanje(false)
+      return
+    }
+    if (aktivniZaposleni.length > 1 && !forma.zaposleni_id) {
+      setBookingSlobodniVrijeme([])
+      setBookingSlotoviUcitavanje(false)
+      return
+    }
+    const zid = forma.zaposleni_id || (aktivniZaposleni.length === 1 ? aktivniZaposleni[0].id : '')
+    if (aktivniZaposleni.length > 0 && !zid) {
+      setBookingSlobodniVrijeme([])
+      setBookingSlotoviUcitavanje(false)
+      return
+    }
+    const ac = new AbortController()
+    setBookingSlotoviUcitavanje(true)
+    const params = new URLSearchParams({
+      salon_id: salon.id,
+      usluga_id: odabranaUsluga.id,
+      datum: forma.datum,
+      limit: '64',
+    })
+    if (zid) params.set('zaposleni_id', zid)
+    void fetch(`/api/termini/slobodni?${params.toString()}`, { signal: ac.signal })
+      .then(async (r) => {
+        const d = (await r.json()) as { slotovi_iso?: string[]; error?: string }
+        if (!r.ok || d.error || !Array.isArray(d.slotovi_iso)) {
+          setBookingSlobodniVrijeme([])
+          return
+        }
+        const vv = d.slotovi_iso.map((iso) => datumIVremeFormaIzIsoBelgrad(iso).vrijeme)
+        setBookingSlobodniVrijeme(vv)
+        setForma((f) => {
+          if (vv.length === 0) return f
+          if (vv.includes(f.vrijeme)) return f
+          return { ...f, vrijeme: vv[0] ?? '' }
+        })
+      })
+      .catch(() => {
+        if (!ac.signal.aborted) setBookingSlobodniVrijeme([])
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setBookingSlotoviUcitavanje(false)
+      })
+    return () => ac.abort()
+  }, [showForma, salon?.id, odabranaUsluga?.id, forma.datum, forma.zaposleni_id, aktivniZaposleni])
+
+  useEffect(() => {
+    if (!terminEdit || !salon?.id || !terminEdit.usluga_id || !terminEdit.datum) {
+      setTerminEditSlobodniVrijeme([])
+      setTerminEditSlotoviUcitavanje(false)
+      return
+    }
+    if (aktivniZaposleni.length > 1 && !terminEdit.zaposleni_id) {
+      setTerminEditSlobodniVrijeme([])
+      setTerminEditSlotoviUcitavanje(false)
+      return
+    }
+    const zid = terminEdit.zaposleni_id || (aktivniZaposleni.length === 1 ? aktivniZaposleni[0].id : '')
+    if (aktivniZaposleni.length > 0 && !zid) {
+      setTerminEditSlobodniVrijeme([])
+      setTerminEditSlotoviUcitavanje(false)
+      return
+    }
+    const ac = new AbortController()
+    setTerminEditSlotoviUcitavanje(true)
+    const params = new URLSearchParams({
+      salon_id: salon.id,
+      usluga_id: terminEdit.usluga_id,
+      datum: terminEdit.datum,
+      limit: '64',
+      exclude_termin_id: terminEdit.id,
+    })
+    if (zid) params.set('zaposleni_id', zid)
+    void fetch(`/api/termini/slobodni?${params.toString()}`, { signal: ac.signal })
+      .then(async (r) => {
+        const d = (await r.json()) as { slotovi_iso?: string[]; error?: string }
+        if (!r.ok || d.error || !Array.isArray(d.slotovi_iso)) {
+          setTerminEditSlobodniVrijeme([])
+          return
+        }
+        const vv = d.slotovi_iso.map((iso) => datumIVremeFormaIzIsoBelgrad(iso).vrijeme)
+        setTerminEditSlobodniVrijeme(vv)
+        setTerminEdit((te) => {
+          if (!te) return te
+          if (vv.length === 0) return te
+          if (vv.includes(te.vrijeme)) return te
+          return te
+        })
+      })
+      .catch(() => {
+        if (!ac.signal.aborted) setTerminEditSlobodniVrijeme([])
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setTerminEditSlotoviUcitavanje(false)
+      })
+    return () => ac.abort()
+  }, [terminEdit, salon?.id, aktivniZaposleni])
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)')
@@ -851,6 +969,24 @@ export default function SalonLanding() {
       </span>
     )
 
+  const primeniPredlogSaModala = (iso: string) => {
+    const { datum, vrijeme } = datumIVremeFormaIzIsoBelgrad(iso)
+    const m = slotKonfliktModal?.mode
+    setSlotKonfliktModal(null)
+    if (m === 'booking') {
+      setForma((f) => ({ ...f, datum, vrijeme }))
+      return
+    }
+    if (m === 'edit') {
+      setTerminEdit((te) => (te ? { ...te, datum, vrijeme } : te))
+    }
+  }
+
+  const formatPredlogTermina = (iso: string) => {
+    const { datum, vrijeme } = datumIVremeFormaIzIsoBelgrad(iso)
+    return `${datum} · ${vrijeme}`
+  }
+
   const locationQuery = salon ? buildLocationQuery(salon) : ''
   const mapsUrl = locationQuery ? buildMapsEmbedSrc(locationQuery) : ''
   const openInMapsUrl = locationQuery ? mapsSearchUrl(locationQuery) : ''
@@ -876,8 +1012,13 @@ export default function SalonLanding() {
       setGreska('Izaberite zaposlenog kod kog želite termin.')
       return
     }
+    if (bookingSlobodniVrijeme.length > 0 && forma.vrijeme && !bookingSlobodniVrijeme.includes(forma.vrijeme)) {
+      setGreska('Izaberite jedno od slobodnih vremena iz liste.')
+      return
+    }
     setLoading(true)
     setGreska('')
+    setSlotKonfliktModal(null)
     try {
       const { data: sessionData } = await supabase.auth.getSession()
       const accessToken = sessionData.session?.access_token
@@ -916,7 +1057,21 @@ export default function SalonLanding() {
           ...(emailZaTermin ? { email: emailZaTermin } : {}),
         }),
       })
-      const data = (await res.json()) as { error?: string; success?: boolean; termin_id?: string | null }
+      const data = (await res.json()) as {
+        error?: string
+        success?: boolean
+        termin_id?: string | null
+        code?: string
+        suggestions?: string[]
+      }
+      if (!res.ok) {
+        if (res.status === 409 && data.code === 'SLOT_ZAUZET' && Array.isArray(data.suggestions)) {
+          setSlotKonfliktModal({ suggestions: data.suggestions, mode: 'booking' })
+          return
+        }
+        setGreska(data.error || 'Zakazivanje nije uspelo.')
+        return
+      }
       if (data.error) {
         setGreska(data.error)
         return
@@ -1070,8 +1225,14 @@ export default function SalonLanding() {
           napomena: terminEdit.napomena || null,
         }),
       })
-      const data = (await res.json()) as { error?: string }
-      if (!res.ok) throw new Error(data.error || 'Snimanje nije uspelo.')
+      const data = (await res.json()) as { error?: string; code?: string; suggestions?: string[] }
+      if (!res.ok) {
+        if (res.status === 409 && data.code === 'SLOT_ZAUZET' && Array.isArray(data.suggestions)) {
+          setSlotKonfliktModal({ suggestions: data.suggestions, mode: 'edit' })
+          return
+        }
+        throw new Error(data.error || 'Snimanje nije uspelo.')
+      }
       setTerminEdit(null)
       setTerminAkcijaPoruka('Termin je ažuriran.')
       await ucitajClientSummary()
@@ -1594,10 +1755,10 @@ export default function SalonLanding() {
                         </div>
                         <div>
                           <label style={{ fontSize: '10px', color: 'rgba(245,240,232,.45)', display: 'block', marginBottom: '4px' }}>VREME</label>
-                          <input
-                            type="time"
+                          <select
                             value={terminEdit.vrijeme}
                             onChange={(e) => setTerminEdit({ ...terminEdit, vrijeme: e.target.value })}
+                            disabled={terminEditSlotoviUcitavanje}
                             style={{
                               width: '100%',
                               padding: '8px 10px',
@@ -1607,7 +1768,24 @@ export default function SalonLanding() {
                               color: '#f5f0e8',
                               fontSize: '13px',
                             }}
-                          />
+                          >
+                            {terminEditVrijemeOpcije.length === 0 ? (
+                              <option value="">{terminEditSlotoviUcitavanje ? 'Učitavanje…' : terminEdit.vrijeme || '—'}</option>
+                            ) : (
+                              terminEditVrijemeOpcije.map((v) => (
+                                <option key={v} value={v}>
+                                  {v}
+                                </option>
+                              ))
+                            )}
+                          </select>
+                          {terminEditSlotoviUcitavanje ? (
+                            <div style={{ fontSize: '10px', color: 'rgba(245,240,232,.35)', marginTop: 4 }}>Slobodni slotovi…</div>
+                          ) : terminEditVrijemeOpcije.length === 0 && terminEdit.datum && terminEdit.usluga_id ? (
+                            <div style={{ fontSize: '10px', color: 'rgba(245,240,232,.38)', marginTop: 4 }}>
+                              Nema slobodnih termina za ovaj dan.
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                       <div style={{ marginBottom: '10px' }}>
@@ -1954,24 +2132,70 @@ export default function SalonLanding() {
                 : 'Prijavite se kao korisnik da biste zakazali termin.'}
             </p>
             <div className="forma-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-              {[
-                { label: 'IME I PREZIME *', key: 'ime', placeholder: 'Ana Marković', type: 'text' },
-                { label: 'TELEFON *', key: 'telefon', placeholder: '+381 60 000 000', type: 'tel' },
-                { label: 'DATUM *', key: 'datum', placeholder: '', type: 'date' },
-                { label: 'VREME *', key: 'vrijeme', placeholder: '', type: 'time' },
-              ].map((f) => (
-                <div key={f.key}>
-                  <label style={{ fontSize: '11px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '5px', letterSpacing: '.3px' }}>{f.label}</label>
-                  <input
-                    type={f.type}
-                    style={{ width: '100%', background: '#1a1a1a', border: '0.5px solid rgba(212,175,55,.2)', borderRadius: '10px', padding: '12px 14px', fontSize: '14px' }}
-                    placeholder={f.placeholder}
-                    value={(forma as Record<string, string>)[f.key]}
-                    onChange={(e) => setForma({ ...forma, [f.key]: e.target.value })}
-                    min={f.type === 'date' ? new Date().toISOString().split('T')[0] : undefined}
-                  />
-                </div>
-              ))}
+              <div>
+                <label style={{ fontSize: '11px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '5px', letterSpacing: '.3px' }}>
+                  IME I PREZIME *
+                </label>
+                <input
+                  type="text"
+                  style={{ width: '100%', background: '#1a1a1a', border: '0.5px solid rgba(212,175,55,.2)', borderRadius: '10px', padding: '12px 14px', fontSize: '14px' }}
+                  placeholder="Ana Marković"
+                  value={forma.ime}
+                  onChange={(e) => setForma({ ...forma, ime: e.target.value })}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '5px', letterSpacing: '.3px' }}>
+                  TELEFON *
+                </label>
+                <input
+                  type="tel"
+                  style={{ width: '100%', background: '#1a1a1a', border: '0.5px solid rgba(212,175,55,.2)', borderRadius: '10px', padding: '12px 14px', fontSize: '14px' }}
+                  placeholder="+381 60 000 000"
+                  value={forma.telefon}
+                  onChange={(e) => setForma({ ...forma, telefon: e.target.value })}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '5px', letterSpacing: '.3px' }}>
+                  DATUM *
+                </label>
+                <input
+                  type="date"
+                  style={{ width: '100%', background: '#1a1a1a', border: '0.5px solid rgba(212,175,55,.2)', borderRadius: '10px', padding: '12px 14px', fontSize: '14px' }}
+                  value={forma.datum}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={(e) => setForma({ ...forma, datum: e.target.value })}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '5px', letterSpacing: '.3px' }}>
+                  VREME * (mreža 15 min, po trajanju usluge)
+                </label>
+                <select
+                  value={forma.vrijeme}
+                  onChange={(e) => setForma({ ...forma, vrijeme: e.target.value })}
+                  disabled={bookingSlotoviUcitavanje || bookingSlobodniVrijeme.length === 0}
+                  style={{ width: '100%', background: '#1a1a1a', border: '0.5px solid rgba(212,175,55,.2)', borderRadius: '10px', padding: '12px 14px', fontSize: '14px', color: '#f5f0e8' }}
+                >
+                  {bookingSlobodniVrijeme.length === 0 ? (
+                    <option value="">{bookingSlotoviUcitavanje ? 'Učitavanje…' : 'Izaberite datum i uslugu'}</option>
+                  ) : (
+                    bookingSlobodniVrijeme.map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))
+                  )}
+                </select>
+                {bookingSlotoviUcitavanje ? (
+                  <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.35)', marginTop: 6 }}>Učitavamo slobodna mesta…</div>
+                ) : bookingSlobodniVrijeme.length === 0 && forma.datum && odabranaUsluga ? (
+                  <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.38)', marginTop: 6 }}>
+                    Nema slobodnih termina za ovaj dan (radno vreme + zauzetost). Probajte drugi datum ili zaposlenog.
+                  </div>
+                ) : null}
+              </div>
               {aktivniZaposleni.length > 0 && (
                 <div style={{ gridColumn: '1/-1' }}>
                   <label style={{ fontSize: '11px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '5px', letterSpacing: '.3px' }}>
@@ -2832,6 +3056,93 @@ export default function SalonLanding() {
             <button
               type="button"
               onClick={() => setBookingPickerOpen(false)}
+              style={{
+                marginTop: '16px',
+                width: '100%',
+                padding: '10px',
+                background: 'transparent',
+                border: '0.5px solid rgba(245,240,232,.15)',
+                color: 'rgba(245,240,232,.55)',
+                borderRadius: 10,
+                cursor: 'pointer',
+                fontSize: '13px',
+              }}
+            >
+              Zatvori
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {slotKonfliktModal ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="slot-konflikt-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 210,
+            background: 'rgba(0,0,0,.78)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+          onClick={() => setSlotKonfliktModal(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: 420,
+              width: '100%',
+              background: '#141414',
+              border: `0.5px solid ${goldBorder}`,
+              borderRadius: 18,
+              padding: '22px 20px',
+            }}
+          >
+            <h2
+              id="slot-konflikt-title"
+              style={{ fontSize: '17px', fontWeight: 600, color: '#f5f0e8', marginBottom: '10px' }}
+            >
+              Termin je zauzet
+            </h2>
+            <p style={{ fontSize: '13px', color: 'rgba(245,240,232,.55)', lineHeight: 1.55, marginBottom: '16px' }}>
+              Žao nam je, ovaj termin je zauzet. Odaberite prvi slobodan koji vam odgovara — ispod su do tri predloga iz rasporeda
+              (trajanje usluge, radno vreme salona i mreža od 15 minuta).
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {slotKonfliktModal.suggestions.length === 0 ? (
+                <p style={{ fontSize: '13px', color: 'rgba(245,240,232,.45)' }}>
+                  Nema predloga za isti dan; promenite datum ili zaposlenog pa ponovo učitajte slobodna vremena.
+                </p>
+              ) : (
+                slotKonfliktModal.suggestions.map((iso) => (
+                  <button
+                    key={iso}
+                    type="button"
+                    onClick={() => primeniPredlogSaModala(iso)}
+                    style={{
+                      textAlign: 'left',
+                      padding: '12px 14px',
+                      borderRadius: 12,
+                      border: `0.5px solid ${goldBorder}`,
+                      background: '#1a1a1a',
+                      color: '#f5f0e8',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {formatPredlogTermina(iso)}
+                  </button>
+                ))
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setSlotKonfliktModal(null)}
               style={{
                 marginTop: '16px',
                 width: '100%',
