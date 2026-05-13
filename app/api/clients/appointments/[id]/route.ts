@@ -181,15 +181,16 @@ export async function DELETE(request: Request, context: RouteCtx) {
         )
       }
       if (rpc?.tier) {
-        const ensured = await osigurajStatusOtkazan(userClient, terminId, clientData.id)
-        if (!ensured.ok) {
-          return NextResponse.json({ error: ensured.error }, { status: 500 })
+        const posleOsiguravanja = await osigurajStatusOtkazan(userClient, terminId, clientData.id)
+        if (posleOsiguravanja.ok) {
+          return NextResponse.json({
+            success: true,
+            tier: rpc.tier,
+            message: rpc.message || 'Termin je otkazan.',
+          })
         }
-        return NextResponse.json({
-          success: true,
-          tier: rpc.tier,
-          message: rpc.message || 'Termin je otkazan.',
-        })
+        // RPC je prijavio uspeh, ali SELECT/UPDATE provera nije prošla (npr. zadrška replike).
+        // Ne vraćaj 500 odmah — nastavi na ručni otkaz ispod koji ponovo čita termin i radi UPDATE.
       }
     }
 
