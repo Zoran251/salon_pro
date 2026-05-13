@@ -279,6 +279,30 @@ export type Database = {
         Update: Partial<Database['public']['Tables']['rashodi']['Insert']>
         Relationships: []
       }
+      salon_notifications: {
+        Row: {
+          id: string
+          salon_id: string
+          tip: string | null
+          title: string
+          body: string
+          appointment_id: string | null
+          read_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          salon_id: string
+          tip?: string | null
+          title: string
+          body: string
+          appointment_id?: string | null
+          read_at?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['salon_notifications']['Insert']>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {

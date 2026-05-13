@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
 import { APP_ROLE_KEY } from '@/lib/user-role'
 import { rateLimitByIp } from '@/lib/rate-limit'
-import { setAuthCookies, clearAuthCookies } from '@/lib/auth-cookies'
+import { setAuthCookies } from '@/lib/auth-cookies'
 
 /**
  * Prijava / registracija preko servera → preglednik ne mora direktno zvati *.supabase.co

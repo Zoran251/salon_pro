@@ -40,6 +40,8 @@ type SalonNotification = {
   body: string
   created_at: string
   appointment_id: string | null
+  read_at: string | null
+  tip?: string | null
 }
 type RashodRow = Database['public']['Tables']['rashodi']['Row']
 type AnalitikaPeriod = 'danas' | 'sedmica' | 'mesec' | 'godina' | 'svi'
@@ -101,13 +103,6 @@ function getLocalDateKey(value: Date | string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-function addDaysToDateKey(dateKey: string, days: number): string {
-  const base = dateKey ? new Date(`${dateKey}T12:00:00`) : new Date()
-  if (Number.isNaN(base.getTime())) return getLocalDateKey(new Date())
-  base.setDate(base.getDate() + days)
-  return getLocalDateKey(base)
-}
-
 function formatDateLabel(dateKey: string): string {
   const d = new Date(`${dateKey}T12:00:00`)
   if (Number.isNaN(d.getTime())) return 'Izabrani dan'
@@ -117,6 +112,12 @@ function formatDateLabel(dateKey: string): string {
     month: 'long',
     year: 'numeric',
   })
+}
+
+function skratiNotifTekst(s: string, max = 220): string {
+  const t = s.trim()
+  if (t.length <= max) return t
+  return `${t.slice(0, max - 1)}…`
 }
 
 function employeeInitials(name: string | null | undefined): string {
@@ -151,6 +152,7 @@ export default function Dashboard() {
   const [termini, setTermini] = useState<TerminRow[]>([])
   const [salonNotifications, setSalonNotifications] = useState<SalonNotification[]>([])
   const [notifMenuOpen, setNotifMenuOpen] = useState(false)
+  const [notifStarijeOtvoreno, setNotifStarijeOtvoreno] = useState(false)
   const notifMenuRef = useRef<HTMLDivElement>(null)
   const [crnaLista, setCrnaLista] = useState<CrnaListaRow[]>([])
   const [crnaRučnoTelefon, setCrnaRučnoTelefon] = useState('')
@@ -231,7 +233,21 @@ export default function Dashboard() {
   ).length
   const neprocitaniTermini =
     termini.filter((t) => t.status !== 'potvrđen' && t.status !== 'otkazan').length + kupacIzmijenioPotvrdjen
-  const zvonacBroj = Math.max(neprocitaniTermini, salonNotifications.length)
+
+  const NAJNOVIJE_SALON_NOTIF = 3
+  const najnovijeSalonNotifikacije = useMemo(
+    () => salonNotifications.slice(0, NAJNOVIJE_SALON_NOTIF),
+    [salonNotifications],
+  )
+  const starijeSalonNotifikacije = useMemo(
+    () => salonNotifications.slice(NAJNOVIJE_SALON_NOTIF),
+    [salonNotifications],
+  )
+  const neprocitaneSalonNotifikacijeBroj = useMemo(
+    () => salonNotifications.filter((n) => !n.read_at).length,
+    [salonNotifications],
+  )
+  const zvonacBroj = Math.max(neprocitaniTermini, neprocitaneSalonNotifikacijeBroj)
 
   useEffect(() => {
     if (!notifMenuOpen) return
@@ -295,6 +311,7 @@ export default function Dashboard() {
       cancelled = true
       subscription.unsubscribe()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- jednokratan auth bootstrap; ucitajPodatke je definisan ispod i ne sme u dependency
   }, [router])
 
   const ucitajPodatke = async (userId: string) => {
@@ -450,10 +467,10 @@ export default function Dashboard() {
 
       const { data: salonNotifData, error: salonNotifErr } = await supabase
         .from('salon_notifications')
-        .select('id, title, body, created_at, appointment_id')
+        .select('id, title, body, created_at, appointment_id, read_at, tip')
         .eq('salon_id', userId)
         .order('created_at', { ascending: false })
-        .limit(25)
+        .limit(50)
 
       if (salonNotifErr) {
         const missingTable = /relation .*salon_notifications.* does not exist/i.test(salonNotifErr.message)
@@ -487,6 +504,22 @@ export default function Dashboard() {
     } finally {
       setUcitavanje(false)
     }
+  }
+
+  const oznaciSalonNotifikacijuProcitanom = async (notifId: string) => {
+    const sid = salon?.id
+    if (!sid) return
+    const readAt = new Date().toISOString()
+    const { error } = await supabase
+      .from('salon_notifications')
+      .update({ read_at: readAt })
+      .eq('id', notifId)
+      .eq('salon_id', sid)
+    if (error) {
+      console.error('[dashboard] Označavanje obaveštenja:', error.message)
+      return
+    }
+    setSalonNotifications((prev) => prev.map((n) => (n.id === notifId ? { ...n, read_at: readAt } : n)))
   }
 
   useEffect(() => {
@@ -981,6 +1014,7 @@ export default function Dashboard() {
 
   const renderEmployeeAvatar = (z: Pick<ZaposleniRow, 'ime' | 'foto_url'>, size = 46) => (
     z.foto_url ? (
+      // eslint-disable-next-line @next/next/no-img-element -- spoljni URL zaposlenog; Image zahteva konfiguraciju domena
       <img
         src={z.foto_url}
         alt={z.ime}
@@ -1008,6 +1042,110 @@ export default function Dashboard() {
       </div>
     )
   )
+
+  const renderRezSalonNotifikacija = (n: SalonNotification) => {
+    const procitano = Boolean(n.read_at)
+    return (
+      <div
+        style={{
+          padding: '14px 16px',
+          borderRadius: '12px',
+          border: `0.5px solid ${procitano ? 'rgba(255,255,255,.06)' : goldBorder}`,
+          background: procitano ? 'rgba(255,255,255,.02)' : 'rgba(212,175,55,.06)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '14px', color: text, fontWeight: 600 }}>{n.title}</div>
+              {!procitano && (
+                <span
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    color: '#0a0a0a',
+                    background: gold,
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                  }}
+                >
+                  Novo
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: '13px', color: 'rgba(245,240,232,.78)', lineHeight: 1.55, marginTop: '6px' }}>{skratiNotifTekst(n.body)}</div>
+            <div style={{ fontSize: '11px', color: muted, marginTop: '8px' }}>
+              {new Date(n.created_at).toLocaleString('sr-Latn-RS')}
+            </div>
+          </div>
+          {!procitano && (
+            <button
+              type="button"
+              onClick={() => void oznaciSalonNotifikacijuProcitanom(n.id)}
+              style={{
+                ...btnOutline,
+                padding: '8px 12px',
+                fontSize: '12px',
+                color: gold,
+                borderColor: 'rgba(212,175,55,.35)',
+                flexShrink: 0,
+              }}
+            >
+              Pročitano
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  const renderSalonNotifikacijeTraka = () => {
+    if (salonNotifications.length === 0) return null
+    return (
+      <div id="salon-notifikacije-traka" style={{ marginBottom: '22px' }}>
+        <div style={{ fontSize: '12px', fontWeight: 600, color: muted, letterSpacing: '.06em', marginBottom: '10px' }}>OBAVEŠTENJA SALONA</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {najnovijeSalonNotifikacije.map((n) => (
+            <React.Fragment key={n.id}>{renderRezSalonNotifikacija(n)}</React.Fragment>
+          ))}
+        </div>
+        {starijeSalonNotifikacije.length > 0 && (
+          <div style={{ marginTop: '12px' }}>
+            {!notifStarijeOtvoreno ? (
+              <button
+                type="button"
+                onClick={() => setNotifStarijeOtvoreno(true)}
+                style={{
+                  ...btnOutline,
+                  width: '100%',
+                  padding: '10px 14px',
+                  textAlign: 'center',
+                  color: gold,
+                }}
+              >
+                Pogledaj više ({starijeSalonNotifikacije.length})
+              </button>
+            ) : (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+                  {starijeSalonNotifikacije.map((n) => (
+                    <React.Fragment key={n.id}>{renderRezSalonNotifikacija(n)}</React.Fragment>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNotifStarijeOtvoreno(false)}
+                  style={{ ...btnOutline, width: '100%', marginTop: '10px', padding: '8px 14px', fontSize: '12px' }}
+                >
+                  Sakrij starije
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   // Render funkcije ostaju identične...
   const renderPregled = () => (
@@ -1113,6 +1251,7 @@ export default function Dashboard() {
           <div style={{ width: '100px', height: '100px', borderRadius: '16px', background: goldFaint, border: `0.5px dashed ${gold}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden', cursor: 'pointer' }}
             onClick={() => document.getElementById('logo-upload')?.click()}>
             {profil.logo
+              // eslint-disable-next-line @next/next/no-img-element -- logo kao data URL ili spoljni fajl
               ? <img src={profil.logo} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               : <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '28px', marginBottom: '4px' }}>📷</div>
@@ -1669,6 +1808,7 @@ export default function Dashboard() {
             ) : qrError ? (
               <span style={{ fontSize: 11, color: '#ff8a8a', textAlign: 'center', padding: 4 }}>{qrError}</span>
             ) : qrDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- generisan QR kao data URL
               <img src={qrDataUrl} alt={`QR kod za ${resolvedSlug}`} width={120} height={120} style={{ display: 'block' }} />
             ) : (
               <span style={{ fontSize: 12, color: muted }}>Nema sluga</span>
@@ -2153,30 +2293,27 @@ export default function Dashboard() {
               >
                 <div style={{ padding: '0 14px 10px', borderBottom: '0.5px solid rgba(255,255,255,.08)' }}>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: text }}>Obaveštenja</div>
-                  <div style={{ fontSize: '11px', color: muted, marginTop: '4px' }}>Salon i aktivnosti na terminima</div>
-                </div>
-                {salonNotifications.length === 0 ? (
-                  <div style={{ padding: '16px 14px', fontSize: '13px', color: muted }}>Nema obaveštenja u listi.</div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    {salonNotifications.map((n, idx) => (
-                      <div
-                        key={n.id}
-                        role="menuitem"
-                        style={{
-                          padding: '12px 14px',
-                          borderBottom: idx < salonNotifications.length - 1 ? '0.5px solid rgba(255,255,255,.06)' : 'none',
-                        }}
-                      >
-                        <div style={{ fontSize: '13px', color: text, fontWeight: 600 }}>{n.title}</div>
-                        <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.72)', lineHeight: 1.5, marginTop: '4px' }}>{n.body}</div>
-                        <div style={{ fontSize: '11px', color: muted, marginTop: '6px' }}>
-                          {new Date(n.created_at).toLocaleString('sr-Latn-RS')}
-                        </div>
-                      </div>
-                    ))}
+                  <div style={{ fontSize: '11px', color: muted, marginTop: '4px' }}>
+                    Najnovija obaveštenja su uvek ispod naslova stranice. Zvonce prikazuje broj nepročitanih stavki.
                   </div>
-                )}
+                </div>
+                <div style={{ padding: '14px 14px 6px', fontSize: '12px', color: 'rgba(245,240,232,.72)', lineHeight: 1.55 }}>
+                  {neprocitaneSalonNotifikacijeBroj > 0 && (
+                    <div style={{ marginBottom: '8px' }}>
+                      Nepročitana obaveštenja salona:{' '}
+                      <span style={{ color: gold, fontWeight: 600 }}>{neprocitaneSalonNotifikacijeBroj}</span>
+                    </div>
+                  )}
+                  {neprocitaniTermini > 0 && (
+                    <div>
+                      Termini koji traže pažnju:{' '}
+                      <span style={{ color: gold, fontWeight: 600 }}>{neprocitaniTermini}</span>
+                    </div>
+                  )}
+                  {neprocitaneSalonNotifikacijeBroj === 0 && neprocitaniTermini === 0 && (
+                    <div style={{ color: muted }}>Nema stavki koje zahtevaju pažnju.</div>
+                  )}
+                </div>
                 {neprocitaniTermini > 0 && (
                   <div style={{ padding: '10px 14px 4px', borderTop: '0.5px solid rgba(255,255,255,.08)' }}>
                     <button
@@ -2208,7 +2345,10 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-          {profil.logo && <img src={profil.logo} alt="logo" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />}
+          {profil.logo && (
+            // eslint-disable-next-line @next/next/no-img-element -- mali logo u headeru
+            <img src={profil.logo} alt="logo" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
+          )}
           <span style={{ fontSize: '13px', color: muted }}>{salon?.naziv}</span>
           <div style={{ width: '36px', height: '36px', background: `linear-gradient(135deg,${gold},#b8960c)`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600, color: '#0a0a0a', cursor: 'pointer', flexShrink: 0 }}>
             {salon?.naziv?.charAt(0)}
@@ -2241,6 +2381,7 @@ export default function Dashboard() {
             </h1>
             <p style={{ fontSize: '13px', color: muted }}>{salon?.naziv} · {salon?.tip}</p>
           </div>
+          {renderSalonNotifikacijeTraka()}
           {sections[aktivan]?.()}
         </main>
       </div>
