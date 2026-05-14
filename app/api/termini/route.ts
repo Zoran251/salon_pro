@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { sendSalonAdminEmail } from '@/lib/email/salon-admin-notify'
+import { sendSalonAdminEmail, sendTransactionalEmail } from '@/lib/email/salon-admin-notify'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
 import { getServerSupabaseClient } from '@/lib/server-supabase'
 import { storageTerminStatus } from '@/lib/termin-status'
@@ -105,6 +105,56 @@ async function posaljiEmailNoviTermin(params: {
     })
   } catch (err) {
     console.error('[termini] Email novi termin:', err)
+  }
+}
+
+async function posaljiEmailKorisnikuNakonZakazivanja(params: {
+  toEmail: string
+  salonId: string
+  datumVrijeme: string
+  ime: string
+  uslugaId: string | null
+}) {
+  const to = params.toEmail.trim()
+  if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return
+  try {
+    const srv = getServerSupabaseClient()
+    let salonNaziv = 'Salon'
+    let uslugaNaziv: string | null = null
+    if (srv) {
+      const { data: sal } = await srv.from('saloni').select('naziv').eq('id', params.salonId).maybeSingle()
+      if (sal?.naziv) salonNaziv = String(sal.naziv)
+      if (params.uslugaId) {
+        const { data: us } = await srv
+          .from('usluge')
+          .select('naziv')
+          .eq('id', params.uslugaId)
+          .eq('salon_id', params.salonId)
+          .maybeSingle()
+        if (us?.naziv) uslugaNaziv = String(us.naziv)
+      }
+    }
+    const when = new Date(params.datumVrijeme).toLocaleString('sr-RS')
+    const text = [
+      `Poštovani/a ${params.ime},`,
+      '',
+      'Primili smo vaš zahtev za termin.',
+      '',
+      `Salon: ${salonNaziv}`,
+      ...(uslugaNaziv ? [`Usluga: ${uslugaNaziv}`] : []),
+      `Datum i vreme: ${when}`,
+      '',
+      'Kada salon potvrdi termin, dobićete još jednu poruku na ovu adresu.',
+      '',
+      '— SalonPro',
+    ].join('\n')
+    await sendTransactionalEmail({
+      to,
+      subject: `SalonPro: zahtev za termin — ${salonNaziv}`,
+      text,
+    })
+  } catch (err) {
+    console.error('[termini] Email korisniku (zakazivanje):', err)
   }
 }
 
@@ -230,6 +280,13 @@ export async function POST(request: Request) {
         napomena: napomenaZaMail,
         klijentEmail: klijentEmailZaObavestenje,
       })
+      void posaljiEmailKorisnikuNakonZakazivanja({
+        toEmail: klijentEmailZaObavestenje,
+        salonId: String(salon_id),
+        datumVrijeme: datumVrijemeStr,
+        ime: imeKlijenta,
+        uslugaId: uslugaIdZaObavestenje,
+      })
       return NextResponse.json({ success: true, termin_id: terminIdOut })
     }
 
@@ -254,6 +311,13 @@ export async function POST(request: Request) {
           uslugaId: uslugaIdZaObavestenje,
           napomena: napomenaZaMail,
           klijentEmail: klijentEmailZaObavestenje,
+        })
+        void posaljiEmailKorisnikuNakonZakazivanja({
+          toEmail: klijentEmailZaObavestenje,
+          salonId: String(salon_id),
+          datumVrijeme: datumVrijemeStr,
+          ime: imeKlijenta,
+          uslugaId: uslugaIdZaObavestenje,
         })
         return NextResponse.json({ success: true, termin_id: terminIdOut })
       }
