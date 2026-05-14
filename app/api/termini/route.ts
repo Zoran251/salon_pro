@@ -4,6 +4,10 @@ import { sendSalonAdminEmail, sendTransactionalEmail } from '@/lib/email/salon-a
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
 import { getServerSupabaseClient } from '@/lib/server-supabase'
 import { storageTerminStatus } from '@/lib/termin-status'
+import {
+  formatDatumVrijemeBelgrad,
+  naivniBelgradDatumVremeUUtcIso,
+} from '@/lib/termin-belgrade-vreme'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +33,12 @@ function unwrapRpcText(raw: unknown): string | null {
 
 function isMissingRpcFunction(message: string): boolean {
   return /function .* does not exist|Could not find the function/i.test(message)
+}
+
+function classifyTerminPoslovnaGreška(msg: string): 'radno' | 'preklapanje' | null {
+  if (/RADNO_VREME/i.test(msg)) return 'radno'
+  if (/SLOT_ZAUZET/i.test(msg)) return 'preklapanje'
+  return null
 }
 
 function getAuthHeaderToken(request: Request): string | null {
@@ -84,7 +94,7 @@ async function posaljiEmailNoviTermin(params: {
         if (us?.naziv) uslugaNaziv = String(us.naziv)
       }
     }
-    const when = new Date(params.datumVrijeme).toLocaleString('sr-RS')
+    const when = formatDatumVrijemeBelgrad(params.datumVrijeme)
     const redovi = [
       'Novi zakazan termin.',
       '',
@@ -134,7 +144,7 @@ async function posaljiEmailKorisnikuNakonZakazivanja(params: {
         if (us?.naziv) uslugaNaziv = String(us.naziv)
       }
     }
-    const when = new Date(params.datumVrijeme).toLocaleString('sr-RS')
+    const when = formatDatumVrijemeBelgrad(params.datumVrijeme)
     const text = [
       `Poštovani/a ${params.ime},`,
       '',
@@ -254,7 +264,8 @@ export async function POST(request: Request) {
       (typeof email === 'string' && email.trim() ? email.trim() : userRes.user.email || '') || ''
     const napomenaZaMail =
       typeof napomena === 'string' && napomena.trim() ? napomena.trim() : null
-    const datumVrijemeStr = String(datum_vrijeme).trim()
+    const datumVrijemeStr =
+      naivniBelgradDatumVremeUUtcIso(String(datum_vrijeme).trim()) ?? String(datum_vrijeme).trim()
 
     const bookingPayload = {
       p_salon_id: salon_id,
@@ -263,7 +274,7 @@ export async function POST(request: Request) {
       p_zaposleni_id: zaposleni_id || null,
       p_ime: imeKlijenta,
       p_telefon: telefonKlijenta,
-      p_datum_vrijeme: datum_vrijeme,
+      p_datum_vrijeme: datumVrijemeStr,
       p_napomena: napomena || null,
     }
     const { data: rpcBookingId, error: bookingRpcError } = await userClient.rpc('create_authenticated_booking', bookingPayload)
@@ -290,6 +301,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, termin_id: terminIdOut })
     }
 
+    const biz = classifyTerminPoslovnaGreška(bookingRpcError.message)
+    if (biz === 'radno') {
+      return NextResponse.json(
+        { error: 'Salon ne radi u izabrano vreme ili je zatvoren tog dana. Izaberite drugi termin.' },
+        { status: 409 }
+      )
+    }
+    if (biz === 'preklapanje') {
+      return NextResponse.json(
+        { error: 'Ovaj termin je zauzet za izabranog zaposlenog. Izaberite drugo vreme.' },
+        { status: 409 }
+      )
+    }
+
     if (isMissingRpcFunction(bookingRpcError.message) && !zaposleni_id) {
       const { data: legacyBookingId, error: legacyBookingError } = await userClient.rpc('create_authenticated_booking', {
         p_salon_id: salon_id,
@@ -297,7 +322,7 @@ export async function POST(request: Request) {
         p_usluga_id: usluga_id || null,
         p_ime: imeKlijenta,
         p_telefon: telefonKlijenta,
-        p_datum_vrijeme: datum_vrijeme,
+        p_datum_vrijeme: datumVrijemeStr,
         p_napomena: napomena || null,
       })
       if (!legacyBookingError) {
@@ -320,6 +345,19 @@ export async function POST(request: Request) {
           uslugaId: uslugaIdZaObavestenje,
         })
         return NextResponse.json({ success: true, termin_id: terminIdOut })
+      }
+      const legacyBiz = classifyTerminPoslovnaGreška(legacyBookingError.message)
+      if (legacyBiz === 'radno') {
+        return NextResponse.json(
+          { error: 'Salon ne radi u izabrano vreme ili je zatvoren tog dana. Izaberite drugi termin.' },
+          { status: 409 }
+        )
+      }
+      if (legacyBiz === 'preklapanje') {
+        return NextResponse.json(
+          { error: 'Ovaj termin je zauzet za izabranog zaposlenog. Izaberite drugo vreme.' },
+          { status: 409 }
+        )
       }
     }
 
@@ -366,12 +404,17 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Nedostaju podaci za proveru statusa termina.' }, { status: 400 })
     }
 
+    const datumNorm =
+      datum_vrijeme && datum_vrijeme.trim()
+        ? naivniBelgradDatumVremeUUtcIso(datum_vrijeme.trim()) ?? datum_vrijeme.trim()
+        : null
+
     const { data: rpcStatus, error: rpcErr } = await supabase.rpc('get_public_termin_status', {
       p_salon_id: salon_id,
       p_termin_id: termin_id,
       p_ime: termin_id ? null : ime,
       p_telefon: termin_id ? null : telefon,
-      p_datum_vrijeme: termin_id ? null : datum_vrijeme,
+      p_datum_vrijeme: termin_id ? null : datumNorm,
     })
 
     if (rpcErr) {

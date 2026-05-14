@@ -5,6 +5,7 @@ import { getPublicSupabaseEnv } from '@/lib/env-supabase'
 import { rateLimitByIp } from '@/lib/rate-limit'
 import { SUPABASE_PUBLIC_ENV_MISSING } from '@/lib/supabase-service-role-hint'
 import { getAppRole } from '@/lib/user-role'
+import { formatDatumVrijemeBelgrad } from '@/lib/termin-belgrade-vreme'
 
 function getAnonClient() {
   const { url: supabaseUrl, anonKey: supabaseAnonKey, ok } = getPublicSupabaseEnv()
@@ -137,7 +138,7 @@ export async function POST(request: Request) {
     if (u?.naziv) uslugaNaziv = String(u.naziv)
   }
 
-  const when = new Date(termin.datum_vrijeme as string).toLocaleString('sr-RS')
+  const when = formatDatumVrijemeBelgrad(termin.datum_vrijeme as string)
   const imeK =
     typeof klijent?.ime === 'string' && klijent.ime.trim()
       ? klijent.ime.trim()

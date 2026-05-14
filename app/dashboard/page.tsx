@@ -8,6 +8,12 @@ import { buildSalonSlug, fallbackSalonSlug } from '@/lib/slug'
 import { getAppRole } from '@/lib/user-role'
 import { getPublicSiteBase } from '@/lib/public-site-url'
 import type { Database } from '@/lib/supabase'
+import {
+  datumKljucBelgrad,
+  formatDatumBelgrad,
+  formatDateLabelBelgrade,
+  formatVremeBelgrad,
+} from '@/lib/termin-belgrade-vreme'
 
 type SalonRow = Database['public']['Tables']['saloni']['Row']
 type UslugaRow = Database['public']['Tables']['usluge']['Row']
@@ -97,21 +103,12 @@ function terminiSaUslugaNazivom(termini: TerminRow[] | null, uslugeLista: Usluga
 }
 
 function getLocalDateKey(value: Date | string): string {
-  const d = typeof value === 'string' ? new Date(value) : value
-  if (Number.isNaN(d.getTime())) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  if (typeof value === 'string') return datumKljucBelgrad(value)
+  return datumKljucBelgrad(value.toISOString())
 }
 
 function formatDateLabel(dateKey: string): string {
-  const d = new Date(`${dateKey}T12:00:00`)
-  if (Number.isNaN(d.getTime())) return 'Izabrani dan'
-  return d.toLocaleDateString('sr-Latn-RS', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  })
+  return formatDateLabelBelgrade(dateKey)
 }
 
 function skratiNotifTekst(s: string, max = 220): string {
@@ -175,6 +172,13 @@ export default function Dashboard() {
   const [uslugaGreska, setUslugaGreska] = useState('')
   const [uslugaLoading, setUslugaLoading] = useState(false)
   const [lagerGreska, setLagerGreska] = useState('')
+  /** Prijem zalihe za već postojeći artikal (ne novi red u tabeli). */
+  const [lagerPrijem, setLagerPrijem] = useState<{ lagerId: string | null; kolicina: string }>({
+    lagerId: null,
+    kolicina: '',
+  })
+  const [lagerPrijemGreska, setLagerPrijemGreska] = useState('')
+  const [lagerPrijemLoading, setLagerPrijemLoading] = useState(false)
   const [terminiPotvrdaGreska, setTerminiPotvrdaGreska] = useState('')
   const [terminFilter, setTerminFilter] = useState<TerminFilter>('danas')
   const [izabraniDatum, setIzabraniDatum] = useState(() => getLocalDateKey(new Date()))
@@ -835,7 +839,48 @@ export default function Dashboard() {
     }
   }
 
+  const potvrdiPrijemZalihe = async () => {
+    const id = lagerPrijem.lagerId
+    if (!id) return
+    const sid = salon?.id
+    if (!sid) {
+      setLagerPrijemGreska('Salon nije učitan. Osvežite stranicu.')
+      return
+    }
+    const dodatak = parseInt(lagerPrijem.kolicina, 10)
+    if (!Number.isFinite(dodatak) || dodatak <= 0 || dodatak > 1_000_000) {
+      setLagerPrijemGreska('Unesite celu pozitivnu količinu koju dodajete na zalihu (npr. 5).')
+      return
+    }
+    const row = lager.find((x) => x.id === id)
+    if (!row) return
+    setLagerPrijemGreska('')
+    setLagerPrijemLoading(true)
+    const nova = Number(row.kolicina) + dodatak
+    const { data, error } = await supabase
+      .from('lager')
+      .update({ kolicina: nova })
+      .eq('id', id)
+      .eq('salon_id', sid)
+      .select()
+      .single()
+    setLagerPrijemLoading(false)
+    if (error) {
+      setLagerPrijemGreska(formatSalonFkErrorMessage(error.message))
+      return
+    }
+    if (data) {
+      setLager((prev) => prev.map((x) => (x.id === id ? { ...x, kolicina: data.kolicina } : x)))
+      setLagerPrijem({ lagerId: null, kolicina: '' })
+      setLagerPrijemGreska('')
+    }
+  }
+
   const obrisiLager = async (id: string) => {
+    if (lagerPrijem.lagerId === id) {
+      setLagerPrijem({ lagerId: null, kolicina: '' })
+      setLagerPrijemGreska('')
+    }
     await supabase.from('lager').delete().eq('id', id)
     setLager(lager.filter(l => l.id !== id))
   }
@@ -1102,11 +1147,11 @@ export default function Dashboard() {
             <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: i < 4 ? `0.5px solid rgba(255,255,255,.06)` : 'none', gap: '12px', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{ width: '44px', height: '44px', background: goldFaint, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 600, color: gold, flexShrink: 0, textAlign: 'center' }}>
-                  {new Date(t.datum_vrijeme).toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' })}
+                  {formatVremeBelgrad(t.datum_vrijeme)}
                 </div>
                 <div>
                   <div style={{ fontSize: '14px', color: text, fontWeight: 500 }}>{t.ime_klijenta}</div>
-                  <div style={{ fontSize: '12px', color: muted }}>{t.usluge?.naziv || 'Bez usluge'} · {new Date(t.datum_vrijeme).toLocaleDateString('sr-Latn-RS')}</div>
+                  <div style={{ fontSize: '12px', color: muted }}>{t.usluge?.naziv || 'Bez usluge'} · {formatDatumBelgrad(t.datum_vrijeme)}</div>
                 </div>
               </div>
               <div
@@ -1464,23 +1509,84 @@ export default function Dashboard() {
         </div>
       )}
       {lager.map(l => (
-        <div key={l.id} style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', borderColor: l.kolicina <= l.minimum ? 'rgba(220,80,50,.3)' : goldBorder }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{ width: '42px', height: '42px', background: l.kolicina <= l.minimum ? 'rgba(220,80,50,.1)' : goldFaint, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>
-              {l.kolicina <= l.minimum ? '⚠️' : '📦'}
+        <div
+          key={l.id}
+          style={{
+            ...cardStyle,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            borderColor: l.kolicina <= l.minimum ? 'rgba(220,80,50,.3)' : goldBorder,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ width: '42px', height: '42px', background: l.kolicina <= l.minimum ? 'rgba(220,80,50,.1)' : goldFaint, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>
+                {l.kolicina <= l.minimum ? '⚠️' : '📦'}
+              </div>
+              <div>
+                <div style={{ fontSize: '15px', fontWeight: 500, color: text }}>{l.naziv}</div>
+                <div style={{ fontSize: '12px', color: muted }}>{l.kategorija} · Min: {l.minimum} {l.jedinica}</div>
+              </div>
             </div>
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: 500, color: text }}>{l.naziv}</div>
-              <div style={{ fontSize: '12px', color: muted }}>{l.kategorija} · Min: {l.minimum} {l.jedinica}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '20px', fontWeight: 500, color: l.kolicina <= l.minimum ? '#ff6b6b' : gold }}>{l.kolicina}</div>
+                <div style={{ fontSize: '11px', color: muted }}>{l.jedinica}</div>
+              </div>
+              {lagerPrijem.lagerId === l.id ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: '10px' }}>
+                  <div>
+                    <label style={labelStyle}>DODAJ NA ZALIHU ({l.jedinica || 'kom'})</label>
+                    <input
+                      style={{ ...inputStyle, width: 'min(120px, 100%)' }}
+                      type="number"
+                      min={1}
+                      max={1_000_000}
+                      inputMode="numeric"
+                      placeholder="npr. 5"
+                      disabled={lagerPrijemLoading}
+                      value={lagerPrijem.kolicina}
+                      onChange={(e) => setLagerPrijem((p) => (p.lagerId === l.id ? { ...p, kolicina: e.target.value } : p))}
+                    />
+                  </div>
+                  <button type="button" style={btnGold} disabled={lagerPrijemLoading} onClick={() => void potvrdiPrijemZalihe()}>
+                    {lagerPrijemLoading ? '…' : 'Dodaj'}
+                  </button>
+                  <button
+                    type="button"
+                    style={btnOutline}
+                    disabled={lagerPrijemLoading}
+                    onClick={() => {
+                      setLagerPrijem({ lagerId: null, kolicina: '' })
+                      setLagerPrijemGreska('')
+                    }}
+                  >
+                    Odustani
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  style={btnOutline}
+                  onClick={() => {
+                    setLagerPrijem({ lagerId: l.id, kolicina: '' })
+                    setLagerPrijemGreska('')
+                    setShowNoviLager(false)
+                    setLagerGreska('')
+                  }}
+                >
+                  Dodaj zalihu
+                </button>
+              )}
+              <button type="button" style={btnOutline} onClick={() => obrisiLager(l.id)}>Obriši</button>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', fontWeight: 500, color: l.kolicina <= l.minimum ? '#ff6b6b' : gold }}>{l.kolicina}</div>
-              <div style={{ fontSize: '11px', color: muted }}>{l.jedinica}</div>
+          {lagerPrijem.lagerId === l.id && lagerPrijemGreska ? (
+            <div style={{ background: 'rgba(220,50,50,.1)', border: '0.5px solid rgba(220,50,50,.3)', borderRadius: '10px', padding: '10px 12px', fontSize: '12px', color: '#ff6b6b' }}>
+              ⚠️ {lagerPrijemGreska}
             </div>
-            <button style={btnOutline} onClick={() => obrisiLager(l.id)}>Obriši</button>
-          </div>
+          ) : null}
         </div>
       ))}
       {showNoviLager ? (
@@ -1505,7 +1611,7 @@ export default function Dashboard() {
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button style={btnGold} onClick={dodajLager}>Dodaj artikal</button>
-            <button style={btnOutline} onClick={() => { setShowNoviLager(false); setLagerGreska('') }}>Odustani</button>
+            <button style={btnOutline} onClick={() => { setShowNoviLager(false); setLagerGreska(''); setLagerPrijem({ lagerId: null, kolicina: '' }); setLagerPrijemGreska('') }}>Odustani</button>
           </div>
         </div>
       ) : (
@@ -1514,6 +1620,8 @@ export default function Dashboard() {
           onClick={() => {
             setShowNoviLager(true)
             setLagerGreska('')
+            setLagerPrijem({ lagerId: null, kolicina: '' })
+            setLagerPrijemGreska('')
           }}
         >
           + Dodaj artikal u lager
@@ -1599,7 +1707,8 @@ export default function Dashboard() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {filtriraniTermini.map((t) => {
-                const terminDate = new Date(t.datum_vrijeme)
+                const terminVrijeme = formatVremeBelgrad(t.datum_vrijeme)
+                const terminDatum = formatDatumBelgrad(t.datum_vrijeme)
                 const statusColor =
                   t.status === 'potvrđen'
                     ? '#4caf81'
@@ -1625,8 +1734,8 @@ export default function Dashboard() {
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 220, flex: '1 1 260px' }}>
                       <div style={{ width: '52px', minHeight: '52px', background: goldFaint, borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: gold, textAlign: 'center' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 700 }}>{terminDate.toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' })}</span>
-                        <span style={{ fontSize: '9px', color: muted, marginTop: 2 }}>{terminDate.toLocaleDateString('sr-Latn-RS')}</span>
+                        <span style={{ fontSize: '13px', fontWeight: 700 }}>{terminVrijeme}</span>
+                        <span style={{ fontSize: '9px', color: muted, marginTop: 2 }}>{terminDatum}</span>
                       </div>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: '14px', fontWeight: 600, color: text }}>{t.ime_klijenta}</div>
