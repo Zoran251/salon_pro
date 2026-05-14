@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { sendSalonAdminEmail } from '@/lib/email/salon-admin-notify'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
+import { getServerSupabaseClient } from '@/lib/server-supabase'
 import { storageTerminStatus } from '@/lib/termin-status'
 
 export const dynamic = 'force-dynamic'
@@ -53,6 +55,57 @@ function getUserSupabaseClient(authToken: string) {
       headers: { Authorization: `Bearer ${authToken}` },
     },
   })
+}
+
+async function posaljiEmailNoviTermin(params: {
+  salonId: string
+  terminId: string | null
+  ime: string
+  telefon: string
+  datumVrijeme: string
+  uslugaId: string | null
+  napomena: string | null
+  klijentEmail: string
+}) {
+  try {
+    const srv = getServerSupabaseClient()
+    let salonNaziv = 'Salon'
+    let uslugaNaziv: string | null = null
+    if (srv) {
+      const { data: sal } = await srv.from('saloni').select('naziv').eq('id', params.salonId).maybeSingle()
+      if (sal?.naziv) salonNaziv = String(sal.naziv)
+      if (params.uslugaId) {
+        const { data: us } = await srv
+          .from('usluge')
+          .select('naziv')
+          .eq('id', params.uslugaId)
+          .eq('salon_id', params.salonId)
+          .maybeSingle()
+        if (us?.naziv) uslugaNaziv = String(us.naziv)
+      }
+    }
+    const when = new Date(params.datumVrijeme).toLocaleString('sr-RS')
+    const redovi = [
+      'Novi zakazan termin.',
+      '',
+      `Salon: ${salonNaziv}`,
+      `Klijent: ${params.ime}`,
+      `Telefon: ${params.telefon}`,
+      ...(params.klijentEmail ? [`Email klijenta: ${params.klijentEmail}`] : []),
+      ...(uslugaNaziv ? [`Usluga: ${uslugaNaziv}`] : []),
+      `Datum i vreme: ${when}`,
+      ...(params.napomena ? [`Napomena: ${params.napomena}`] : []),
+      ...(params.terminId ? [`ID termina: ${params.terminId}`] : []),
+      '',
+      'Proverite dashboard.',
+    ]
+    await sendSalonAdminEmail({
+      subject: `SalonPro: novi termin — ${salonNaziv}`,
+      text: redovi.join('\n'),
+    })
+  } catch (err) {
+    console.error('[termini] Email novi termin:', err)
+  }
 }
 
 export async function POST(request: Request) {
@@ -145,6 +198,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Neuspešno povezivanje kupca sa salonom.' }, { status: 500 })
     }
 
+    const uslugaIdZaObavestenje =
+      usluga_id && String(usluga_id).trim() ? String(usluga_id).trim() : null
+    const klijentEmailZaObavestenje =
+      (typeof email === 'string' && email.trim() ? email.trim() : userRes.user.email || '') || ''
+    const napomenaZaMail =
+      typeof napomena === 'string' && napomena.trim() ? napomena.trim() : null
+    const datumVrijemeStr = String(datum_vrijeme).trim()
+
     const bookingPayload = {
       p_salon_id: salon_id,
       p_client_id: clientId,
@@ -159,6 +220,16 @@ export async function POST(request: Request) {
 
     if (!bookingRpcError) {
       const terminIdOut = typeof rpcBookingId === 'string' ? rpcBookingId : null
+      void posaljiEmailNoviTermin({
+        salonId: String(salon_id),
+        terminId: terminIdOut,
+        ime: imeKlijenta,
+        telefon: telefonKlijenta,
+        datumVrijeme: datumVrijemeStr,
+        uslugaId: uslugaIdZaObavestenje,
+        napomena: napomenaZaMail,
+        klijentEmail: klijentEmailZaObavestenje,
+      })
       return NextResponse.json({ success: true, termin_id: terminIdOut })
     }
 
@@ -174,6 +245,16 @@ export async function POST(request: Request) {
       })
       if (!legacyBookingError) {
         const terminIdOut = typeof legacyBookingId === 'string' ? legacyBookingId : null
+        void posaljiEmailNoviTermin({
+          salonId: String(salon_id),
+          terminId: terminIdOut,
+          ime: imeKlijenta,
+          telefon: telefonKlijenta,
+          datumVrijeme: datumVrijemeStr,
+          uslugaId: uslugaIdZaObavestenje,
+          napomena: napomenaZaMail,
+          klijentEmail: klijentEmailZaObavestenje,
+        })
         return NextResponse.json({ success: true, termin_id: terminIdOut })
       }
     }
