@@ -172,6 +172,13 @@ export default function Dashboard() {
   const [uslugaGreska, setUslugaGreska] = useState('')
   const [uslugaLoading, setUslugaLoading] = useState(false)
   const [lagerGreska, setLagerGreska] = useState('')
+  /** Prijem zalihe za već postojeći artikal (ne novi red u tabeli). */
+  const [lagerPrijem, setLagerPrijem] = useState<{ lagerId: string | null; kolicina: string }>({
+    lagerId: null,
+    kolicina: '',
+  })
+  const [lagerPrijemGreska, setLagerPrijemGreska] = useState('')
+  const [lagerPrijemLoading, setLagerPrijemLoading] = useState(false)
   const [terminiPotvrdaGreska, setTerminiPotvrdaGreska] = useState('')
   const [terminFilter, setTerminFilter] = useState<TerminFilter>('danas')
   const [izabraniDatum, setIzabraniDatum] = useState(() => getLocalDateKey(new Date()))
@@ -832,7 +839,48 @@ export default function Dashboard() {
     }
   }
 
+  const potvrdiPrijemZalihe = async () => {
+    const id = lagerPrijem.lagerId
+    if (!id) return
+    const sid = salon?.id
+    if (!sid) {
+      setLagerPrijemGreska('Salon nije učitan. Osvežite stranicu.')
+      return
+    }
+    const dodatak = parseInt(lagerPrijem.kolicina, 10)
+    if (!Number.isFinite(dodatak) || dodatak <= 0 || dodatak > 1_000_000) {
+      setLagerPrijemGreska('Unesite celu pozitivnu količinu koju dodajete na zalihu (npr. 5).')
+      return
+    }
+    const row = lager.find((x) => x.id === id)
+    if (!row) return
+    setLagerPrijemGreska('')
+    setLagerPrijemLoading(true)
+    const nova = Number(row.kolicina) + dodatak
+    const { data, error } = await supabase
+      .from('lager')
+      .update({ kolicina: nova })
+      .eq('id', id)
+      .eq('salon_id', sid)
+      .select()
+      .single()
+    setLagerPrijemLoading(false)
+    if (error) {
+      setLagerPrijemGreska(formatSalonFkErrorMessage(error.message))
+      return
+    }
+    if (data) {
+      setLager((prev) => prev.map((x) => (x.id === id ? { ...x, kolicina: data.kolicina } : x)))
+      setLagerPrijem({ lagerId: null, kolicina: '' })
+      setLagerPrijemGreska('')
+    }
+  }
+
   const obrisiLager = async (id: string) => {
+    if (lagerPrijem.lagerId === id) {
+      setLagerPrijem({ lagerId: null, kolicina: '' })
+      setLagerPrijemGreska('')
+    }
     await supabase.from('lager').delete().eq('id', id)
     setLager(lager.filter(l => l.id !== id))
   }
@@ -1461,23 +1509,84 @@ export default function Dashboard() {
         </div>
       )}
       {lager.map(l => (
-        <div key={l.id} style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', borderColor: l.kolicina <= l.minimum ? 'rgba(220,80,50,.3)' : goldBorder }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{ width: '42px', height: '42px', background: l.kolicina <= l.minimum ? 'rgba(220,80,50,.1)' : goldFaint, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>
-              {l.kolicina <= l.minimum ? '⚠️' : '📦'}
+        <div
+          key={l.id}
+          style={{
+            ...cardStyle,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            borderColor: l.kolicina <= l.minimum ? 'rgba(220,80,50,.3)' : goldBorder,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ width: '42px', height: '42px', background: l.kolicina <= l.minimum ? 'rgba(220,80,50,.1)' : goldFaint, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>
+                {l.kolicina <= l.minimum ? '⚠️' : '📦'}
+              </div>
+              <div>
+                <div style={{ fontSize: '15px', fontWeight: 500, color: text }}>{l.naziv}</div>
+                <div style={{ fontSize: '12px', color: muted }}>{l.kategorija} · Min: {l.minimum} {l.jedinica}</div>
+              </div>
             </div>
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: 500, color: text }}>{l.naziv}</div>
-              <div style={{ fontSize: '12px', color: muted }}>{l.kategorija} · Min: {l.minimum} {l.jedinica}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '20px', fontWeight: 500, color: l.kolicina <= l.minimum ? '#ff6b6b' : gold }}>{l.kolicina}</div>
+                <div style={{ fontSize: '11px', color: muted }}>{l.jedinica}</div>
+              </div>
+              {lagerPrijem.lagerId === l.id ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: '10px' }}>
+                  <div>
+                    <label style={labelStyle}>DODAJ NA ZALIHU ({l.jedinica || 'kom'})</label>
+                    <input
+                      style={{ ...inputStyle, width: 'min(120px, 100%)' }}
+                      type="number"
+                      min={1}
+                      max={1_000_000}
+                      inputMode="numeric"
+                      placeholder="npr. 5"
+                      disabled={lagerPrijemLoading}
+                      value={lagerPrijem.kolicina}
+                      onChange={(e) => setLagerPrijem((p) => (p.lagerId === l.id ? { ...p, kolicina: e.target.value } : p))}
+                    />
+                  </div>
+                  <button type="button" style={btnGold} disabled={lagerPrijemLoading} onClick={() => void potvrdiPrijemZalihe()}>
+                    {lagerPrijemLoading ? '…' : 'Dodaj'}
+                  </button>
+                  <button
+                    type="button"
+                    style={btnOutline}
+                    disabled={lagerPrijemLoading}
+                    onClick={() => {
+                      setLagerPrijem({ lagerId: null, kolicina: '' })
+                      setLagerPrijemGreska('')
+                    }}
+                  >
+                    Odustani
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  style={btnOutline}
+                  onClick={() => {
+                    setLagerPrijem({ lagerId: l.id, kolicina: '' })
+                    setLagerPrijemGreska('')
+                    setShowNoviLager(false)
+                    setLagerGreska('')
+                  }}
+                >
+                  Dodaj zalihu
+                </button>
+              )}
+              <button type="button" style={btnOutline} onClick={() => obrisiLager(l.id)}>Obriši</button>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', fontWeight: 500, color: l.kolicina <= l.minimum ? '#ff6b6b' : gold }}>{l.kolicina}</div>
-              <div style={{ fontSize: '11px', color: muted }}>{l.jedinica}</div>
+          {lagerPrijem.lagerId === l.id && lagerPrijemGreska ? (
+            <div style={{ background: 'rgba(220,50,50,.1)', border: '0.5px solid rgba(220,50,50,.3)', borderRadius: '10px', padding: '10px 12px', fontSize: '12px', color: '#ff6b6b' }}>
+              ⚠️ {lagerPrijemGreska}
             </div>
-            <button style={btnOutline} onClick={() => obrisiLager(l.id)}>Obriši</button>
-          </div>
+          ) : null}
         </div>
       ))}
       {showNoviLager ? (
@@ -1502,7 +1611,7 @@ export default function Dashboard() {
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button style={btnGold} onClick={dodajLager}>Dodaj artikal</button>
-            <button style={btnOutline} onClick={() => { setShowNoviLager(false); setLagerGreska('') }}>Odustani</button>
+            <button style={btnOutline} onClick={() => { setShowNoviLager(false); setLagerGreska(''); setLagerPrijem({ lagerId: null, kolicina: '' }); setLagerPrijemGreska('') }}>Odustani</button>
           </div>
         </div>
       ) : (
@@ -1511,6 +1620,8 @@ export default function Dashboard() {
           onClick={() => {
             setShowNoviLager(true)
             setLagerGreska('')
+            setLagerPrijem({ lagerId: null, kolicina: '' })
+            setLagerPrijemGreska('')
           }}
         >
           + Dodaj artikal u lager
