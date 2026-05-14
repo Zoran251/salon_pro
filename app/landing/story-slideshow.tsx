@@ -71,12 +71,12 @@ export function StorySlideshow({ onDone }: StorySlideshowProps) {
 
   return (
     <div
+      className="lp-story-root"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       style={{
         width: '100%',
         position: 'relative',
-        borderRadius: 26,
         overflow: 'hidden',
         aspectRatio: '9/16',
         maxHeight: '86vh',
@@ -118,20 +118,20 @@ export function StorySlideshow({ onDone }: StorySlideshowProps) {
           />
 
           <div
+            className="lp-story-inner"
             style={{
               position: 'absolute',
               inset: 0,
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              padding: '22px 22px 26px',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span
+                className="lp-story-brand"
                 style={{
                   color: slide.accent,
-                  fontSize: 14,
                   fontFamily: 'Georgia,serif',
                   fontStyle: 'italic',
                   letterSpacing: '0.18em',
@@ -150,9 +150,9 @@ export function StorySlideshow({ onDone }: StorySlideshowProps) {
                   }}
                 />
                 <span
+                  className="lp-story-counter"
                   style={{
                     color: 'rgba(255,255,255,0.3)',
-                    fontSize: 10,
                     fontFamily: 'sans-serif',
                     letterSpacing: '0.2em',
                   }}
@@ -189,9 +189,9 @@ export function StorySlideshow({ onDone }: StorySlideshowProps) {
                   }}
                 />
                 <span
+                  className="lp-story-phase"
                   style={{
                     color: slide.accent,
-                    fontSize: 9,
                     fontFamily: 'sans-serif',
                     letterSpacing: '0.22em',
                     textTransform: 'uppercase',
@@ -202,12 +202,10 @@ export function StorySlideshow({ onDone }: StorySlideshowProps) {
               </div>
 
               <h2
+                className="lp-story-headline"
                 style={{
                   color: '#fff',
-                  fontSize: 28,
                   fontWeight: 700,
-                  lineHeight: 1.25,
-                  marginBottom: 16,
                   fontFamily: 'Georgia,serif',
                   whiteSpace: 'pre-line',
                 }}
@@ -216,21 +214,19 @@ export function StorySlideshow({ onDone }: StorySlideshowProps) {
               </h2>
 
               <div
+                className="lp-story-panel"
                 style={{
                   background: 'rgba(5,5,5,0.8)',
                   backdropFilter: 'blur(30px)',
                   border: `1px solid ${slide.accent}28`,
-                  borderRadius: 18,
-                  padding: '20px 18px',
                   marginBottom: 14,
                   boxShadow: `0 8px 40px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.04), 0 0 30px ${slide.accentGlow}`,
                 }}
               >
                 <p
+                  className="lp-story-body"
                   style={{
                     color: 'rgba(255,255,255,0.88)',
-                    fontSize: 16,
-                    lineHeight: 1.65,
                     fontFamily: 'Georgia,serif',
                     marginBottom: 12,
                   }}
@@ -238,9 +234,9 @@ export function StorySlideshow({ onDone }: StorySlideshowProps) {
                   {slide.body}
                 </p>
                 <p
+                  className="lp-story-sub"
                   style={{
                     color: slide.accent,
-                    fontSize: 11,
                     fontFamily: 'sans-serif',
                     letterSpacing: '0.1em',
                     opacity: 0.85,
@@ -256,15 +252,14 @@ export function StorySlideshow({ onDone }: StorySlideshowProps) {
                     style={{ marginTop: 20, display: 'block', textDecoration: 'none' }}
                   >
                     <motion.div
+                      className="lp-story-cta"
                       whileHover={{ scale: 1.04, boxShadow: '0 22px 55px rgba(212,175,55,0.45)' }}
                       whileTap={{ scale: 0.97 }}
                       style={{
                         width: '100%',
-                        padding: '16px 0',
                         background: `linear-gradient(135deg, ${GOLD_LIGHT}, ${GOLD}, ${GOLD_DARK})`,
                         color: '#000',
                         fontWeight: 900,
-                        fontSize: 13,
                         letterSpacing: '0.18em',
                         textTransform: 'uppercase',
                         border: 'none',
@@ -333,6 +328,7 @@ export function StorySlideshow({ onDone }: StorySlideshowProps) {
         <motion.button
           key={b.s}
           type="button"
+          className="lp-story-nav-btn"
           onClick={b.fn}
           whileHover={{ opacity: 1, scale: 1.15 }}
           style={{
@@ -344,9 +340,6 @@ export function StorySlideshow({ onDone }: StorySlideshowProps) {
             background: 'rgba(255,255,255,0.06)',
             border: '1px solid rgba(255,255,255,0.1)',
             color: 'rgba(255,255,255,0.4)',
-            fontSize: 26,
-            width: 38,
-            height: 38,
             borderRadius: '50%',
             cursor: 'pointer',
             display: 'flex',

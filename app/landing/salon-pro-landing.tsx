@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { AnimatePresence, motion, useInView } from 'framer-motion'
 import { BG, CARD, GOLD, GOLD_DARK, GOLD_LIGHT } from './constants'
 import { StorySlideshow } from './story-slideshow'
+import './landing-responsive.css'
 
 function FadeIn({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -35,6 +36,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
       role="button"
       aria-expanded={open}
       tabIndex={0}
+      className="lp-faq-item"
       style={{
         background: CARD,
         border: '1px solid rgba(255,255,255,0.06)',
@@ -45,8 +47,10 @@ function FAQItem({ q, a }: { q: string; a: string }) {
       }}
     >
       <div style={{ padding: '17px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-        <span style={{ color: 'rgba(255,255,255,0.78)', fontSize: 14, fontFamily: 'sans-serif', lineHeight: 1.4 }}>{q}</span>
-        <motion.span animate={{ rotate: open ? 45 : 0 }} style={{ color: GOLD, fontSize: 22, flexShrink: 0 }}>
+        <span className="lp-faq-q" style={{ color: 'rgba(255,255,255,0.78)', fontFamily: 'sans-serif', lineHeight: 1.4 }}>
+          {q}
+        </span>
+        <motion.span className="lp-faq-toggle" animate={{ rotate: open ? 45 : 0 }} style={{ color: GOLD, flexShrink: 0 }}>
           +
         </motion.span>
       </div>
@@ -59,15 +63,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
             transition={{ duration: 0.3 }}
             style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
           >
-            <p
-              style={{
-                padding: '14px 18px 16px',
-                color: 'rgba(255,255,255,0.42)',
-                fontSize: 13,
-                lineHeight: 1.7,
-                fontFamily: 'sans-serif',
-              }}
-            >
+            <p className="lp-faq-a" style={{ padding: '14px 18px 16px', color: 'rgba(255,255,255,0.42)', lineHeight: 1.7, fontFamily: 'sans-serif' }}>
               {a}
             </p>
           </motion.div>
@@ -132,15 +128,15 @@ export default function SalonProLanding() {
   ]
 
   return (
-    <div style={{ minHeight: '100vh', background: BG, color: '#fff' }}>
+    <div className="lp-page" style={{ minHeight: '100vh', background: BG, color: '#fff' }}>
       <nav
+        className="lp-nav"
         style={{
           position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           zIndex: 100,
-          padding: '18px 24px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -149,26 +145,28 @@ export default function SalonProLanding() {
           borderBottom: '1px solid rgba(255,255,255,0.04)',
         }}
       >
-        <span style={{ color: GOLD, fontSize: 18, fontFamily: 'Georgia,serif', fontStyle: 'italic', letterSpacing: '0.2em' }}>
+        <span
+          className="lp-nav-brand"
+          style={{ color: GOLD, fontFamily: 'Georgia,serif', fontStyle: 'italic', letterSpacing: '0.2em' }}
+        >
           Salon Pro
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <Link href="/demo" style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: 'sans-serif', textDecoration: 'none' }}>
+          <Link href="/demo" className="lp-nav-link" style={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'sans-serif', textDecoration: 'none' }}>
             Demo
           </Link>
-          <Link href="/login" style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: 'sans-serif', textDecoration: 'none' }}>
+          <Link href="/login" className="lp-nav-link" style={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'sans-serif', textDecoration: 'none' }}>
             Prijava
           </Link>
           <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
             <Link
               href="/registracija"
+              className="lp-nav-cta"
               style={{
                 background: `linear-gradient(135deg, ${GOLD_LIGHT}, ${GOLD})`,
                 color: '#000',
                 border: 'none',
                 borderRadius: 50,
-                padding: '9px 20px',
-                fontSize: 11,
                 fontWeight: 800,
                 letterSpacing: '0.15em',
                 cursor: 'pointer',
@@ -184,33 +182,34 @@ export default function SalonProLanding() {
       </nav>
 
       <section
+        className="lp-hero"
         style={{
-          paddingTop: 70,
           minHeight: '100vh',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '80px 20px 40px',
         }}
       >
-        <div style={{ width: '100%', maxWidth: 390 }}>
+        <div className="lp-hero-story-wrap">
           <StorySlideshow onDone={scrollDown} />
         </div>
         <motion.div
+          className="lp-scroll-cue"
           animate={{ y: [0, 8, 0] }}
           transition={{ duration: 2, repeat: Infinity }}
           onClick={scrollDown}
-          style={{ marginTop: 32, color: 'rgba(255,255,255,0.2)', fontSize: 22, cursor: 'pointer', userSelect: 'none' }}
+          style={{ color: 'rgba(255,255,255,0.2)', cursor: 'pointer', userSelect: 'none' }}
         >
           ↓
         </motion.div>
       </section>
 
-      <section ref={belowRef} style={{ padding: '80px 20px', maxWidth: 760, margin: '0 auto' }}>
+      <section ref={belowRef} className="lp-features">
         <FadeIn>
-          <div style={{ textAlign: 'center', marginBottom: 56 }}>
+          <div className="lp-features-intro" style={{ textAlign: 'center' }}>
             <div
+              className="lp-eyebrow"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -218,58 +217,42 @@ export default function SalonProLanding() {
                 background: `${GOLD}14`,
                 border: `1px solid ${GOLD}33`,
                 borderRadius: 20,
-                padding: '5px 16px',
                 marginBottom: 20,
               }}
             >
               <div style={{ width: 5, height: 5, borderRadius: '50%', background: GOLD }} />
-              <span style={{ color: GOLD, fontSize: 10, fontFamily: 'sans-serif', letterSpacing: '0.2em' }}>FUNKCIONALNOSTI</span>
+              <span style={{ color: GOLD, fontFamily: 'sans-serif', letterSpacing: '0.2em' }}>FUNKCIONALNOSTI</span>
             </div>
-            <h2
-              style={{
-                fontSize: 32,
-                fontWeight: 700,
-                fontFamily: 'Georgia,serif',
-                lineHeight: 1.3,
-                color: '#fff',
-                marginBottom: 14,
-              }}
-            >
+            <h2 className="lp-features-h2" style={{ fontWeight: 700, fontFamily: 'Georgia,serif', color: '#fff', marginBottom: 14 }}>
               Sve što ti treba.
               <br />
               Ništa što ne treba.
             </h2>
-            <p
-              style={{
-                color: 'rgba(255,255,255,0.4)',
-                fontSize: 15,
-                fontFamily: 'sans-serif',
-                lineHeight: 1.7,
-                maxWidth: 440,
-                margin: '0 auto',
-              }}
-            >
+            <p className="lp-features-lead" style={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'sans-serif', lineHeight: 1.7, margin: '0 auto' }}>
               Salon Pro je napravljen za frizere i kozmetičare — ne za IT stručnjake.
             </p>
           </div>
         </FadeIn>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+        <div className="lp-feature-grid">
           {features.filter((f) => !f.highlight).map((f, i) => (
               <FadeIn key={f.title} delay={i * 0.08}>
                 <motion.div
                   whileHover={{ y: -4, borderColor: `${GOLD}44` }}
+                  className="lp-feature-card"
                   style={{
                     background: CARD,
                     border: '1px solid rgba(255,255,255,0.06)',
-                    borderRadius: 18,
-                    padding: '24px 20px',
                     transition: 'border-color 0.3s',
                   }}
                 >
-                  <div style={{ fontSize: 28, marginBottom: 12 }}>{f.icon}</div>
-                  <h3 style={{ color: '#fff', fontSize: 15, fontWeight: 700, marginBottom: 8, fontFamily: 'sans-serif' }}>{f.title}</h3>
-                  <p style={{ color: 'rgba(255,255,255,0.38)', fontSize: 13, lineHeight: 1.65, fontFamily: 'sans-serif' }}>{f.desc}</p>
+                  <div className="lp-feat-icon">{f.icon}</div>
+                  <h3 className="lp-feat-title" style={{ color: '#fff', fontWeight: 700, fontFamily: 'sans-serif' }}>
+                    {f.title}
+                  </h3>
+                  <p className="lp-feat-desc" style={{ color: 'rgba(255,255,255,0.38)', fontFamily: 'sans-serif', margin: 0 }}>
+                    {f.desc}
+                  </p>
                 </motion.div>
               </FadeIn>
             ))}
@@ -278,17 +261,14 @@ export default function SalonProLanding() {
         <FadeIn delay={0.55}>
           <motion.div
             whileHover={{ y: -3 }}
+            className="lp-spotlight"
             style={{
-              marginTop: 14,
               position: 'relative',
               overflow: 'hidden',
               background: '#0d0000',
               border: '1px solid rgba(231,76,60,0.25)',
-              borderRadius: 18,
-              padding: '28px 26px',
               display: 'flex',
               alignItems: 'flex-start',
-              gap: 20,
             }}
           >
             <div
@@ -311,16 +291,14 @@ export default function SalonProLanding() {
             />
             <div style={{ position: 'relative', flexShrink: 0 }}>
               <div
+                className="lp-spotlight-icon"
                 style={{
-                  width: 52,
-                  height: 52,
                   borderRadius: 14,
                   background: 'rgba(231,76,60,0.1)',
                   border: '1px solid rgba(231,76,60,0.25)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 24,
                 }}
               >
                 🚫
@@ -336,14 +314,13 @@ export default function SalonProLanding() {
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
-                <h3 style={{ color: '#fff', fontSize: 16, fontWeight: 700, fontFamily: 'sans-serif', margin: 0 }}>Crna lista</h3>
+                <h3 style={{ color: '#fff', fontWeight: 700, fontFamily: 'sans-serif', margin: 0 }}>Crna lista</h3>
                 <span
+                  className="lp-spotlight-badge"
                   style={{
                     background: 'rgba(231,76,60,0.15)',
                     border: '1px solid rgba(231,76,60,0.3)',
                     borderRadius: 20,
-                    padding: '2px 10px',
-                    fontSize: 9,
                     color: 'rgba(231,76,60,0.85)',
                     fontFamily: 'sans-serif',
                     letterSpacing: '0.15em',
@@ -353,7 +330,7 @@ export default function SalonProLanding() {
                   EKSKLUZIVNO
                 </span>
               </div>
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 1.7, fontFamily: 'sans-serif', margin: 0 }}>
+              <p style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.7, fontFamily: 'sans-serif', margin: 0 }}>
                 Zaštita od klijenata koji često ne dolaze ili otkazuju u poslednji čas — po pravilima koje ti podesiš.
               </p>
             </div>
@@ -361,14 +338,13 @@ export default function SalonProLanding() {
         </FadeIn>
       </section>
 
-      <section style={{ padding: '60px 20px 80px', maxWidth: 480, margin: '0 auto' }}>
+      <section className="lp-pricing">
         <FadeIn>
           <div
+            className="lp-pricing-card"
             style={{
               background: CARD,
               border: `1px solid ${GOLD}33`,
-              borderRadius: 24,
-              padding: '40px 32px',
               textAlign: 'center',
               position: 'relative',
               overflow: 'hidden',
@@ -387,6 +363,7 @@ export default function SalonProLanding() {
             />
 
             <div
+              className="lp-eyebrow"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -394,18 +371,19 @@ export default function SalonProLanding() {
                 background: `${GOLD}14`,
                 border: `1px solid ${GOLD}33`,
                 borderRadius: 20,
-                padding: '5px 16px',
                 marginBottom: 24,
               }}
             >
-              <span style={{ color: GOLD, fontSize: 10, fontFamily: 'sans-serif', letterSpacing: '0.2em' }}>CIJENA</span>
+              <span style={{ color: GOLD, fontFamily: 'sans-serif', letterSpacing: '0.2em' }}>CIJENA</span>
             </div>
 
             <div style={{ marginBottom: 8 }}>
-              <span style={{ color: GOLD, fontSize: 52, fontWeight: 900, fontFamily: 'Georgia,serif' }}>29,99€</span>
-              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14, fontFamily: 'sans-serif' }}> / mj.</span>
+              <span className="lp-price-big" style={{ color: GOLD, fontWeight: 900, fontFamily: 'Georgia,serif' }}>
+                29,99€
+              </span>
+              <span style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'sans-serif' }}> / mj.</span>
             </div>
-            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, fontFamily: 'sans-serif', marginBottom: 32 }}>
+            <p style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'sans-serif', marginBottom: 32 }}>
               Prve 2 sedmice besplatno. Otkaži kad hoćeš.
             </p>
 
@@ -413,11 +391,11 @@ export default function SalonProLanding() {
               {perks.map((p, i) => (
                 <div
                   key={p}
+                  className="lp-perk-row"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: 10,
-                    padding: '9px 0',
                     borderBottom: i < perks.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
                     background: p.includes('Crna lista') ? 'rgba(231,76,60,0.05)' : 'transparent',
                     borderRadius: p.includes('Crna lista') ? 8 : 0,
@@ -426,13 +404,12 @@ export default function SalonProLanding() {
                     margin: p.includes('Crna lista') ? '4px -8px' : 0,
                   }}
                 >
-                  <span style={{ color: p.includes('Crna lista') ? 'rgba(231,76,60,0.9)' : GOLD, fontSize: 14 }}>
+                  <span style={{ color: p.includes('Crna lista') ? 'rgba(231,76,60,0.9)' : GOLD, fontSize: '1.1em' }}>
                     {p.includes('Crna lista') ? '🚫' : '✓'}
                   </span>
                   <span
                     style={{
                       color: p.includes('Crna lista') ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.65)',
-                      fontSize: 13,
                       fontFamily: 'sans-serif',
                       fontWeight: p.includes('Crna lista') ? 600 : 400,
                     }}
@@ -462,15 +439,14 @@ export default function SalonProLanding() {
 
             <Link href="/registracija" style={{ textDecoration: 'none', display: 'block' }}>
               <motion.div
+                className="lp-pricing-cta"
                 whileHover={{ scale: 1.03, boxShadow: '0 22px 55px rgba(212,175,55,0.4)' }}
                 whileTap={{ scale: 0.97 }}
                 style={{
                   width: '100%',
-                  padding: '18px 0',
                   background: `linear-gradient(135deg, ${GOLD_LIGHT}, ${GOLD}, ${GOLD_DARK})`,
                   color: '#000',
                   fontWeight: 900,
-                  fontSize: 13,
                   letterSpacing: '0.18em',
                   textTransform: 'uppercase',
                   border: 'none',
@@ -484,16 +460,16 @@ export default function SalonProLanding() {
                 Počni besplatno →
               </motion.div>
             </Link>
-            <p style={{ color: 'rgba(255,255,255,0.18)', fontSize: 11, fontFamily: 'sans-serif', marginTop: 16 }}>
+            <p style={{ color: 'rgba(255,255,255,0.18)', fontFamily: 'sans-serif', marginTop: 16 }}>
               Kartica nije potrebna za probni period
             </p>
           </div>
         </FadeIn>
       </section>
 
-      <section style={{ padding: '0 20px 80px', maxWidth: 560, margin: '0 auto' }}>
+      <section className="lp-faq">
         <FadeIn>
-          <h2 style={{ fontSize: 26, fontWeight: 700, fontFamily: 'Georgia,serif', marginBottom: 28, textAlign: 'center', color: '#fff' }}>
+          <h2 className="lp-faq-h2" style={{ fontWeight: 700, fontFamily: 'Georgia,serif', textAlign: 'center', color: '#fff' }}>
             Česta pitanja
           </h2>
         </FadeIn>
@@ -526,9 +502,9 @@ export default function SalonProLanding() {
       </section>
 
       <footer
+        className="lp-footer"
         style={{
           borderTop: '1px solid rgba(255,255,255,0.05)',
-          padding: '28px 24px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -536,8 +512,10 @@ export default function SalonProLanding() {
           gap: 12,
         }}
       >
-        <span style={{ color: GOLD, fontSize: 15, fontFamily: 'Georgia,serif', fontStyle: 'italic' }}>Salon Pro</span>
-        <span style={{ color: 'rgba(255,255,255,0.18)', fontSize: 11, fontFamily: 'sans-serif' }}>
+        <span className="lp-footer-brand" style={{ color: GOLD, fontFamily: 'Georgia,serif', fontStyle: 'italic' }}>
+          Salon Pro
+        </span>
+        <span className="lp-footer-copy" style={{ color: 'rgba(255,255,255,0.18)', fontFamily: 'sans-serif' }}>
           © {new Date().getFullYear()} Salon Pro. Sva prava zadržana.
         </span>
       </footer>
