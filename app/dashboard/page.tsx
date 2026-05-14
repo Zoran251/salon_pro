@@ -857,6 +857,18 @@ export default function Dashboard() {
       setTerminiPotvrdaGreska(formatSalonFkErrorMessage(error.message))
       return
     }
+    const { data: sessionData } = await supabase.auth.getSession()
+    const accessTok = sessionData.session?.access_token
+    if (accessTok) {
+      void fetch('/api/salon/notify-customer-termin-potvrden', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessTok}`,
+        },
+        body: JSON.stringify({ termin_id: id }),
+      }).catch(() => {})
+    }
     const { data: refreshed, error: refErr } = await supabase
       .from('termini')
       .select('*')
