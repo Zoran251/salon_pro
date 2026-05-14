@@ -8,6 +8,12 @@ import { buildSalonSlug, fallbackSalonSlug } from '@/lib/slug'
 import { getAppRole } from '@/lib/user-role'
 import { getPublicSiteBase } from '@/lib/public-site-url'
 import type { Database } from '@/lib/supabase'
+import {
+  datumKljucBelgrad,
+  formatDatumBelgrad,
+  formatDateLabelBelgrade,
+  formatVremeBelgrad,
+} from '@/lib/termin-belgrade-vreme'
 
 type SalonRow = Database['public']['Tables']['saloni']['Row']
 type UslugaRow = Database['public']['Tables']['usluge']['Row']
@@ -97,21 +103,12 @@ function terminiSaUslugaNazivom(termini: TerminRow[] | null, uslugeLista: Usluga
 }
 
 function getLocalDateKey(value: Date | string): string {
-  const d = typeof value === 'string' ? new Date(value) : value
-  if (Number.isNaN(d.getTime())) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  if (typeof value === 'string') return datumKljucBelgrad(value)
+  return datumKljucBelgrad(value.toISOString())
 }
 
 function formatDateLabel(dateKey: string): string {
-  const d = new Date(`${dateKey}T12:00:00`)
-  if (Number.isNaN(d.getTime())) return 'Izabrani dan'
-  return d.toLocaleDateString('sr-Latn-RS', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  })
+  return formatDateLabelBelgrade(dateKey)
 }
 
 function skratiNotifTekst(s: string, max = 220): string {
@@ -1102,11 +1099,11 @@ export default function Dashboard() {
             <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: i < 4 ? `0.5px solid rgba(255,255,255,.06)` : 'none', gap: '12px', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{ width: '44px', height: '44px', background: goldFaint, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 600, color: gold, flexShrink: 0, textAlign: 'center' }}>
-                  {new Date(t.datum_vrijeme).toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' })}
+                  {formatVremeBelgrad(t.datum_vrijeme)}
                 </div>
                 <div>
                   <div style={{ fontSize: '14px', color: text, fontWeight: 500 }}>{t.ime_klijenta}</div>
-                  <div style={{ fontSize: '12px', color: muted }}>{t.usluge?.naziv || 'Bez usluge'} · {new Date(t.datum_vrijeme).toLocaleDateString('sr-Latn-RS')}</div>
+                  <div style={{ fontSize: '12px', color: muted }}>{t.usluge?.naziv || 'Bez usluge'} · {formatDatumBelgrad(t.datum_vrijeme)}</div>
                 </div>
               </div>
               <div
@@ -1599,7 +1596,8 @@ export default function Dashboard() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {filtriraniTermini.map((t) => {
-                const terminDate = new Date(t.datum_vrijeme)
+                const terminVrijeme = formatVremeBelgrad(t.datum_vrijeme)
+                const terminDatum = formatDatumBelgrad(t.datum_vrijeme)
                 const statusColor =
                   t.status === 'potvrđen'
                     ? '#4caf81'
@@ -1625,8 +1623,8 @@ export default function Dashboard() {
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 220, flex: '1 1 260px' }}>
                       <div style={{ width: '52px', minHeight: '52px', background: goldFaint, borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: gold, textAlign: 'center' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 700 }}>{terminDate.toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' })}</span>
-                        <span style={{ fontSize: '9px', color: muted, marginTop: 2 }}>{terminDate.toLocaleDateString('sr-Latn-RS')}</span>
+                        <span style={{ fontSize: '13px', fontWeight: 700 }}>{terminVrijeme}</span>
+                        <span style={{ fontSize: '9px', color: muted, marginTop: 2 }}>{terminDatum}</span>
                       </div>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: '14px', fontWeight: 600, color: text }}>{t.ime_klijenta}</div>

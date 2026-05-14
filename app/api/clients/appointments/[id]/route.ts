@@ -5,6 +5,7 @@ import { ensureSalonClientForCustomer } from '@/lib/ensure-customer-salon-client
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
 import { SUPABASE_PUBLIC_ENV_MISSING } from '@/lib/supabase-service-role-hint'
 import { getServerSupabaseClient, hasServiceRoleKey } from '@/lib/server-supabase'
+import { formatDatumVrijemeBelgrad, naivniBelgradDatumVremeUUtcIso } from '@/lib/termin-belgrade-vreme'
 
 function getAnonClient() {
   const { url: supabaseUrl, anonKey: supabaseAnonKey, ok } = getPublicSupabaseEnv()
@@ -21,6 +22,12 @@ function getUserClient(authToken: string) {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { Authorization: `Bearer ${authToken}` } },
   })
+}
+
+function classifyTerminPoslovnaGreška(msg: string): 'radno' | 'preklapanje' | null {
+  if (/RADNO_VREME/i.test(msg)) return 'radno'
+  if (/SLOT_ZAUZET/i.test(msg)) return 'preklapanje'
+  return null
 }
 
 function getAuthToken(request: Request): string | null {
@@ -171,7 +178,7 @@ export async function DELETE(request: Request, context: RouteCtx) {
     }
 
     const warningEmoji = tier === 'blacklist' ? '🚨' : tier === 'late_warning' ? '⚠️' : '❌'
-    const adminPoruka = `${warningEmoji} TERMIN OTKAZAN\n\nKlijent: ${clientData.ime}\nVreme: ${new Date(datumVrijeme).toLocaleString('sr-RS')}\nTip: ${tier}\n\nProverite dashboard!`
+    const adminPoruka = `${warningEmoji} TERMIN OTKAZAN\n\nKlijent: ${clientData.ime}\nVreme: ${formatDatumVrijemeBelgrad(datumVrijeme)}\nTip: ${tier}\n\nProverite dashboard!`
     const emailPredmet =
       tier === 'blacklist'
         ? 'SalonPro: hitno — termin otkazan (kasno otkazivanje)'
@@ -295,7 +302,8 @@ export async function PATCH(request: Request, context: RouteCtx) {
 
     const patch: Record<string, string | null> = {}
     if (typeof body.datum_vrijeme === 'string' && body.datum_vrijeme.trim()) {
-      patch.datum_vrijeme = body.datum_vrijeme.trim()
+      const raw = body.datum_vrijeme.trim()
+      patch.datum_vrijeme = naivniBelgradDatumVremeUUtcIso(raw) ?? raw
     }
     if (body.usluga_id !== undefined) {
       patch.usluga_id = body.usluga_id === null || body.usluga_id === '' ? null : String(body.usluga_id)
@@ -325,12 +333,27 @@ export async function PATCH(request: Request, context: RouteCtx) {
 
     const { error: updErr } = await userClient.from('termini').update(patch).eq('id', terminId)
 
-    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
-    
-    if (typeof body.datum_vrijeme === 'string' && body.datum_vrijeme.trim()) {
+    if (updErr) {
+      const biz = classifyTerminPoslovnaGreška(updErr.message)
+      if (biz === 'radno') {
+        return NextResponse.json(
+          { error: 'Salon ne radi u izabrano vreme ili je zatvoren tog dana. Izaberite drugi termin.' },
+          { status: 409 }
+        )
+      }
+      if (biz === 'preklapanje') {
+        return NextResponse.json(
+          { error: 'Ovaj termin je zauzet za izabranog zaposlenog. Izaberite drugo vreme.' },
+          { status: 409 }
+        )
+      }
+      return NextResponse.json({ error: updErr.message }, { status: 500 })
+    }
+
+    if (typeof body.datum_vrijeme === 'string' && body.datum_vrijeme.trim() && patch.datum_vrijeme) {
       const oldTime = termin.datum_vrijeme as string
-      const newTime = body.datum_vrijeme.trim()
-      const adminPoruka = `🔄 PROMENA VREMENA TERMINA\n\nKlijent: ${clientData.ime}\nStaro vreme: ${new Date(oldTime).toLocaleString('sr-RS')}\nNovo vreme: ${new Date(newTime).toLocaleString('sr-RS')}\n\nProverite dashboard!`
+      const newTime = patch.datum_vrijeme as string
+      const adminPoruka = `🔄 PROMENA VREMENA TERMINA\n\nKlijent: ${clientData.ime}\nStaro vreme: ${formatDatumVrijemeBelgrad(oldTime)}\nNovo vreme: ${formatDatumVrijemeBelgrad(newTime)}\n\nProverite dashboard!`
 
       try {
         void sendSalonAdminEmail({

@@ -6,6 +6,13 @@ import { supabase } from '@/lib/supabase'
 import { waitForClientSession } from '@/lib/wait-client-session'
 import { getAppRole } from '@/lib/user-role'
 import { isTerminOtkazan, isTerminPotvrdjen, storageTerminStatus } from '@/lib/termin-status'
+import {
+  datumKljucBelgrad,
+  formatDatumVrijemeBelgrad,
+  formatVremeBelgrad,
+  naivniBelgradDatumVremeUUtcIso,
+  ujednacenoDatumVremeBelgrad,
+} from '@/lib/termin-belgrade-vreme'
 
 interface Usluga {
   id: string
@@ -659,10 +666,7 @@ export default function SalonLanding() {
     const pending = bookingNotifRef.current
     if (!pending || isTerminPotvrdjen(pending.status) || isTerminOtkazan(pending.status)) return
 
-    const normDatum = (iso: string) => {
-      const t = iso.replace(' ', 'T').replace(/(\.\d{3})?Z?$/, '').replace(/\+00:00$/, '')
-      return t.length >= 16 ? t.slice(0, 16) : t
-    }
+    const normDatum = (iso: string) => ujednacenoDatumVremeBelgrad(iso)
 
     if (clientSummary?.notifications?.length && pending.termin_id) {
       const confirmed = clientSummary.notifications.some(
@@ -876,7 +880,9 @@ export default function SalonLanding() {
     setLoading(true)
     setGreska('')
     try {
-      const datumVrijeme = `${forma.datum}T${forma.vrijeme}:00`
+      const datumVrijeme =
+        naivniBelgradDatumVremeUUtcIso(`${forma.datum}T${forma.vrijeme}:00`) ??
+        `${forma.datum}T${forma.vrijeme}:00`
       const emailZaTermin =
         klijentUlogovan && clientSummary?.client?.email ? String(clientSummary.client.email).trim() : undefined
 
@@ -1003,12 +1009,11 @@ export default function SalonLanding() {
   const otvoriTerminZaEdit = (termin: TerminPregled) => {
     setTerminAkcijaPoruka('')
     setTerminAkcijaGreska('')
-    const d = new Date(termin.datum_vrijeme)
-    const pad = (n: number) => String(n).padStart(2, '0')
+    const dIso = naivniBelgradDatumVremeUUtcIso(termin.datum_vrijeme) ?? termin.datum_vrijeme
     setTerminEdit({
       id: termin.id,
-      datum: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-      vrijeme: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+      datum: datumKljucBelgrad(dIso),
+      vrijeme: formatVremeBelgrad(dIso),
       usluga_id: termin.usluga_id || '',
       zaposleni_id: termin.zaposleni_id || '',
       napomena: termin.napomena || '',
@@ -1028,7 +1033,9 @@ export default function SalonLanding() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          datum_vrijeme: `${terminEdit.datum}T${terminEdit.vrijeme}:00`,
+          datum_vrijeme:
+            naivniBelgradDatumVremeUUtcIso(`${terminEdit.datum}T${terminEdit.vrijeme}:00`) ??
+            `${terminEdit.datum}T${terminEdit.vrijeme}:00`,
           usluga_id: terminEdit.usluga_id || null,
           zaposleni_id: terminEdit.zaposleni_id || null,
           napomena: terminEdit.napomena || null,
@@ -1692,7 +1699,7 @@ export default function SalonLanding() {
                         >
                           <div style={{ flex: '1 1 160px' }}>
                             <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.85)' }}>
-                              {new Date(termin.datum_vrijeme).toLocaleString('sr')}
+                              {formatDatumVrijemeBelgrad(termin.datum_vrijeme)}
                             </div>
                             <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.45)', marginTop: '2px' }}>
                               {termin.usluge?.naziv || 'Usluga'}
