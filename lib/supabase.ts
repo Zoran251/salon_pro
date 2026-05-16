@@ -78,6 +78,7 @@ export type Database = {
           kategorija: string | null
           aktivan: boolean | null
           created_at: string | null
+          slika_url: string | null
         }
         Insert: {
           id?: string
@@ -89,6 +90,7 @@ export type Database = {
           kategorija?: string | null
           aktivan?: boolean | null
           created_at?: string | null
+          slika_url?: string | null
         }
         Update: Partial<Database['public']['Tables']['usluge']['Insert']>
         Relationships: []

@@ -20,6 +20,7 @@ import {
   formatDateLabelBelgrade,
   formatVremeBelgrad,
 } from '@/lib/termin-belgrade-vreme'
+import { fileToUslugaSlikaDataUrl } from '@/lib/usluga-slika'
 
 type SalonRow = Database['public']['Tables']['saloni']['Row']
 type UslugaRow = Database['public']['Tables']['usluge']['Row']
@@ -193,7 +194,10 @@ export default function Dashboard() {
   const [qrLoading, setQrLoading] = useState(false)
   const [qrError, setQrError] = useState('')
   // ...ostatak state-a ostaje isti...
-  const [novaUsluga, setNovaUsluga] = useState({ naziv: '', cijena: '', trajanje: '', opis: '' })
+  const [novaUsluga, setNovaUsluga] = useState({ naziv: '', cijena: '', trajanje: '', opis: '', slika_url: '' })
+  const uslugaSlikaInputRef = useRef<HTMLInputElement>(null)
+  const uslugaSlikaCiljRef = useRef<'nova' | string | null>(null)
+  const [uslugaSlikaBusyId, setUslugaSlikaBusyId] = useState<string | null>(null)
   const [novaUslugaLager, setNovaUslugaLager] = useState<NovaUslugaLagerItem[]>([])
   const [uslugaLager, setUslugaLager] = useState<UslugaLagerConsumption[]>([])
   const [noviLager, setNoviLager] = useState({ naziv: '', kategorija: '', kolicina: '', minimum: '', jedinica: 'kom' })
@@ -765,6 +769,7 @@ export default function Dashboard() {
         trajanje,
         opis: novaUsluga.opis.trim(),
         aktivan: true,
+        slika_url: novaUsluga.slika_url?.trim() || null,
       }).select().single()
 
       if (error || !data) {
@@ -806,7 +811,7 @@ export default function Dashboard() {
 
       setUsluge((prev) => [...prev, data])
       setUslugaLager((prev) => [...prev, ...novaPotrosnja])
-      setNovaUsluga({ naziv: '', cijena: '', trajanje: '', opis: '' })
+      setNovaUsluga({ naziv: '', cijena: '', trajanje: '', opis: '', slika_url: '' })
       setNovaUslugaLager([])
       setShowNovaUsluga(false)
     } catch {
@@ -820,6 +825,59 @@ export default function Dashboard() {
     await supabase.from('usluge').delete().eq('id', id)
     setUsluge(usluge.filter(u => u.id !== id))
     setUslugaLager((prev) => prev.filter((p) => p.usluga_id !== id))
+  }
+
+  const otvoriUslugaSlikuPicker = (cilj: 'nova' | string) => {
+    uslugaSlikaCiljRef.current = cilj
+    window.setTimeout(() => uslugaSlikaInputRef.current?.click(), 0)
+  }
+
+  const handleUslugaSlikaFajl = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const cilj = uslugaSlikaCiljRef.current
+    uslugaSlikaCiljRef.current = null
+    e.target.value = ''
+    const file = e.target.files?.[0]
+    if (!file || !cilj) return
+    setUslugaGreska('')
+    try {
+      const dataUrl = await fileToUslugaSlikaDataUrl(file)
+      if (cilj === 'nova') {
+        setNovaUsluga((prev) => ({ ...prev, slika_url: dataUrl }))
+        return
+      }
+      setUslugaSlikaBusyId(cilj)
+      const { error } = await supabase.from('usluge').update({ slika_url: dataUrl }).eq('id', cilj)
+      if (error) {
+        const msg = /slika_url|column .* does not exist|schema cache/i.test(error.message)
+          ? 'U Supabase pokrenite migraciju 2026-05-21_usluge_slika_url.sql, pa pokušajte ponovo.'
+          : error.message
+        setUslugaGreska(msg)
+        return
+      }
+      setUsluge((prev) => prev.map((u) => (u.id === cilj ? { ...u, slika_url: dataUrl } : u)))
+    } catch (err) {
+      setUslugaGreska(err instanceof Error ? err.message : 'Slika nije učitana.')
+    } finally {
+      setUslugaSlikaBusyId(null)
+    }
+  }
+
+  const ukloniSlikuUsluge = async (id: string) => {
+    setUslugaGreska('')
+    setUslugaSlikaBusyId(id)
+    try {
+      const { error } = await supabase.from('usluge').update({ slika_url: null }).eq('id', id)
+      if (error) {
+        const msg = /slika_url|column .* does not exist|schema cache/i.test(error.message)
+          ? 'U Supabase pokrenite migraciju 2026-05-21_usluge_slika_url.sql, pa pokušajte ponovo.'
+          : error.message
+        setUslugaGreska(msg)
+        return
+      }
+      setUsluge((prev) => prev.map((u) => (u.id === id ? { ...u, slika_url: null } : u)))
+    } finally {
+      setUslugaSlikaBusyId(null)
+    }
   }
 
   const dodajZaposlenog = async () => {
@@ -1368,36 +1426,110 @@ export default function Dashboard() {
 
   const renderUsluge = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <input
+        ref={uslugaSlikaInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        style={{ display: 'none' }}
+        aria-hidden
+        onChange={(e) => void handleUslugaSlikaFajl(e)}
+      />
       {usluge.length === 0 && !showNovaUsluga && (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '40px' }}>
           <div style={{ fontSize: '32px', marginBottom: '12px' }}>💈</div>
           <p style={{ fontSize: '14px', color: muted, marginBottom: '16px' }}>Još nemaš dodanih usluga.</p>
         </div>
       )}
-      {usluge.map(u => (
-        <div key={u.id} style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{ width: '42px', height: '42px', background: goldFaint, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>💈</div>
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: 500, color: text }}>{u.naziv}</div>
-              <div style={{ fontSize: '12px', color: muted }}>
-                {u.trajanje} min · {Number(u.cijena).toLocaleString()} RSD
-              </div>
-              {u.opis && <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.3)', marginTop: '2px' }}>{u.opis}</div>}
-              {uslugaLager.filter((p) => p.usluga_id === u.id).length > 0 && (
-                <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.45)', marginTop: '6px' }}>
-                  Troši:{' '}
-                  {uslugaLager
-                    .filter((p) => p.usluga_id === u.id)
-                    .map((p) => `${p.lager?.naziv || 'Artikal'} ${p.kolicina} ${p.lager?.jedinica || ''}`.trim())
-                    .join(' · ')}
+      {usluge.map((u) => {
+        const busy = uslugaSlikaBusyId === u.id
+        const inicijal = (u.naziv || '?').trim().charAt(0).toUpperCase() || '•'
+        return (
+          <div
+            key={u.id}
+            style={{
+              ...cardStyle,
+              padding: 0,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                aspectRatio: '16 / 10',
+                background: `linear-gradient(145deg,${goldFaint},rgba(18,16,12,.95))`,
+                borderBottom: `0.5px solid ${goldBorder}`,
+              }}
+            >
+              {u.slika_url ? (
+                // eslint-disable-next-line @next/next/no-img-element -- data URL ili spoljni URL
+                <img
+                  src={u.slika_url}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              ) : (
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '42px',
+                    fontWeight: 700,
+                    color: 'rgba(212,175,55,.35)',
+                    letterSpacing: '0.04em',
+                  }}
+                  aria-hidden
+                >
+                  {inicijal}
                 </div>
               )}
             </div>
+            <div style={{ padding: '18px 20px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ minWidth: 0, flex: '1 1 200px' }}>
+                  <div style={{ fontSize: '15px', fontWeight: 500, color: text }}>{u.naziv}</div>
+                  <div style={{ fontSize: '12px', color: muted, marginTop: '4px' }}>
+                    {u.trajanje} min · {Number(u.cijena).toLocaleString()} RSD
+                  </div>
+                  {u.opis ? <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.32)', marginTop: '6px', lineHeight: 1.45 }}>{u.opis}</div> : null}
+                  {uslugaLager.filter((p) => p.usluga_id === u.id).length > 0 ? (
+                    <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.45)', marginTop: '8px', lineHeight: 1.45 }}>
+                      Troši:{' '}
+                      {uslugaLager
+                        .filter((p) => p.usluga_id === u.id)
+                        .map((p) => `${p.lager?.naziv || 'Artikal'} ${p.kolicina} ${p.lager?.jedinica || ''}`.trim())
+                        .join(' · ')}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.38)', lineHeight: 1.5 }}>
+                Opciona slika (JPG/PNG/WebP, do 2 MB). Prikazuje se kupcima na javnoj stranici salona — automatski se smanjuje u pregledaču.
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                <button type="button" style={{ ...btnGold, padding: '9px 14px', fontSize: '12px', opacity: busy ? 0.65 : 1 }} disabled={busy} onClick={() => otvoriUslugaSlikuPicker(u.id)}>
+                  {busy ? 'Obrada…' : u.slika_url ? 'Promeni sliku' : 'Dodaj sliku'}
+                </button>
+                {u.slika_url ? (
+                  <button type="button" style={{ ...btnOutline, padding: '9px 14px', fontSize: '12px' }} disabled={busy} onClick={() => void ukloniSlikuUsluge(u.id)}>
+                    Ukloni sliku
+                  </button>
+                ) : null}
+                <button type="button" style={{ ...btnOutline, padding: '9px 14px', fontSize: '12px', marginLeft: 'auto' }} disabled={busy} onClick={() => obrisiUslugu(u.id)}>
+                  Obriši uslugu
+                </button>
+              </div>
+            </div>
           </div>
-          <button style={btnOutline} onClick={() => obrisiUslugu(u.id)}>Obriši</button>
-        </div>
-      ))}
+        )
+      })}
       {showNovaUsluga ? (
         <div style={cardStyle}>
           <h3 style={{ fontSize: '14px', fontWeight: 500, color: text, marginBottom: '16px' }}>Nova usluga</h3>
@@ -1411,6 +1543,64 @@ export default function Dashboard() {
             <div><label style={labelStyle}>CIJENA (RSD)</label><input style={inputStyle} placeholder="1500" value={novaUsluga.cijena} onChange={e => setNovaUsluga({ ...novaUsluga, cijena: e.target.value })} /></div>
             <div><label style={labelStyle}>TRAJANJE (min)</label><input style={inputStyle} placeholder="45" value={novaUsluga.trajanje} onChange={e => setNovaUsluga({ ...novaUsluga, trajanje: e.target.value })} /></div>
             <div style={{ gridColumn: '1/-1' }}><label style={labelStyle}>OPIS (opciono)</label><input style={inputStyle} placeholder="Kratki opis usluge" value={novaUsluga.opis} onChange={e => setNovaUsluga({ ...novaUsluga, opis: e.target.value })} /></div>
+          </div>
+          <div
+            style={{
+              marginBottom: '16px',
+              padding: '14px',
+              borderRadius: '12px',
+              border: `0.5px solid ${goldBorder}`,
+              background: 'rgba(255,255,255,.03)',
+            }}
+          >
+            <label style={{ ...labelStyle, marginBottom: '10px' }}>SLIKA USLUGE (OPCIONO)</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center' }}>
+              <div
+                style={{
+                  width: '120px',
+                  height: '75px',
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  border: `0.5px solid ${goldBorder}`,
+                  background: `linear-gradient(145deg,${goldFaint},#141210)`,
+                  flexShrink: 0,
+                }}
+              >
+                {novaUsluga.slika_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={novaUsluga.slika_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                ) : (
+                  <div
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '22px',
+                      fontWeight: 700,
+                      color: 'rgba(212,175,55,.3)',
+                    }}
+                    aria-hidden
+                  >
+                    {(novaUsluga.naziv || '?').trim().charAt(0).toUpperCase() || '•'}
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
+                <button type="button" style={{ ...btnGold, padding: '9px 14px', fontSize: '12px', alignSelf: 'flex-start' }} onClick={() => otvoriUslugaSlikuPicker('nova')}>
+                  Izaberi sliku
+                </button>
+                {novaUsluga.slika_url ? (
+                  <button type="button" style={{ ...btnOutline, padding: '9px 14px', fontSize: '12px', alignSelf: 'flex-start' }} onClick={() => setNovaUsluga({ ...novaUsluga, slika_url: '' })}>
+                    Ukloni pregled
+                  </button>
+                ) : null}
+                <span style={{ fontSize: '11px', color: 'rgba(245,240,232,.38)', maxWidth: '280px', lineHeight: 1.45 }}>
+                  Pregled na tvojoj javnoj stranici; fajl do 2 MB, smanjenje u pregledaču pre snimanja.
+                </span>
+              </div>
+            </div>
           </div>
           <div style={{ background: 'rgba(255,255,255,.03)', border: `0.5px solid ${goldBorder}`, borderRadius: '12px', padding: '14px', marginBottom: '14px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
@@ -1477,7 +1667,18 @@ export default function Dashboard() {
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button style={btnGold} disabled={uslugaLoading} onClick={dodajUslugu}>{uslugaLoading ? 'Dodavanje...' : 'Dodaj uslugu'}</button>
-            <button style={btnOutline} onClick={() => { setShowNovaUsluga(false); setUslugaGreska(''); setNovaUslugaLager([]) }}>Odustani</button>
+            <button
+              type="button"
+              style={btnOutline}
+              onClick={() => {
+                setShowNovaUsluga(false)
+                setUslugaGreska('')
+                setNovaUslugaLager([])
+                setNovaUsluga({ naziv: '', cijena: '', trajanje: '', opis: '', slika_url: '' })
+              }}
+            >
+              Odustani
+            </button>
           </div>
         </div>
       ) : (
