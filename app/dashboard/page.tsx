@@ -20,6 +20,7 @@ import {
   formatDateLabelBelgrade,
   formatVremeBelgrad,
 } from '@/lib/termin-belgrade-vreme'
+import { fileToUslugaSlikaDataUrl } from '@/lib/usluga-slika'
 
 type SalonRow = Database['public']['Tables']['saloni']['Row']
 type UslugaRow = Database['public']['Tables']['usluge']['Row']
@@ -139,6 +140,14 @@ function klijentGrupacijaKljuc(t: TerminRow): string {
   return `t:${tel}|${(t.ime_klijenta || '').trim().toLowerCase()}`
 }
 
+const ANALITIKA_BEZ_ZAPOSLENOG = '__bez_zaposlenog__'
+
+function prometTerminaUSalonu(t: TerminRow, uslugeMap: Map<string, UslugaRow>): number {
+  if (!t.usluga_id) return 0
+  const u = uslugeMap.get(t.usluga_id)
+  return u ? Number(u.cijena) : 0
+}
+
 function employeeInitials(name: string | null | undefined): string {
   const parts = (name || '')
     .trim()
@@ -185,7 +194,10 @@ export default function Dashboard() {
   const [qrLoading, setQrLoading] = useState(false)
   const [qrError, setQrError] = useState('')
   // ...ostatak state-a ostaje isti...
-  const [novaUsluga, setNovaUsluga] = useState({ naziv: '', cijena: '', trajanje: '', opis: '' })
+  const [novaUsluga, setNovaUsluga] = useState({ naziv: '', cijena: '', trajanje: '', opis: '', slika_url: '' })
+  const uslugaSlikaInputRef = useRef<HTMLInputElement>(null)
+  const uslugaSlikaCiljRef = useRef<'nova' | string | null>(null)
+  const [uslugaSlikaBusyId, setUslugaSlikaBusyId] = useState<string | null>(null)
   const [novaUslugaLager, setNovaUslugaLager] = useState<NovaUslugaLagerItem[]>([])
   const [uslugaLager, setUslugaLager] = useState<UslugaLagerConsumption[]>([])
   const [noviLager, setNoviLager] = useState({ naziv: '', kategorija: '', kolicina: '', minimum: '', jedinica: 'kom' })
@@ -208,6 +220,8 @@ export default function Dashboard() {
   const [analitikaPeriod, setAnalitikaPeriod] = useState<AnalitikaPeriod>('mesec')
   const [preporuceneSalone, setPreporuceneSalone] = useState<{ naziv: string; created_at: string | null }[]>([])
   const [referalKopiran, setReferalKopiran] = useState(false)
+  const [analitikaZaposleniDetaljKljuc, setAnalitikaZaposleniDetaljKljuc] = useState<string | null>(null)
+  const [analitikaKlijentDetaljKljuc, setAnalitikaKlijentDetaljKljuc] = useState<string | null>(null)
   const [showNoviRashod, setShowNoviRashod] = useState(false)
   const [noviRashod, setNoviRashod] = useState({ naziv: '', iznos: '', kategorija: 'Ostalo', datum: getLocalDateKey(new Date()), napomena: '' })
   const [rashodGreska, setRashodGreska] = useState('')
@@ -276,6 +290,20 @@ export default function Dashboard() {
     [notifStarijeOtvoreno, salonNotifications, najnovijeSalonNotifikacije],
   )
   const zvonacBroj = Math.max(neprocitaniTermini, salonNotifications.length)
+
+  useEffect(() => {
+    setAnalitikaZaposleniDetaljKljuc(null)
+    setAnalitikaKlijentDetaljKljuc(null)
+  }, [analitikaPeriod])
+
+  useEffect(() => {
+    if (!analitikaKlijentDetaljKljuc) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setAnalitikaKlijentDetaljKljuc(null)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [analitikaKlijentDetaljKljuc])
 
   useEffect(() => {
     if (!notifMenuOpen) return
@@ -741,6 +769,7 @@ export default function Dashboard() {
         trajanje,
         opis: novaUsluga.opis.trim(),
         aktivan: true,
+        slika_url: novaUsluga.slika_url?.trim() || null,
       }).select().single()
 
       if (error || !data) {
@@ -782,7 +811,7 @@ export default function Dashboard() {
 
       setUsluge((prev) => [...prev, data])
       setUslugaLager((prev) => [...prev, ...novaPotrosnja])
-      setNovaUsluga({ naziv: '', cijena: '', trajanje: '', opis: '' })
+      setNovaUsluga({ naziv: '', cijena: '', trajanje: '', opis: '', slika_url: '' })
       setNovaUslugaLager([])
       setShowNovaUsluga(false)
     } catch {
@@ -796,6 +825,59 @@ export default function Dashboard() {
     await supabase.from('usluge').delete().eq('id', id)
     setUsluge(usluge.filter(u => u.id !== id))
     setUslugaLager((prev) => prev.filter((p) => p.usluga_id !== id))
+  }
+
+  const otvoriUslugaSlikuPicker = (cilj: 'nova' | string) => {
+    uslugaSlikaCiljRef.current = cilj
+    window.setTimeout(() => uslugaSlikaInputRef.current?.click(), 0)
+  }
+
+  const handleUslugaSlikaFajl = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const cilj = uslugaSlikaCiljRef.current
+    uslugaSlikaCiljRef.current = null
+    e.target.value = ''
+    const file = e.target.files?.[0]
+    if (!file || !cilj) return
+    setUslugaGreska('')
+    try {
+      const dataUrl = await fileToUslugaSlikaDataUrl(file)
+      if (cilj === 'nova') {
+        setNovaUsluga((prev) => ({ ...prev, slika_url: dataUrl }))
+        return
+      }
+      setUslugaSlikaBusyId(cilj)
+      const { error } = await supabase.from('usluge').update({ slika_url: dataUrl }).eq('id', cilj)
+      if (error) {
+        const msg = /slika_url|column .* does not exist|schema cache/i.test(error.message)
+          ? 'U Supabase pokrenite migraciju 2026-05-21_usluge_slika_url.sql, pa pokušajte ponovo.'
+          : error.message
+        setUslugaGreska(msg)
+        return
+      }
+      setUsluge((prev) => prev.map((u) => (u.id === cilj ? { ...u, slika_url: dataUrl } : u)))
+    } catch (err) {
+      setUslugaGreska(err instanceof Error ? err.message : 'Slika nije učitana.')
+    } finally {
+      setUslugaSlikaBusyId(null)
+    }
+  }
+
+  const ukloniSlikuUsluge = async (id: string) => {
+    setUslugaGreska('')
+    setUslugaSlikaBusyId(id)
+    try {
+      const { error } = await supabase.from('usluge').update({ slika_url: null }).eq('id', id)
+      if (error) {
+        const msg = /slika_url|column .* does not exist|schema cache/i.test(error.message)
+          ? 'U Supabase pokrenite migraciju 2026-05-21_usluge_slika_url.sql, pa pokušajte ponovo.'
+          : error.message
+        setUslugaGreska(msg)
+        return
+      }
+      setUsluge((prev) => prev.map((u) => (u.id === id ? { ...u, slika_url: null } : u)))
+    } finally {
+      setUslugaSlikaBusyId(null)
+    }
   }
 
   const dodajZaposlenog = async () => {
@@ -1344,36 +1426,110 @@ export default function Dashboard() {
 
   const renderUsluge = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <input
+        ref={uslugaSlikaInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        style={{ display: 'none' }}
+        aria-hidden
+        onChange={(e) => void handleUslugaSlikaFajl(e)}
+      />
       {usluge.length === 0 && !showNovaUsluga && (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '40px' }}>
           <div style={{ fontSize: '32px', marginBottom: '12px' }}>💈</div>
           <p style={{ fontSize: '14px', color: muted, marginBottom: '16px' }}>Još nemaš dodanih usluga.</p>
         </div>
       )}
-      {usluge.map(u => (
-        <div key={u.id} style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{ width: '42px', height: '42px', background: goldFaint, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>💈</div>
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: 500, color: text }}>{u.naziv}</div>
-              <div style={{ fontSize: '12px', color: muted }}>
-                {u.trajanje} min · {Number(u.cijena).toLocaleString()} RSD
-              </div>
-              {u.opis && <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.3)', marginTop: '2px' }}>{u.opis}</div>}
-              {uslugaLager.filter((p) => p.usluga_id === u.id).length > 0 && (
-                <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.45)', marginTop: '6px' }}>
-                  Troši:{' '}
-                  {uslugaLager
-                    .filter((p) => p.usluga_id === u.id)
-                    .map((p) => `${p.lager?.naziv || 'Artikal'} ${p.kolicina} ${p.lager?.jedinica || ''}`.trim())
-                    .join(' · ')}
+      {usluge.map((u) => {
+        const busy = uslugaSlikaBusyId === u.id
+        const inicijal = (u.naziv || '?').trim().charAt(0).toUpperCase() || '•'
+        return (
+          <div
+            key={u.id}
+            style={{
+              ...cardStyle,
+              padding: 0,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                aspectRatio: '16 / 10',
+                background: `linear-gradient(145deg,${goldFaint},rgba(18,16,12,.95))`,
+                borderBottom: `0.5px solid ${goldBorder}`,
+              }}
+            >
+              {u.slika_url ? (
+                // eslint-disable-next-line @next/next/no-img-element -- data URL ili spoljni URL
+                <img
+                  src={u.slika_url}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              ) : (
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '42px',
+                    fontWeight: 700,
+                    color: 'rgba(212,175,55,.35)',
+                    letterSpacing: '0.04em',
+                  }}
+                  aria-hidden
+                >
+                  {inicijal}
                 </div>
               )}
             </div>
+            <div style={{ padding: '18px 20px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ minWidth: 0, flex: '1 1 200px' }}>
+                  <div style={{ fontSize: '15px', fontWeight: 500, color: text }}>{u.naziv}</div>
+                  <div style={{ fontSize: '12px', color: muted, marginTop: '4px' }}>
+                    {u.trajanje} min · {Number(u.cijena).toLocaleString()} RSD
+                  </div>
+                  {u.opis ? <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.32)', marginTop: '6px', lineHeight: 1.45 }}>{u.opis}</div> : null}
+                  {uslugaLager.filter((p) => p.usluga_id === u.id).length > 0 ? (
+                    <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.45)', marginTop: '8px', lineHeight: 1.45 }}>
+                      Troši:{' '}
+                      {uslugaLager
+                        .filter((p) => p.usluga_id === u.id)
+                        .map((p) => `${p.lager?.naziv || 'Artikal'} ${p.kolicina} ${p.lager?.jedinica || ''}`.trim())
+                        .join(' · ')}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.38)', lineHeight: 1.5 }}>
+                Opciona slika (JPG/PNG/WebP, do 2 MB). Prikazuje se kupcima na javnoj stranici salona — automatski se smanjuje u pregledaču.
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                <button type="button" style={{ ...btnGold, padding: '9px 14px', fontSize: '12px', opacity: busy ? 0.65 : 1 }} disabled={busy} onClick={() => otvoriUslugaSlikuPicker(u.id)}>
+                  {busy ? 'Obrada…' : u.slika_url ? 'Promeni sliku' : 'Dodaj sliku'}
+                </button>
+                {u.slika_url ? (
+                  <button type="button" style={{ ...btnOutline, padding: '9px 14px', fontSize: '12px' }} disabled={busy} onClick={() => void ukloniSlikuUsluge(u.id)}>
+                    Ukloni sliku
+                  </button>
+                ) : null}
+                <button type="button" style={{ ...btnOutline, padding: '9px 14px', fontSize: '12px', marginLeft: 'auto' }} disabled={busy} onClick={() => obrisiUslugu(u.id)}>
+                  Obriši uslugu
+                </button>
+              </div>
+            </div>
           </div>
-          <button style={btnOutline} onClick={() => obrisiUslugu(u.id)}>Obriši</button>
-        </div>
-      ))}
+        )
+      })}
       {showNovaUsluga ? (
         <div style={cardStyle}>
           <h3 style={{ fontSize: '14px', fontWeight: 500, color: text, marginBottom: '16px' }}>Nova usluga</h3>
@@ -1387,6 +1543,64 @@ export default function Dashboard() {
             <div><label style={labelStyle}>CIJENA (RSD)</label><input style={inputStyle} placeholder="1500" value={novaUsluga.cijena} onChange={e => setNovaUsluga({ ...novaUsluga, cijena: e.target.value })} /></div>
             <div><label style={labelStyle}>TRAJANJE (min)</label><input style={inputStyle} placeholder="45" value={novaUsluga.trajanje} onChange={e => setNovaUsluga({ ...novaUsluga, trajanje: e.target.value })} /></div>
             <div style={{ gridColumn: '1/-1' }}><label style={labelStyle}>OPIS (opciono)</label><input style={inputStyle} placeholder="Kratki opis usluge" value={novaUsluga.opis} onChange={e => setNovaUsluga({ ...novaUsluga, opis: e.target.value })} /></div>
+          </div>
+          <div
+            style={{
+              marginBottom: '16px',
+              padding: '14px',
+              borderRadius: '12px',
+              border: `0.5px solid ${goldBorder}`,
+              background: 'rgba(255,255,255,.03)',
+            }}
+          >
+            <label style={{ ...labelStyle, marginBottom: '10px' }}>SLIKA USLUGE (OPCIONO)</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center' }}>
+              <div
+                style={{
+                  width: '120px',
+                  height: '75px',
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  border: `0.5px solid ${goldBorder}`,
+                  background: `linear-gradient(145deg,${goldFaint},#141210)`,
+                  flexShrink: 0,
+                }}
+              >
+                {novaUsluga.slika_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={novaUsluga.slika_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                ) : (
+                  <div
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '22px',
+                      fontWeight: 700,
+                      color: 'rgba(212,175,55,.3)',
+                    }}
+                    aria-hidden
+                  >
+                    {(novaUsluga.naziv || '?').trim().charAt(0).toUpperCase() || '•'}
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
+                <button type="button" style={{ ...btnGold, padding: '9px 14px', fontSize: '12px', alignSelf: 'flex-start' }} onClick={() => otvoriUslugaSlikuPicker('nova')}>
+                  Izaberi sliku
+                </button>
+                {novaUsluga.slika_url ? (
+                  <button type="button" style={{ ...btnOutline, padding: '9px 14px', fontSize: '12px', alignSelf: 'flex-start' }} onClick={() => setNovaUsluga({ ...novaUsluga, slika_url: '' })}>
+                    Ukloni pregled
+                  </button>
+                ) : null}
+                <span style={{ fontSize: '11px', color: 'rgba(245,240,232,.38)', maxWidth: '280px', lineHeight: 1.45 }}>
+                  Pregled na tvojoj javnoj stranici; fajl do 2 MB, smanjenje u pregledaču pre snimanja.
+                </span>
+              </div>
+            </div>
           </div>
           <div style={{ background: 'rgba(255,255,255,.03)', border: `0.5px solid ${goldBorder}`, borderRadius: '12px', padding: '14px', marginBottom: '14px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
@@ -1453,7 +1667,18 @@ export default function Dashboard() {
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button style={btnGold} disabled={uslugaLoading} onClick={dodajUslugu}>{uslugaLoading ? 'Dodavanje...' : 'Dodaj uslugu'}</button>
-            <button style={btnOutline} onClick={() => { setShowNovaUsluga(false); setUslugaGreska(''); setNovaUslugaLager([]) }}>Odustani</button>
+            <button
+              type="button"
+              style={btnOutline}
+              onClick={() => {
+                setShowNovaUsluga(false)
+                setUslugaGreska('')
+                setNovaUslugaLager([])
+                setNovaUsluga({ naziv: '', cijena: '', trajanje: '', opis: '', slika_url: '' })
+              }}
+            >
+              Odustani
+            </button>
           </div>
         </div>
       ) : (
@@ -1982,6 +2207,23 @@ export default function Dashboard() {
       danas: 'Danas', sedmica: 'Ova sedmica', mesec: 'Ovaj mesec', godina: 'Ova godina', svi: 'Svi podaci',
     }
 
+    const klijentModalTermini =
+      analitikaKlijentDetaljKljuc === null
+        ? []
+        : termini
+            .filter((t) => {
+              const d = new Date(t.datum_vrijeme)
+              return (
+                d >= periodStart &&
+                (t.status === 'potvrđen' || t.status === 'završen') &&
+                klijentGrupacijaKljuc(t) === analitikaKlijentDetaljKljuc
+              )
+            })
+            .sort((a, b) => new Date(a.datum_vrijeme).getTime() - new Date(b.datum_vrijeme).getTime())
+    const klijentModalUkupno = klijentModalTermini.reduce((s, t) => s + prometTerminaUSalonu(t, uslugeMap), 0)
+    const klijentModalIme = (klijentModalTermini[0]?.ime_klijenta || '').trim() || 'Klijent'
+    const klijentModalTel = (klijentModalTermini[0]?.telefon_klijenta || '').trim()
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -2064,53 +2306,154 @@ export default function Dashboard() {
 
         {(() => {
           const zaposleniImena = new Map(zaposleni.map((z) => [z.id, z.ime]))
-          const brojPoZaposlenom = new Map<string | null, number>()
-          for (const t of relevantTermini) {
-            const k = t.zaposleni_id ?? null
-            brojPoZaposlenom.set(k, (brojPoZaposlenom.get(k) || 0) + 1)
-          }
-          const zaposleniRedosled = [...brojPoZaposlenom.entries()].sort((a, b) => b[1] - a[1])
-          const maxZ = zaposleniRedosled.length > 0 ? Math.max(...zaposleniRedosled.map(([, n]) => n)) : 1
 
-          const verniMapa = new Map<string, { ime: string; broj: number }>()
+          type ZaposleniAgregat = {
+            storageKljuc: string
+            ime: string
+            brojTermina: number
+            promet: number
+            poUsluzi: { naziv: string; broj: number; promet: number }[]
+          }
+
+          const zaposleniGrupa = new Map<string | null, TerminRow[]>()
+          for (const t of relevantTermini) {
+            const zid = t.zaposleni_id ?? null
+            if (!zaposleniGrupa.has(zid)) zaposleniGrupa.set(zid, [])
+            zaposleniGrupa.get(zid)!.push(t)
+          }
+
+          const zaposleniAgregati: ZaposleniAgregat[] = []
+          for (const [zid, lista] of zaposleniGrupa) {
+            const storageKljuc = zid ?? ANALITIKA_BEZ_ZAPOSLENOG
+            const ime = zid ? zaposleniImena.get(zid) || 'Zaposleni' : 'Bez dodeljenog zaposlenog'
+            let promet = 0
+            const poUsluziMap = new Map<string, { naziv: string; broj: number; promet: number }>()
+            for (const t of lista) {
+              const c = prometTerminaUSalonu(t, uslugeMap)
+              promet += c
+              const uid = t.usluga_id || ''
+              const u = t.usluga_id ? uslugeMap.get(t.usluga_id) : null
+              const naziv = u?.naziv || 'Bez usluge'
+              const cur = poUsluziMap.get(uid) || { naziv, broj: 0, promet: 0 }
+              cur.naziv = naziv
+              cur.broj += 1
+              cur.promet += c
+              poUsluziMap.set(uid, cur)
+            }
+            const poUsluzi = [...poUsluziMap.values()].sort((a, b) => b.promet - a.promet)
+            zaposleniAgregati.push({
+              storageKljuc,
+              ime,
+              brojTermina: lista.length,
+              promet,
+              poUsluzi,
+            })
+          }
+          zaposleniAgregati.sort((a, b) => b.promet - a.promet || b.brojTermina - a.brojTermina)
+          const maxZPromet = zaposleniAgregati.length > 0 ? Math.max(...zaposleniAgregati.map((r) => r.promet), 1) : 1
+
+          type VerniRed = { kljuc: string; ime: string; broj: number; promet: number }
+          const verniMapa = new Map<string, VerniRed>()
           for (const t of relevantTermini) {
             const key = klijentGrupacijaKljuc(t)
+            const c = prometTerminaUSalonu(t, uslugeMap)
             const ime = (t.ime_klijenta || '').trim() || 'Nepoznato'
             const postoji = verniMapa.get(key)
-            if (postoji) postoji.broj += 1
-            else verniMapa.set(key, { ime, broj: 1 })
+            if (postoji) {
+              postoji.broj += 1
+              postoji.promet += c
+            } else {
+              verniMapa.set(key, { kljuc: key, ime, broj: 1, promet: c })
+            }
           }
-          const verniLista = [...verniMapa.values()].sort((a, b) => b.broj - a.broj).slice(0, 15)
-          const maxVerni = verniLista.length > 0 ? verniLista[0].broj : 1
+          const verniLista = [...verniMapa.values()].sort((a, b) => b.promet - a.promet || b.broj - a.broj).slice(0, 15)
+          const maxVerniPromet = verniLista.length > 0 ? Math.max(...verniLista.map((v) => v.promet), 1) : 1
 
           return (
             <>
               <div style={cardStyle}>
-                <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '6px' }}>Termini po zaposlenom</h3>
-                <p style={{ fontSize: '12px', color: muted, marginBottom: '14px' }}>Broj potvrđenih / završenih termina u izabranom periodu.</p>
-                {zaposleniRedosled.length === 0 ? (
+                <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '6px' }}>Zaposleni — promet i usluge</h3>
+                <p style={{ fontSize: '12px', color: muted, marginBottom: '14px' }}>
+                  Potvrđeni i završeni termini u periodu: broj termina, ukupan promet (RSD) i raspodela po uslugama. Otvori „Detalji” za tabelu usluga.
+                </p>
+                {zaposleniAgregati.length === 0 ? (
                   <p style={{ fontSize: '13px', color: muted }}>Nema termina u ovom periodu.</p>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {zaposleniRedosled.map(([zid, br]) => {
-                      const ime = zid ? zaposleniImena.get(zid) || 'Zaposleni' : 'Bez dodeljenog zaposlenog'
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {zaposleniAgregati.map((row) => {
+                      const otvoren = analitikaZaposleniDetaljKljuc === row.storageKljuc
                       return (
-                        <div key={zid ?? 'nema'}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                            <span style={{ fontSize: '13px', color: text }}>{ime}</span>
-                            <span style={{ fontSize: '13px', color: gold, fontWeight: 500 }}>{br}</span>
+                        <div
+                          key={row.storageKljuc}
+                          style={{
+                            border: `0.5px solid ${goldBorder}`,
+                            borderRadius: '12px',
+                            padding: '12px 14px',
+                            background: 'rgba(255,255,255,.018)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+                            <div style={{ minWidth: 0, flex: '1 1 200px' }}>
+                              <div style={{ fontSize: '14px', fontWeight: 500, color: text }}>{row.ime}</div>
+                              <div style={{ fontSize: '12px', color: muted, marginTop: '4px' }}>
+                                {row.brojTermina} {row.brojTermina === 1 ? 'termin' : 'termina'} ·{' '}
+                                <span style={{ color: gold, fontWeight: 600 }}>{row.promet.toLocaleString('sr-Latn-RS')} RSD</span> prometa
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              style={{ ...btnOutline, padding: '8px 14px', fontSize: '12px', flexShrink: 0 }}
+                              onClick={() =>
+                                setAnalitikaZaposleniDetaljKljuc((prev) => (prev === row.storageKljuc ? null : row.storageKljuc))
+                              }
+                            >
+                              {otvoren ? 'Sakrij detalje' : 'Detalji'}
+                            </button>
                           </div>
-                          <div style={{ height: '6px', background: 'rgba(255,255,255,.06)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ height: '6px', background: 'rgba(255,255,255,.06)', borderRadius: '3px', overflow: 'hidden', marginTop: '10px' }}>
                             <div
                               style={{
                                 height: '100%',
-                                width: `${(br / maxZ) * 100}%`,
+                                width: `${(row.promet / maxZPromet) * 100}%`,
                                 background: `linear-gradient(90deg,${gold},#b8960c)`,
                                 borderRadius: '3px',
                                 transition: 'width .3s',
                               }}
                             />
                           </div>
+                          {otvoren && row.poUsluzi.length > 0 ? (
+                            <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: `0.5px solid ${goldBorder}` }}>
+                              <div style={{ fontSize: '11px', color: muted, marginBottom: '8px', letterSpacing: '0.04em' }}>USLUGE U PERIODU</div>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                                <thead>
+                                  <tr style={{ color: muted, textAlign: 'left' }}>
+                                    <th style={{ padding: '6px 8px', fontWeight: 500 }}>Usluga</th>
+                                    <th style={{ padding: '6px 8px', fontWeight: 500, width: '72px' }}>Termina</th>
+                                    <th style={{ padding: '6px 8px', fontWeight: 500, width: '100px', textAlign: 'right' }}>Promet</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {row.poUsluzi.map((u, uidx) => (
+                                    <tr key={uidx} style={{ borderTop: '0.5px solid rgba(255,255,255,.06)' }}>
+                                      <td style={{ padding: '8px', color: text }}>{u.naziv}</td>
+                                      <td style={{ padding: '8px', color: muted }}>{u.broj}</td>
+                                      <td style={{ padding: '8px', textAlign: 'right', color: gold, fontWeight: 500 }}>{u.promet.toLocaleString('sr-Latn-RS')} RSD</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                                <tfoot>
+                                  <tr style={{ borderTop: `0.5px solid ${goldBorder}` }}>
+                                    <td style={{ padding: '8px', fontWeight: 600, color: text }}>Ukupno</td>
+                                    <td style={{ padding: '8px', fontWeight: 600, color: text }}>{row.brojTermina}</td>
+                                    <td style={{ padding: '8px', textAlign: 'right', fontWeight: 600, color: gold }}>{row.promet.toLocaleString('sr-Latn-RS')} RSD</td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                          ) : null}
+                          {otvoren && row.poUsluzi.length === 0 ? (
+                            <p style={{ fontSize: '12px', color: muted, marginTop: '12px' }}>Nema povezanih usluga na terminima u ovom periodu.</p>
+                          ) : null}
                         </div>
                       )
                     })}
@@ -2121,23 +2464,43 @@ export default function Dashboard() {
               <div style={cardStyle}>
                 <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '6px' }}>Verni klijenti</h3>
                 <p style={{ fontSize: '12px', color: muted, marginBottom: '14px' }}>
-                  Klijenti sa najviše termina u izabranom periodu (isti klijent = isti nalog ili isti telefon).
+                  Klijenti sa najviše prometa u izabranom periodu (grupa po nalogu ili telefonu + imenu). Dugme „Detalji” prikazuje sve termine i ukupnu potrošnju.
                 </p>
                 {verniLista.length === 0 ? (
                   <p style={{ fontSize: '13px', color: muted }}>Nema podataka za ovaj period.</p>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {verniLista.map((v, i) => (
-                      <div key={i}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span style={{ fontSize: '13px', color: text }}>{v.ime}</span>
-                          <span style={{ fontSize: '13px', color: gold, fontWeight: 500 }}>{v.broj} termina</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {verniLista.map((v) => (
+                      <div
+                        key={v.kljuc}
+                        style={{
+                          border: `0.5px solid ${goldBorder}`,
+                          borderRadius: '12px',
+                          padding: '12px 14px',
+                          background: 'rgba(255,255,255,.018)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+                          <div style={{ minWidth: 0, flex: '1 1 200px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 500, color: text }}>{v.ime}</div>
+                            <div style={{ fontSize: '12px', color: muted, marginTop: '4px' }}>
+                              {v.broj} {v.broj === 1 ? 'termin' : 'termina'} ·{' '}
+                              <span style={{ color: gold, fontWeight: 600 }}>{v.promet.toLocaleString('sr-Latn-RS')} RSD</span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            style={{ ...btnGold, padding: '8px 14px', fontSize: '12px', flexShrink: 0 }}
+                            onClick={() => setAnalitikaKlijentDetaljKljuc(v.kljuc)}
+                          >
+                            Detalji
+                          </button>
                         </div>
-                        <div style={{ height: '6px', background: 'rgba(255,255,255,.06)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ height: '6px', background: 'rgba(255,255,255,.06)', borderRadius: '3px', overflow: 'hidden', marginTop: '10px' }}>
                           <div
                             style={{
                               height: '100%',
-                              width: `${(v.broj / maxVerni) * 100}%`,
+                              width: `${(v.promet / maxVerniPromet) * 100}%`,
                               background: `linear-gradient(90deg,#6b9e7d,${gold})`,
                               borderRadius: '3px',
                               transition: 'width .3s',
@@ -2252,6 +2615,111 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {analitikaKlijentDetaljKljuc !== null ? (
+          <div
+            role="presentation"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 2000,
+              background: 'rgba(0,0,0,.72)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px',
+            }}
+            onClick={() => setAnalitikaKlijentDetaljKljuc(null)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="analitika-klijent-naslov"
+              style={{
+                width: '100%',
+                maxWidth: '520px',
+                maxHeight: 'min(85vh, 640px)',
+                overflow: 'auto',
+                background: '#111',
+                border: `0.5px solid ${goldBorder}`,
+                borderRadius: '16px',
+                padding: '22px 20px',
+                boxShadow: '0 24px 60px rgba(0,0,0,.55)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '14px' }}>
+                <div>
+                  <h3 id="analitika-klijent-naslov" style={{ fontSize: '17px', fontWeight: 600, color: text }}>
+                    {klijentModalIme}
+                  </h3>
+                  {klijentModalTel ? (
+                    <div style={{ fontSize: '12px', color: muted, marginTop: '4px' }}>Tel. {klijentModalTel}</div>
+                  ) : null}
+                </div>
+                <button type="button" style={{ ...btnOutline, padding: '8px 12px', fontSize: '12px' }} onClick={() => setAnalitikaKlijentDetaljKljuc(null)}>
+                  Zatvori
+                </button>
+              </div>
+              <div
+                style={{
+                  fontSize: '13px',
+                  color: text,
+                  marginBottom: '16px',
+                  padding: '12px 14px',
+                  borderRadius: '12px',
+                  background: goldFaint,
+                  border: `0.5px solid ${goldBorder}`,
+                }}
+              >
+                U izabranom periodu: <strong style={{ color: gold }}>{klijentModalTermini.length}</strong>{' '}
+                {klijentModalTermini.length === 1 ? 'termin' : 'termina'} · ukupno potrošeno{' '}
+                <strong style={{ color: gold }}>{klijentModalUkupno.toLocaleString('sr-Latn-RS')} RSD</strong>
+              </div>
+              {klijentModalTermini.length === 0 ? (
+                <p style={{ fontSize: '13px', color: muted }}>Nema termina za ovog klijenta u ovom periodu.</p>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                  <thead>
+                    <tr style={{ color: muted, textAlign: 'left' }}>
+                      <th style={{ padding: '8px 6px', fontWeight: 500 }}>Datum i vreme</th>
+                      <th style={{ padding: '8px 6px', fontWeight: 500 }}>Usluga</th>
+                      <th style={{ padding: '8px 6px', fontWeight: 500, textAlign: 'right', width: '96px' }}>Iznos</th>
+                      <th style={{ padding: '8px 6px', fontWeight: 500, width: '88px' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {klijentModalTermini.map((t) => {
+                      const c = prometTerminaUSalonu(t, uslugeMap)
+                      const naz = t.usluge?.naziv || (t.usluga_id ? uslugeMap.get(t.usluga_id)?.naziv : null) || '—'
+                      return (
+                        <tr key={t.id} style={{ borderTop: '0.5px solid rgba(255,255,255,.08)' }}>
+                          <td style={{ padding: '10px 6px', color: text, whiteSpace: 'nowrap' }}>
+                            {formatDatumBelgrad(t.datum_vrijeme)} · {formatVremeBelgrad(t.datum_vrijeme)}
+                          </td>
+                          <td style={{ padding: '10px 6px', color: muted }}>{naz}</td>
+                          <td style={{ padding: '10px 6px', textAlign: 'right', color: gold, fontWeight: 500 }}>{c.toLocaleString('sr-Latn-RS')} RSD</td>
+                          <td style={{ padding: '10px 6px', color: muted }}>{t.status || '—'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ borderTop: `0.5px solid ${goldBorder}` }}>
+                      <td colSpan={2} style={{ padding: '10px 6px', fontWeight: 600, color: text }}>
+                        Ukupno
+                      </td>
+                      <td style={{ padding: '10px 6px', textAlign: 'right', fontWeight: 600, color: gold }}>
+                        {klijentModalUkupno.toLocaleString('sr-Latn-RS')} RSD
+                      </td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
+            </div>
+          </div>
+        ) : null}
       </div>
     )
   }

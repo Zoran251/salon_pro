@@ -21,6 +21,7 @@ interface Usluga {
   trajanje: number
   opis?: string
   kategorija?: string | null
+  slika_url?: string | null
 }
 
 interface Salon {
@@ -1875,28 +1876,54 @@ export default function SalonLanding() {
           <div ref={uslugeAnchorRef} style={{ marginTop: '48px' }}>
             <h2 style={{ fontSize: '22px', fontWeight: 500, color: '#f5f0e8', marginBottom: '8px' }}>Naše usluge</h2>
             <p style={{ fontSize: '13px', color: 'rgba(245,240,232,.4)', marginBottom: '24px' }}>
-              Klik na karticu bira uslugu odmah. Dugme „Zakaži termin” otvara prozor za kategoriju pa uslugu.
+              Klik ili Enter na karticu bira uslugu. Ako salon doda sliku, videćete je na kartici. Dugme „Zakaži termin” otvara prozor za kategoriju pa uslugu.
             </p>
             <div className="usluge-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              {usluge.map((u) => (
+              {usluge.map((u) => {
+                const ini = (u.naziv || '?').trim().charAt(0).toUpperCase() || '•'
+                return (
                 <div
                   key={u.id}
+                  role="button"
+                  tabIndex={0}
                   className={`usluga-card${odabranaUsluga?.id === u.id ? ' usluga-active' : ''}`}
                   onClick={() => {
                     setOdabranaUsluga(odabranaUsluga?.id === u.id ? null : u)
                     setShowForma(true)
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setOdabranaUsluga(odabranaUsluga?.id === u.id ? null : u)
+                      setShowForma(true)
+                    }
+                  }}
+                  aria-pressed={odabranaUsluga?.id === u.id}
+                  aria-label={`${u.naziv}, ${Number(u.cijena).toLocaleString('sr-Latn-RS')} dinara, ${u.trajanje} minuta`}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                    <div style={{ fontSize: '15px', fontWeight: 500, color: '#f5f0e8' }}>{u.naziv}</div>
-                    <div style={{ fontSize: '14px', fontWeight: 600, color: gold }}>{Number(u.cijena).toLocaleString()} RSD</div>
+                  <div className="usluga-card-media">
+                    {u.slika_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- javna strana; data URL ili CDN
+                      <img src={u.slika_url} alt="" loading="lazy" decoding="async" />
+                    ) : (
+                      <div className="usluga-card-ph" aria-hidden>
+                        {ini}
+                      </div>
+                    )}
                   </div>
-                  <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.4)' }}>
-                    {(u.kategorija?.trim() || 'Ostalo')} · {u.trajanje} min
+                  <div className="usluga-card-body">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: 600, color: '#f5f0e8', lineHeight: 1.3 }}>{u.naziv}</div>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: gold, flexShrink: 0 }}>{Number(u.cijena).toLocaleString('sr-Latn-RS')} RSD</div>
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.42)' }}>
+                      {(u.kategorija?.trim() || 'Ostalo')} · {u.trajanje} min
+                    </div>
+                    {u.opis ? <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.34)', marginTop: '4px', lineHeight: 1.45 }}>{u.opis}</div> : null}
                   </div>
-                  {u.opis && <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.35)', marginTop: '6px' }}>{u.opis}</div>}
                 </div>
-              ))}
+              )
+            })}
             </div>
           </div>
         )}
@@ -2132,9 +2159,18 @@ export default function SalonLanding() {
         *{box-sizing:border-box;margin:0;padding:0}
         input,textarea{outline:none;font-family:sans-serif;color:#f5f0e8}
         input:focus,textarea:focus{border-color:rgba(212,175,55,.6)!important}
-        .usluga-card{cursor:pointer;background:#161616;border:0.5px solid rgba(212,175,55,.15);border-radius:16px;padding:20px;transition:all .3s}
-        .usluga-card:hover{border-color:rgba(212,175,55,.4);transform:translateY(-2px)}
-        .usluga-active{border-color:#d4af37!important;background:rgba(212,175,55,.08)!important}
+        .usluga-card{cursor:pointer;background:#161616;border:0.5px solid rgba(212,175,55,.15);border-radius:16px;padding:0;overflow:hidden;display:flex;flex-direction:column;transition:border-color .25s ease,box-shadow .25s ease,transform .25s ease}
+        .usluga-card:hover{border-color:rgba(212,175,55,.42);box-shadow:0 14px 40px rgba(0,0,0,.4);transform:translateY(-3px)}
+        .usluga-card:focus-visible{outline:2px solid #d4af37;outline-offset:3px}
+        .usluga-active{border-color:#d4af37!important;background:rgba(212,175,55,.06)!important;box-shadow:0 0 0 1px rgba(212,175,55,.25)}
+        .usluga-card-media{position:relative;width:100%;aspect-ratio:4/3;background:linear-gradient(155deg,rgba(212,175,55,.12),rgba(20,18,14,.98))}
+        .usluga-card-media img{width:100%;height:100%;object-fit:cover;display:block}
+        .usluga-card-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(28px,8vw,40px);font-weight:700;color:rgba(212,175,55,.28);letter-spacing:.06em}
+        .usluga-card-body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:6px;min-height:0}
+        @media (prefers-reduced-motion:reduce){
+          .usluga-card{transition:none}
+          .usluga-card:hover{transform:none;box-shadow:none}
+        }
         .salon-sticky-nav{
           position:sticky;top:0;z-index:50;
           background:rgba(8,8,8,.88);
@@ -2775,7 +2811,9 @@ export default function SalonLanding() {
               {uslugeUFokusu.length === 0 ? (
                 <p style={{ fontSize: '13px', color: 'rgba(245,240,232,.45)' }}>Nema usluga u ovoj kategoriji.</p>
               ) : (
-                uslugeUFokusu.map((u) => (
+                uslugeUFokusu.map((u) => {
+                  const ini = (u.naziv || '?').trim().charAt(0).toUpperCase() || '•'
+                  return (
                   <button
                     key={u.id}
                     type="button"
@@ -2789,13 +2827,52 @@ export default function SalonLanding() {
                       color: '#f5f0e8',
                       cursor: 'pointer',
                       fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      width: '100%',
                     }}
                   >
-                    <span style={{ fontWeight: 600 }}>{u.naziv}</span>
-                    <span style={{ marginLeft: 8, color: gold }}>{Number(u.cijena).toLocaleString()} RSD</span>
-                    <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.38)', marginTop: '4px' }}>{u.trajanje} min</div>
+                    <div
+                      style={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: 12,
+                        overflow: 'hidden',
+                        flexShrink: 0,
+                        background: 'linear-gradient(145deg,rgba(212,175,55,.15),rgba(24,22,18,.95))',
+                        border: '0.5px solid rgba(212,175,55,.2)',
+                      }}
+                    >
+                      {u.slika_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={u.slika_url} alt="" width={52} height={52} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" decoding="async" />
+                      ) : (
+                        <div
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '18px',
+                            fontWeight: 700,
+                            color: 'rgba(212,175,55,.35)',
+                          }}
+                          aria-hidden
+                        >
+                          {ini}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <span style={{ fontWeight: 600, display: 'block' }}>{u.naziv}</span>
+                      <span style={{ display: 'block', marginTop: 4, color: gold, fontWeight: 600 }}>{Number(u.cijena).toLocaleString('sr-Latn-RS')} RSD</span>
+                      <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.38)', marginTop: '4px' }}>{u.trajanje} min</div>
+                    </div>
                   </button>
-                ))
+                  )
+                })
               )}
             </div>
             <button
