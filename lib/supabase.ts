@@ -32,6 +32,9 @@ export type Database = {
           boja_primarna: string | null
           landing_page: string | null
           created_at: string | null
+          referal_kod: string | null
+          preporucio_salon_id: string | null
+          referal_kod_prijava: string | null
         }
         Insert: {
           id?: string
@@ -57,6 +60,9 @@ export type Database = {
           boja_primarna?: string | null
           landing_page?: string | null
           created_at?: string | null
+          referal_kod?: string | null
+          preporucio_salon_id?: string | null
+          referal_kod_prijava?: string | null
         }
         Update: Partial<Database['public']['Tables']['saloni']['Insert']>
         Relationships: []

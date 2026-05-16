@@ -1,19 +1,23 @@
 'use client'
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { authPasswordViaApi } from '@/lib/auth-via-api'
 import { isSupabaseConfigured, supabase } from '@/lib/supabase'
+import type { Database } from '@/lib/supabase'
 import { formatAuthError } from '@/lib/format-auth-error'
 import { buildSalonSlug, fallbackSalonSlug } from '@/lib/slug'
 
 const tipovi = ['Frizerski salon', 'Kozmetički salon', 'Salon za nokte', 'Spa / Wellness', 'Barbershop', 'Drugo']
+
 type SalonRegistrationForm = {
   naziv: string
   email: string
   lozinka: string
   telefon: string
   grad: string
-  tip: string
+  tipovi: string[]
+  referalKod: string
 }
 type SalonRegistrationField = {
   label: string
@@ -22,20 +26,43 @@ type SalonRegistrationField = {
   placeholder: string
 }
 
-export default function Registracija() {
+function formatTipZaBazu(tipoviLista: string[]): string {
+  return [...new Set(tipoviLista)].sort().join(', ')
+}
+
+function RegistracijaForm() {
+  const searchParams = useSearchParams()
+  const refInit = (searchParams.get('ref') ?? '').trim().slice(0, 32)
   const [korak, setKorak] = useState(1)
   const [loading, setLoading] = useState(false)
   const [greska, setGreska] = useState('')
-  const [forma, setForma] = useState({ naziv: '', email: '', lozinka: '', telefon: '', grad: '', tip: '' })
+  const [forma, setForma] = useState<SalonRegistrationForm>({
+    naziv: '',
+    email: '',
+    lozinka: '',
+    telefon: '',
+    grad: '',
+    tipovi: [],
+    referalKod: refInit,
+  })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForma({ ...forma, [e.target.name]: e.target.value })
     setGreska('')
   }
 
+  const toggleTip = (t: string) => {
+    setGreska('')
+    setForma((prev) => ({
+      ...prev,
+      tipovi: prev.tipovi.includes(t) ? prev.tipovi.filter((x) => x !== t) : [...prev.tipovi, t],
+    }))
+  }
+
   const handleSubmit = async () => {
     setLoading(true)
     setGreska('')
+    const tipBaza = formatTipZaBazu(forma.tipovi)
     try {
       const email = forma.email.trim()
       const r = await authPasswordViaApi('signup', email, forma.lozinka, { app_role: 'salon_owner' })
@@ -50,7 +77,8 @@ export default function Registracija() {
         return
       }
 
-      // Ne oslanjati se na getSession() odmah poslije setSession — često je null iako server ima sesiju.
+      const referalBody = forma.referalKod.trim().slice(0, 32)
+
       if (!r.serverReturnedSession) {
         const res2 = await fetch('/api/salon/register-initial', {
           method: 'POST',
@@ -61,7 +89,8 @@ export default function Registracija() {
             email,
             telefon: forma.telefon,
             grad: forma.grad,
-            tip: forma.tip,
+            tip: tipBaza,
+            referalKod: referalBody || undefined,
           }),
         })
         const j2 = (await res2.json()) as { error?: string }
@@ -81,7 +110,6 @@ export default function Registracija() {
         return
       }
 
-      // Server je vratio tokene — kratko čekaj da lokalna sesija bude spremna.
       let sessionReady = false
       for (let i = 0; i < 8; i++) {
         const { data: s } = await supabase.auth.getSession()
@@ -121,16 +149,19 @@ export default function Registracija() {
         suffix += 1
       }
 
-      const { error: salonError } = await supabase.from('saloni').insert({
+      const insertRow: Database['public']['Tables']['saloni']['Insert'] = {
         id: r.userId,
         naziv: forma.naziv,
         slug: slug,
         email,
         telefon: forma.telefon,
         grad: forma.grad,
-        tip: forma.tip,
+        tip: tipBaza,
         aktivan: true,
-      })
+        ...(referalBody ? { referal_kod_prijava: referalBody } : {}),
+      }
+
+      const { error: salonError } = await supabase.from('saloni').insert(insertRow)
       if (salonError) {
         let msg = formatAuthError(salonError.message, 'salon-register')
         if (/row-level security|rls|permission denied|policy|42501/i.test(salonError.message)) {
@@ -198,15 +229,23 @@ export default function Registracija() {
             <div style={{ animation: 'fadeUp .4s ease' }}>
               <div style={{ marginBottom: '28px' }}>
                 <div style={{ fontSize: '12px', color: '#d4af37', letterSpacing: '.5px', marginBottom: '8px' }}>KORAK 1 OD 2</div>
-                <h1 style={{ fontSize: '26px', fontWeight: 500, color: '#f5f0e8', marginBottom: '8px' }}>Koji tip salona vodiš?</h1>
-                <p style={{ fontSize: '14px', color: 'rgba(245,240,232,.4)', lineHeight: 1.6 }}>Odaberi kategoriju koja najbolje opisuje tvoj salon.</p>
+                <h1 style={{ fontSize: '26px', fontWeight: 500, color: '#f5f0e8', marginBottom: '8px' }}>Koje tipove salona vodiš?</h1>
+                <p style={{ fontSize: '14px', color: 'rgba(245,240,232,.4)', lineHeight: 1.6 }}>Možeš izabrati više opcija (npr. frizerski salon i barbershop).</p>
               </div>
-              <div role="radiogroup" aria-label="Tip salona" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '28px' }}>
+              <div role="group" aria-label="Tipovi salona" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '28px' }}>
                 {tipovi.map(t => (
-                  <button type="button" key={t} role="radio" aria-checked={forma.tip === t} className={`tip-btn${forma.tip === t ? ' tip-active' : ''}`} onClick={() => setForma({ ...forma, tip: t })}>{t}</button>
+                  <button
+                    type="button"
+                    key={t}
+                    aria-pressed={forma.tipovi.includes(t)}
+                    className={`tip-btn${forma.tipovi.includes(t) ? ' tip-active' : ''}`}
+                    onClick={() => toggleTip(t)}
+                  >
+                    {t}
+                  </button>
                 ))}
               </div>
-              <button className="submit-btn" disabled={!forma.tip} onClick={() => setKorak(2)}>Nastavi →</button>
+              <button className="submit-btn" disabled={forma.tipovi.length === 0} onClick={() => setKorak(2)}>Nastavi →</button>
             </div>
           )}
 
@@ -234,6 +273,19 @@ export default function Registracija() {
                     <input name={f.name} type={f.type} placeholder={f.placeholder} value={forma[f.name]} onChange={handleChange} />
                   </div>
                 ))}
+                <div>
+                  <label style={{ fontSize: '12px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '6px', letterSpacing: '.3px' }}>REFERAL KOD (opciono)</label>
+                  <input
+                    name="referalKod"
+                    placeholder="Ako te je kolega pozvao"
+                    value={forma.referalKod}
+                    onChange={handleChange}
+                    autoCapitalize="characters"
+                  />
+                  <p style={{ fontSize: '11px', color: 'rgba(245,240,232,.32)', marginTop: '6px', lineHeight: 1.5 }}>
+                    Ako si došao preko linka sa kodom, polje je već popunjeno. Posle tri nova salona koja se registruju preko tvog koda, godišnja pretplata Pamet je 250 € umesto 360 €.
+                  </p>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
                     <label style={{ fontSize: '12px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '6px', letterSpacing: '.3px' }}>TELEFON</label>
@@ -294,5 +346,19 @@ export default function Registracija() {
         © {new Date().getFullYear()} SalonPro
       </footer>
     </main>
+  )
+}
+
+export default function Registracija() {
+  return (
+    <Suspense
+      fallback={(
+        <main style={{ background: '#0a0a0a', minHeight: '100vh', color: 'rgba(245,240,232,.45)', fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          Učitavanje…
+        </main>
+      )}
+    >
+      <RegistracijaForm />
+    </Suspense>
   )
 }
