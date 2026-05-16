@@ -7,6 +7,12 @@ import { waitForClientSession } from '@/lib/wait-client-session'
 import { buildSalonSlug, fallbackSalonSlug } from '@/lib/slug'
 import { getAppRole } from '@/lib/user-role'
 import { getPublicSiteBase } from '@/lib/public-site-url'
+import {
+  GODISNJA_CIJENA_EUR,
+  GODISNJA_CIJENA_SA_REF_EUR,
+  PREPORUKE_ZA_POPUST,
+  godisnjaCijenaZaBrojPreporuka,
+} from '@/lib/salon-referral'
 import type { Database } from '@/lib/supabase'
 import {
   datumKljucBelgrad,
@@ -117,6 +123,22 @@ function skratiNotifTekst(s: string, max = 220): string {
   return `${t.slice(0, max - 1)}…`
 }
 
+function formatSalonTipZaPrikaz(tip: string | null | undefined): string {
+  if (!tip?.trim()) return '—'
+  return tip
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(' · ')
+}
+
+function klijentGrupacijaKljuc(t: TerminRow): string {
+  const cid = t.client_id
+  if (cid) return `c:${cid}`
+  const tel = (t.telefon_klijenta || '').replace(/\D/g, '')
+  return `t:${tel}|${(t.ime_klijenta || '').trim().toLowerCase()}`
+}
+
 function employeeInitials(name: string | null | undefined): string {
   const parts = (name || '')
     .trim()
@@ -184,6 +206,8 @@ export default function Dashboard() {
   const [izabraniDatum, setIzabraniDatum] = useState(() => getLocalDateKey(new Date()))
   const [rashodi, setRashodi] = useState<RashodRow[]>([])
   const [analitikaPeriod, setAnalitikaPeriod] = useState<AnalitikaPeriod>('mesec')
+  const [preporuceneSalone, setPreporuceneSalone] = useState<{ naziv: string; created_at: string | null }[]>([])
+  const [referalKopiran, setReferalKopiran] = useState(false)
   const [showNoviRashod, setShowNoviRashod] = useState(false)
   const [noviRashod, setNoviRashod] = useState({ naziv: '', iznos: '', kategorija: 'Ostalo', datum: getLocalDateKey(new Date()), napomena: '' })
   const [rashodGreska, setRashodGreska] = useState('')
@@ -498,6 +522,19 @@ export default function Dashboard() {
         if (!missingTable) console.error('[dashboard] Rashodi:', rashodiErr.message)
       }
       setRashodi(rashodiData || [])
+
+      const { data: prefData, error: prefErr } = await supabase
+        .from('saloni')
+        .select('naziv, created_at')
+        .eq('preporucio_salon_id', userId)
+        .order('created_at', { ascending: true })
+      if (prefErr) {
+        const missingCol = /preporucio_salon_id|column .* does not exist|schema cache/i.test(prefErr.message)
+        if (!missingCol) console.error('[dashboard] Preporuke salona:', prefErr.message)
+        setPreporuceneSalone([])
+      } else {
+        setPreporuceneSalone(prefData || [])
+      }
 
       const { data: lojalnostData } = await supabase
         .from('lojalnost')
@@ -1975,6 +2012,148 @@ export default function Dashboard() {
         </div>
 
         <div style={cardStyle}>
+          <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '10px' }}>Preporuke i Pamet pretplata</h3>
+          <p style={{ fontSize: '12px', color: muted, lineHeight: 1.55, marginBottom: '14px' }}>
+            Podeli link ispod sa kolegama. Kada se <strong style={{ color: text }}>{PREPORUKE_ZA_POPUST}</strong> nova salona registruju preko tvog koda, godišnja pretplata je{' '}
+            <strong style={{ color: gold }}>{GODISNJA_CIJENA_SA_REF_EUR} €</strong> umesto {GODISNJA_CIJENA_EUR} €.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ fontSize: '20px', fontWeight: 600, color: gold, letterSpacing: '2px' }}>{salon?.referal_kod || '—'}</div>
+            <button
+              type="button"
+              style={{ ...btnOutline, padding: '8px 14px', fontSize: '12px' }}
+              disabled={!salon?.referal_kod}
+              onClick={async () => {
+                if (!salon?.referal_kod) return
+                const url = `${getPublicSiteBase()}/registracija?ref=${encodeURIComponent(salon.referal_kod)}`
+                try {
+                  await navigator.clipboard.writeText(url)
+                  setReferalKopiran(true)
+                  window.setTimeout(() => setReferalKopiran(false), 2200)
+                } catch {
+                  window.prompt('Kopiraj link:', url)
+                }
+              }}
+            >
+              Kopiraj link za registraciju
+            </button>
+            {referalKopiran ? <span style={{ fontSize: '12px', color: '#4caf81' }}>Kopirano u clipboard</span> : null}
+          </div>
+          <div style={{ fontSize: '13px', color: text, marginBottom: '8px' }}>
+            Preporučena salona: <strong>{preporuceneSalone.length}</strong> / {PREPORUKE_ZA_POPUST} · Trenutna godišnja cena:{' '}
+            <strong style={{ color: gold }}>{godisnjaCijenaZaBrojPreporuka(preporuceneSalone.length)} €</strong>
+          </div>
+          {preporuceneSalone.length > 0 ? (
+            <ul style={{ margin: '10px 0 0', paddingLeft: '18px', fontSize: '12px', color: muted, lineHeight: 1.65 }}>
+              {preporuceneSalone.map((p, idx) => (
+                <li key={idx}>
+                  {p.naziv}
+                  {p.created_at ? (
+                    <span style={{ color: 'rgba(245,240,232,.28)' }}>
+                      {' '}
+                      · {new Date(p.created_at).toLocaleDateString('sr-Latn-RS')}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ fontSize: '12px', color: 'rgba(245,240,232,.28)', marginTop: '8px' }}>Još nema registrovanih salona preko tvog koda.</p>
+          )}
+        </div>
+
+        {(() => {
+          const zaposleniImena = new Map(zaposleni.map((z) => [z.id, z.ime]))
+          const brojPoZaposlenom = new Map<string | null, number>()
+          for (const t of relevantTermini) {
+            const k = t.zaposleni_id ?? null
+            brojPoZaposlenom.set(k, (brojPoZaposlenom.get(k) || 0) + 1)
+          }
+          const zaposleniRedosled = [...brojPoZaposlenom.entries()].sort((a, b) => b[1] - a[1])
+          const maxZ = zaposleniRedosled.length > 0 ? Math.max(...zaposleniRedosled.map(([, n]) => n)) : 1
+
+          const verniMapa = new Map<string, { ime: string; broj: number }>()
+          for (const t of relevantTermini) {
+            const key = klijentGrupacijaKljuc(t)
+            const ime = (t.ime_klijenta || '').trim() || 'Nepoznato'
+            const postoji = verniMapa.get(key)
+            if (postoji) postoji.broj += 1
+            else verniMapa.set(key, { ime, broj: 1 })
+          }
+          const verniLista = [...verniMapa.values()].sort((a, b) => b.broj - a.broj).slice(0, 15)
+          const maxVerni = verniLista.length > 0 ? verniLista[0].broj : 1
+
+          return (
+            <>
+              <div style={cardStyle}>
+                <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '6px' }}>Termini po zaposlenom</h3>
+                <p style={{ fontSize: '12px', color: muted, marginBottom: '14px' }}>Broj potvrđenih / završenih termina u izabranom periodu.</p>
+                {zaposleniRedosled.length === 0 ? (
+                  <p style={{ fontSize: '13px', color: muted }}>Nema termina u ovom periodu.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {zaposleniRedosled.map(([zid, br]) => {
+                      const ime = zid ? zaposleniImena.get(zid) || 'Zaposleni' : 'Bez dodeljenog zaposlenog'
+                      return (
+                        <div key={zid ?? 'nema'}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '13px', color: text }}>{ime}</span>
+                            <span style={{ fontSize: '13px', color: gold, fontWeight: 500 }}>{br}</span>
+                          </div>
+                          <div style={{ height: '6px', background: 'rgba(255,255,255,.06)', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div
+                              style={{
+                                height: '100%',
+                                width: `${(br / maxZ) * 100}%`,
+                                background: `linear-gradient(90deg,${gold},#b8960c)`,
+                                borderRadius: '3px',
+                                transition: 'width .3s',
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div style={cardStyle}>
+                <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '6px' }}>Verni klijenti</h3>
+                <p style={{ fontSize: '12px', color: muted, marginBottom: '14px' }}>
+                  Klijenti sa najviše termina u izabranom periodu (isti klijent = isti nalog ili isti telefon).
+                </p>
+                {verniLista.length === 0 ? (
+                  <p style={{ fontSize: '13px', color: muted }}>Nema podataka za ovaj period.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {verniLista.map((v, i) => (
+                      <div key={i}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '13px', color: text }}>{v.ime}</span>
+                          <span style={{ fontSize: '13px', color: gold, fontWeight: 500 }}>{v.broj} termina</span>
+                        </div>
+                        <div style={{ height: '6px', background: 'rgba(255,255,255,.06)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div
+                            style={{
+                              height: '100%',
+                              width: `${(v.broj / maxVerni) * 100}%`,
+                              background: `linear-gradient(90deg,#6b9e7d,${gold})`,
+                              borderRadius: '3px',
+                              transition: 'width .3s',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )
+        })()}
+
+        <div style={cardStyle}>
           <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '16px' }}>Prihod po usluzi</h3>
           {topUsluge.length === 0 ? (
             <p style={{ fontSize: '13px', color: muted }}>Nema potvrđenih termina sa uslugom u ovom periodu.</p>
@@ -2452,7 +2631,7 @@ export default function Dashboard() {
             <h1 style={{ fontSize: '22px', fontWeight: 500, color: text, marginBottom: '4px' }}>
               {navItems.find(n => n.id === aktivan)?.icon} {navItems.find(n => n.id === aktivan)?.label}
             </h1>
-            <p style={{ fontSize: '13px', color: muted }}>{salon?.naziv} · {salon?.tip}</p>
+            <p style={{ fontSize: '13px', color: muted }}>{salon?.naziv} · {formatSalonTipZaPrikaz(salon?.tip)}</p>
           </div>
           {sections[aktivan]?.()}
         </main>

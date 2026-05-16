@@ -43,6 +43,12 @@ export async function POST(request: Request) {
     const telefon = typeof body.telefon === 'string' ? body.telefon : ''
     const grad = typeof body.grad === 'string' ? body.grad : ''
     const tip = typeof body.tip === 'string' ? body.tip : ''
+    const referalKodUnos =
+      typeof body.referalKod === 'string'
+        ? body.referalKod.trim().slice(0, 32)
+        : typeof body.referal_kod === 'string'
+          ? body.referal_kod.trim().slice(0, 32)
+          : ''
 
     const uid = typeof userId === 'string' ? userId.trim() : ''
     if (!uid || !naziv || !email) {
@@ -84,7 +90,7 @@ export async function POST(request: Request) {
       suffix += 1
     }
 
-    const { error: insErr } = await admin.from('saloni').insert({
+    const insertPayload: Record<string, unknown> = {
       id: uid,
       naziv,
       slug,
@@ -93,7 +99,12 @@ export async function POST(request: Request) {
       grad,
       tip,
       aktivan: true,
-    })
+    }
+    if (referalKodUnos) {
+      insertPayload.referal_kod_prijava = referalKodUnos
+    }
+
+    const { error: insErr } = await admin.from('saloni').insert(insertPayload)
 
     if (insErr) {
       console.error('[register-initial] insert error:', insErr.message)
