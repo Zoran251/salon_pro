@@ -1575,7 +1575,7 @@ export default function Dashboard() {
                       </div>
                     ) : null}
                     <div className="dash-usluga-hint">
-                      Slika do 2 MB (JPG, PNG…). Klik na sličicu ili dugme ispod.
+                      Slika do 4 MB (JPG, PNG…). Klik na sličicu ili dugme ispod.
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
                       <button type="button" style={{ ...btnGold, padding: '8px 10px', fontSize: '11px', opacity: busy ? 0.65 : 1 }} disabled={busy} onClick={() => otvoriUslugaSlikuPickerPostojeca(u.id)}>
@@ -1671,7 +1671,7 @@ export default function Dashboard() {
                   </button>
                 ) : null}
                 <span style={{ fontSize: '11px', color: 'rgba(245,240,232,.38)', maxWidth: '280px', lineHeight: 1.45 }}>
-                  Klik na pregled ili „Izaberi sliku“ otvara izbor fajla (isti princip kao logo). Do 2 MB.
+                  Klik na pregled ili „Izaberi sliku“ otvara izbor fajla (isti princip kao logo). Do 4 MB.
                 </span>
               </div>
             </div>

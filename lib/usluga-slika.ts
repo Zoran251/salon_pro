@@ -1,5 +1,5 @@
-/** Maksimalna veličina fajla pre obrade (kao kod logoa / zaposlenih). */
-export const MAX_USLUGA_SLIKA_ULAZ_BYTES = 2 * 1024 * 1024
+/** Maksimalna veličina fajla pre obrade (usluge — više od loga da ostane prostor za kvalitetnije fotografije). */
+export const MAX_USLUGA_SLIKA_ULAZ_BYTES = 4 * 1024 * 1024
 
 /** Maksimalna dužina data URL stringa za kolonu `text` (rezerva za Postgres/REST). */
 const MAX_DATA_URL_CHARS = 1_200_000
@@ -43,7 +43,7 @@ export async function fileToUslugaSlikaDataUrl(
   opts?: { maxEdge?: number },
 ): Promise<string> {
   if (file.size > MAX_USLUGA_SLIKA_ULAZ_BYTES) {
-    throw new Error('Slika je prevelika. Maksimalno 2 MB pre otpremanja.')
+    throw new Error('Slika je prevelika. Maksimalno 4 MB pre otpremanja.')
   }
   if (!jeVerovatnoSlikaFajl(file)) {
     throw new Error(
