@@ -827,9 +827,10 @@ export default function Dashboard() {
     setUslugaLager((prev) => prev.filter((p) => p.usluga_id !== id))
   }
 
+  /** Bez setTimeout: na iOS/Safari odloženi click gubi „user gesture“ i dijalog fajla se ne otvori. */
   const otvoriUslugaSlikuPicker = (cilj: 'nova' | string) => {
     uslugaSlikaCiljRef.current = cilj
-    window.setTimeout(() => uslugaSlikaInputRef.current?.click(), 0)
+    uslugaSlikaInputRef.current?.click()
   }
 
   const handleUslugaSlikaFajl = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -846,7 +847,11 @@ export default function Dashboard() {
         return
       }
       setUslugaSlikaBusyId(cilj)
-      const { error } = await supabase.from('usluge').update({ slika_url: dataUrl }).eq('id', cilj)
+      const { data: updatedRows, error } = await supabase
+        .from('usluge')
+        .update({ slika_url: dataUrl })
+        .eq('id', cilj)
+        .select('id, slika_url')
       if (error) {
         const msg = /slika_url|column .* does not exist|schema cache/i.test(error.message)
           ? 'U Supabase pokrenite migraciju 2026-05-21_usluge_slika_url.sql, pa pokušajte ponovo.'
@@ -854,7 +859,14 @@ export default function Dashboard() {
         setUslugaGreska(msg)
         return
       }
-      setUsluge((prev) => prev.map((u) => (u.id === cilj ? { ...u, slika_url: dataUrl } : u)))
+      const updated = updatedRows?.[0]
+      if (!updated) {
+        setUslugaGreska(
+          'Slika nije sačuvana (baza nije vratila ažuriran red). Proverite da li ste prijavljeni kao vlasnik ovog salona, osvežite stranicu, pa u Supabase proverite migraciju za kolonu slika_url.',
+        )
+        return
+      }
+      setUsluge((prev) => prev.map((u) => (u.id === cilj ? { ...u, slika_url: updated.slika_url } : u)))
     } catch (err) {
       setUslugaGreska(err instanceof Error ? err.message : 'Slika nije učitana.')
     } finally {
@@ -866,12 +878,20 @@ export default function Dashboard() {
     setUslugaGreska('')
     setUslugaSlikaBusyId(id)
     try {
-      const { error } = await supabase.from('usluge').update({ slika_url: null }).eq('id', id)
+      const { data: clearedRows, error } = await supabase
+        .from('usluge')
+        .update({ slika_url: null })
+        .eq('id', id)
+        .select('id, slika_url')
       if (error) {
         const msg = /slika_url|column .* does not exist|schema cache/i.test(error.message)
           ? 'U Supabase pokrenite migraciju 2026-05-21_usluge_slika_url.sql, pa pokušajte ponovo.'
           : error.message
         setUslugaGreska(msg)
+        return
+      }
+      if (!clearedRows?.[0]) {
+        setUslugaGreska('Uklanjanje slike nije uspelo. Osvežite stranicu i pokušajte ponovo.')
         return
       }
       setUsluge((prev) => prev.map((u) => (u.id === id ? { ...u, slika_url: null } : u)))
@@ -1429,11 +1449,27 @@ export default function Dashboard() {
       <input
         ref={uslugaSlikaInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept="image/*"
         style={{ display: 'none' }}
         aria-hidden
         onChange={(e) => void handleUslugaSlikaFajl(e)}
       />
+      {uslugaGreska ? (
+        <div
+          role="alert"
+          style={{
+            background: 'rgba(220,50,50,.1)',
+            border: '0.5px solid rgba(220,50,50,.3)',
+            borderRadius: '10px',
+            padding: '10px 12px',
+            fontSize: '12px',
+            color: '#ff6b6b',
+            lineHeight: 1.5,
+          }}
+        >
+          ⚠️ {uslugaGreska}
+        </div>
+      ) : null}
       {usluge.length === 0 && !showNovaUsluga && (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '40px' }}>
           <div style={{ fontSize: '32px', marginBottom: '12px' }}>💈</div>
@@ -1511,7 +1547,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.38)', lineHeight: 1.5 }}>
-                Opciona slika (JPG/PNG/WebP, do 2 MB). Prikazuje se kupcima na javnoj stranici salona — automatski se smanjuje u pregledaču.
+                Opciona slika (do 2 MB, kao logo — iz pregledača). Snima se kao PNG u bazi; prikazuje se kupcima na javnoj stranici salona.
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                 <button type="button" style={{ ...btnGold, padding: '9px 14px', fontSize: '12px', opacity: busy ? 0.65 : 1 }} disabled={busy} onClick={() => otvoriUslugaSlikuPicker(u.id)}>
@@ -1533,11 +1569,6 @@ export default function Dashboard() {
       {showNovaUsluga ? (
         <div style={cardStyle}>
           <h3 style={{ fontSize: '14px', fontWeight: 500, color: text, marginBottom: '16px' }}>Nova usluga</h3>
-          {uslugaGreska && (
-            <div style={{ background: 'rgba(220,50,50,.1)', border: '0.5px solid rgba(220,50,50,.3)', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px', fontSize: '12px', color: '#ff6b6b' }}>
-              ⚠️ {uslugaGreska}
-            </div>
-          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: '12px', marginBottom: '14px' }}>
             <div><label style={labelStyle}>NAZIV</label><input style={inputStyle} placeholder="Šišanje" value={novaUsluga.naziv} onChange={e => setNovaUsluga({ ...novaUsluga, naziv: e.target.value })} /></div>
             <div><label style={labelStyle}>CIJENA (RSD)</label><input style={inputStyle} placeholder="1500" value={novaUsluga.cijena} onChange={e => setNovaUsluga({ ...novaUsluga, cijena: e.target.value })} /></div>
@@ -1597,7 +1628,7 @@ export default function Dashboard() {
                   </button>
                 ) : null}
                 <span style={{ fontSize: '11px', color: 'rgba(245,240,232,.38)', maxWidth: '280px', lineHeight: 1.45 }}>
-                  Pregled na tvojoj javnoj stranici; fajl do 2 MB, smanjenje u pregledaču pre snimanja.
+                  Pregled na javnoj stranici; do 2 MB, u PNG formatu kao kod loga salona.
                 </span>
               </div>
             </div>
