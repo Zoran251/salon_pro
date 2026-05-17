@@ -1876,9 +1876,9 @@ export default function SalonLanding() {
           <div ref={uslugeAnchorRef} style={{ marginTop: '48px' }}>
             <h2 style={{ fontSize: '22px', fontWeight: 500, color: '#f5f0e8', marginBottom: '8px' }}>Naše usluge</h2>
             <p style={{ fontSize: '13px', color: 'rgba(245,240,232,.4)', marginBottom: '24px' }}>
-              Klik ili Enter na karticu bira uslugu. Ako salon doda sliku, videćete je na kartici. Dugme „Zakaži termin” otvara prozor za kategoriju pa uslugu.
+              Kartice su u mreži (2 u redu na telefonu, 3 na širem ekranu), kvadratne sličice kao na Instagramu. Klik ili Enter bira uslugu; dugme „Zakaži termin” otvara prozor za kategoriju pa uslugu.
             </p>
-            <div className="usluge-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div className="usluge-grid">
               {usluge.map((u) => {
                 const ini = (u.naziv || '?').trim().charAt(0).toUpperCase() || '•'
                 return (
@@ -1912,14 +1912,14 @@ export default function SalonLanding() {
                     )}
                   </div>
                   <div className="usluga-card-body">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
-                      <div style={{ fontSize: '15px', fontWeight: 600, color: '#f5f0e8', lineHeight: 1.3 }}>{u.naziv}</div>
-                      <div style={{ fontSize: '14px', fontWeight: 700, color: gold, flexShrink: 0 }}>{Number(u.cijena).toLocaleString('sr-Latn-RS')} RSD</div>
+                    <div className="usluga-card-row">
+                      <div className="usluga-card-naziv">{u.naziv}</div>
+                      <div className="usluga-card-cijena">{Number(u.cijena).toLocaleString('sr-Latn-RS')} RSD</div>
                     </div>
-                    <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.42)' }}>
+                    <div className="usluga-card-meta">
                       {(u.kategorija?.trim() || 'Ostalo')} · {u.trajanje} min
                     </div>
-                    {u.opis ? <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.34)', marginTop: '4px', lineHeight: 1.45 }}>{u.opis}</div> : null}
+                    {u.opis ? <div className="usluga-card-opis">{u.opis}</div> : null}
                   </div>
                 </div>
               )
@@ -2159,14 +2159,23 @@ export default function SalonLanding() {
         *{box-sizing:border-box;margin:0;padding:0}
         input,textarea{outline:none;font-family:sans-serif;color:#f5f0e8}
         input:focus,textarea:focus{border-color:rgba(212,175,55,.6)!important}
-        .usluga-card{cursor:pointer;background:#161616;border:0.5px solid rgba(212,175,55,.15);border-radius:16px;padding:0;overflow:hidden;display:flex;flex-direction:column;transition:border-color .25s ease,box-shadow .25s ease,transform .25s ease}
-        .usluga-card:hover{border-color:rgba(212,175,55,.42);box-shadow:0 14px 40px rgba(0,0,0,.4);transform:translateY(-3px)}
+        .usluge-grid{display:grid;width:100%;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}
+        @media(min-width:720px){
+          .usluge-grid{gap:14px;grid-template-columns:repeat(3,minmax(0,1fr))}
+        }
+        .usluga-card{cursor:pointer;background:#161616;border:0.5px solid rgba(212,175,55,.15);border-radius:14px;padding:0;overflow:hidden;display:flex;flex-direction:column;max-width:100%;transition:border-color .25s ease,box-shadow .25s ease,transform .25s ease}
+        .usluga-card:hover{border-color:rgba(212,175,55,.38);box-shadow:0 8px 28px rgba(0,0,0,.35);transform:translateY(-2px)}
         .usluga-card:focus-visible{outline:2px solid #d4af37;outline-offset:3px}
         .usluga-active{border-color:#d4af37!important;background:rgba(212,175,55,.06)!important;box-shadow:0 0 0 1px rgba(212,175,55,.25)}
-        .usluga-card-media{position:relative;width:100%;aspect-ratio:4/3;background:linear-gradient(155deg,rgba(212,175,55,.12),rgba(20,18,14,.98))}
+        .usluga-card-media{position:relative;width:100%;aspect-ratio:1/1;background:linear-gradient(155deg,rgba(212,175,55,.12),rgba(20,18,14,.98))}
         .usluga-card-media img{width:100%;height:100%;object-fit:cover;display:block}
-        .usluga-card-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(28px,8vw,40px);font-weight:700;color:rgba(212,175,55,.28);letter-spacing:.06em}
-        .usluga-card-body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:6px;min-height:0}
+        .usluga-card-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(18px,11vw,30px);font-weight:700;color:rgba(212,175,55,.28);letter-spacing:.04em}
+        .usluga-card-body{padding:10px 11px 12px;display:flex;flex-direction:column;gap:4px;min-height:0}
+        .usluga-card-row{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+        .usluga-card-naziv{font-size:clamp(12px,3.2vw,14px);font-weight:600;color:#f5f0e8;line-height:1.25;min-width:0;flex:1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+        .usluga-card-cijena{font-size:clamp(11px,2.8vw,12px);font-weight:700;color:${gold};flex-shrink:0;line-height:1.2;text-align:right}
+        .usluga-card-meta{font-size:10px;color:rgba(245,240,232,.4);line-height:1.35}
+        .usluga-card-opis{font-size:10px;color:rgba(245,240,232,.32);margin-top:2px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
         @media (prefers-reduced-motion:reduce){
           .usluga-card{transition:none}
           .usluga-card:hover{transform:none;box-shadow:none}
@@ -2206,7 +2215,6 @@ export default function SalonLanding() {
           .hero-section{padding:36px 20px 44px!important}
           .hero-title{font-size:28px!important}
           .content-pad{padding:0 20px 40px!important}
-          .usluge-grid{grid-template-columns:1fr!important}
           .forma-grid{grid-template-columns:1fr!important}
         }
       `}</style>
