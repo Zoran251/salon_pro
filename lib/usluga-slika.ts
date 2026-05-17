@@ -1,8 +1,24 @@
-/** Maksimalna veličina fajla pre obrade (kao kod logoa / zaposlenih). */
-export const MAX_USLUGA_SLIKA_ULAZ_BYTES = 2 * 1024 * 1024
+/** Maksimalna veličina fajla pre obrade (usluge — više od loga da ostane prostor za kvalitetnije fotografije). */
+export const MAX_USLUGA_SLIKA_ULAZ_BYTES = 4 * 1024 * 1024
 
 /** Maksimalna dužina data URL stringa za kolonu `text` (rezerva za Postgres/REST). */
 const MAX_DATA_URL_CHARS = 1_200_000
+
+/** Poznati sufiksi + prazan MIME (često iOS/Android galerija) — ne oslanjamo se samo na `file.type`. */
+function jeVerovatnoSlikaFajl(file: File): boolean {
+  const t = (file.type || '').trim().toLowerCase()
+  if (t.startsWith('image/')) return true
+  const ime = file.name?.toLowerCase() || ''
+  if (
+    /\.(jpe?g|jfif|pjpeg|pjp|png|apng|gif|webp|bmp|dib|tiff?|svg|svgz|heic|heif|avif|ico|raw|cr2|nef|arw|dng)$/i.test(
+      ime,
+    )
+  ) {
+    return true
+  }
+  if (!t && file.size > 0) return true
+  return false
+}
 
 function bitmapToPngDataUrl(bitmap: ImageBitmap, maxEdge: number): string {
   let w = bitmap.width
@@ -26,21 +42,18 @@ export async function fileToUslugaSlikaDataUrl(
   file: File,
   opts?: { maxEdge?: number },
 ): Promise<string> {
-  const ime = file.name?.toLowerCase() || ''
-  if (ime.endsWith('.heic') || ime.endsWith('.heif') || file.type === 'image/heic' || file.type === 'image/heif') {
+  if (file.size > MAX_USLUGA_SLIKA_ULAZ_BYTES) {
+    throw new Error('Slika je prevelika. Maksimalno 4 MB pre otpremanja.')
+  }
+  if (!jeVerovatnoSlikaFajl(file)) {
     throw new Error(
-      'HEIC/HEIF (često iPhone) pregledač obično ne obrađuje. Uključite „Najkompatibilnije“ u podešavanjima kamere ili izvezite fotografiju kao JPEG/PNG, pa pokušajte ponovo.',
+      'Fajl ne izgleda kao slika. Probaj JPG, PNG, WebP, GIF, HEIC/HEIF ili drugi uobičajeni format; na telefonu izaberi „fotografija“ iz galerije.',
     )
   }
-  if (!file.type.startsWith('image/')) {
-    throw new Error('Izaberite sliku (npr. JPG, PNG ili WebP).')
-  }
-  if (file.size > MAX_USLUGA_SLIKA_ULAZ_BYTES) {
-    throw new Error('Slika je prevelika. Maksimalno 2 MB pre otpremanja.')
-  }
 
+  let bitmap: ImageBitmap | null = null
   try {
-    const bitmap = await createImageBitmap(file)
+    bitmap = await createImageBitmap(file)
     try {
       let maxEdge = opts?.maxEdge ?? 720
       let out = bitmapToPngDataUrl(bitmap, maxEdge)
@@ -54,24 +67,43 @@ export async function fileToUslugaSlikaDataUrl(
       return out
     } finally {
       bitmap.close()
+      bitmap = null
     }
   } catch {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => {
-        const r = reader.result
-        if (typeof r !== 'string') {
-          reject(new Error('Čitanje slike nije uspelo.'))
-          return
-        }
-        if (r.length > MAX_DATA_URL_CHARS) {
-          reject(new Error('Slika je prevelika za snimanje. Smanjite je ili izvezite kao manji PNG/JPEG.'))
-          return
-        }
-        resolve(r)
+    // Dekodiranje u canvas ne uspeva (npr. neki HEIC u Chrome-u, TIFF, prazan MIME) — isto kao logo: raw data URL.
+  } finally {
+    if (bitmap) {
+      try {
+        bitmap.close()
+      } catch {
+        /* noop */
       }
-      reader.onerror = () => reject(new Error('Čitanje slike nije uspelo.'))
-      reader.readAsDataURL(file)
-    })
+    }
   }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const r = reader.result
+      if (typeof r !== 'string') {
+        reject(new Error('Čitanje slike nije uspelo. Probaj drugi format ili drugi pregledač.'))
+        return
+      }
+      if (!r.startsWith('data:image/') && !r.startsWith('data:application/octet-stream')) {
+        reject(
+          new Error(
+            'Pregledač nije prepoznao sliku. Sačuvaj kao JPG ili PNG pa ponovo izaberi fajl, ili probaj u Chrome/Safari.',
+          ),
+        )
+        return
+      }
+      if (r.length > MAX_DATA_URL_CHARS) {
+        reject(new Error('Slika je prevelika za snimanje. Smanjite je ili izvezite kao manji JPG/PNG.'))
+        return
+      }
+      resolve(r)
+    }
+    reader.onerror = () => reject(new Error('Čitanje fajla nije uspelo.'))
+    reader.readAsDataURL(file)
+  })
 }
