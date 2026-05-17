@@ -9,6 +9,12 @@ export async function fileToUslugaSlikaDataUrl(
   file: File,
   opts?: { maxEdge?: number; quality?: number },
 ): Promise<string> {
+  const ime = file.name?.toLowerCase() || ''
+  if (ime.endsWith('.heic') || ime.endsWith('.heif') || file.type === 'image/heic' || file.type === 'image/heif') {
+    throw new Error(
+      'HEIC/HEIF (često iPhone) pregledač obično ne obrađuje. Uključite „Najkompatibilnije“ u podešavanjima kamere ili izvezite fotografiju kao JPEG, pa pokušajte ponovo.',
+    )
+  }
   if (!file.type.startsWith('image/')) {
     throw new Error('Izaberite sliku (JPG, PNG ili WebP).')
   }
