@@ -1876,7 +1876,7 @@ export default function SalonLanding() {
           <div ref={uslugeAnchorRef} style={{ marginTop: '48px' }}>
             <h2 style={{ fontSize: '22px', fontWeight: 500, color: '#f5f0e8', marginBottom: '8px' }}>Naše usluge</h2>
             <p style={{ fontSize: '13px', color: 'rgba(245,240,232,.4)', marginBottom: '24px' }}>
-              Kartice su u mreži (2 u redu na telefonu, 3 na širem ekranu), kvadratne sličice kao na Instagramu. Klik ili Enter bira uslugu; dugme „Zakaži termin” otvara prozor za kategoriju pa uslugu.
+              Za termin kliknite na željenu karticu.
             </p>
             <div className="usluge-grid">
               {usluge.map((u) => {
