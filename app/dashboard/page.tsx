@@ -1449,7 +1449,7 @@ export default function Dashboard() {
       <input
         ref={uslugaSlikaInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.jpg,.jpeg,.jfif,.pjpeg,.png,.apng,.gif,.webp,.bmp,.tif,.tiff,.svg,.heic,.heif,.avif,.ico"
         style={{ display: 'none' }}
         aria-hidden
         onChange={(e) => void handleUslugaSlikaFajl(e)}
@@ -1547,7 +1547,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.38)', lineHeight: 1.5 }}>
-                Opciona slika (do 2 MB, kao logo — iz pregledača). Snima se kao PNG u bazi; prikazuje se kupcima na javnoj stranici salona.
+                Opciona slika (do 2 MB, kao logo). JPG, PNG, WebP, GIF, HEIC i drugi uobičajeni formati; ako pregledač ne obradi format, probaj drugi ili sačuvaj kao JPG/PNG.
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                 <button type="button" style={{ ...btnGold, padding: '9px 14px', fontSize: '12px', opacity: busy ? 0.65 : 1 }} disabled={busy} onClick={() => otvoriUslugaSlikuPicker(u.id)}>
