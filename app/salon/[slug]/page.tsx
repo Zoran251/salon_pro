@@ -219,6 +219,7 @@ export default function SalonLanding() {
   const knownNotifIdsRef = useRef<Set<string>>(new Set())
   const notifPrimedRef = useRef(false)
   const uslugeAnchorRef = useRef<HTMLDivElement | null>(null)
+  const formaZakazivanjeRef = useRef<HTMLDivElement | null>(null)
   const podaciAnchorRef = useRef<HTMLDivElement | null>(null)
   const kupacMenuRef = useRef<HTMLDivElement | null>(null)
   const [kupacMenuOpen, setKupacMenuOpen] = useState(false)
@@ -1080,15 +1081,19 @@ export default function SalonLanding() {
     }
   }
 
+  const scrollDoFormeZaTermin = () => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        formaZakazivanjeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+    })
+  }
+
   const izaberiUsluguIzPickera = (u: Usluga) => {
     setOdabranaUsluga(u)
     setBookingPickerOpen(false)
     setShowForma(true)
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        uslugeAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      })
-    })
+    scrollDoFormeZaTermin()
   }
 
   const scrollToPodaci = () => {
@@ -1890,12 +1895,14 @@ export default function SalonLanding() {
                   onClick={() => {
                     setOdabranaUsluga(odabranaUsluga?.id === u.id ? null : u)
                     setShowForma(true)
+                    scrollDoFormeZaTermin()
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault()
                       setOdabranaUsluga(odabranaUsluga?.id === u.id ? null : u)
                       setShowForma(true)
+                      scrollDoFormeZaTermin()
                     }
                   }}
                   aria-pressed={odabranaUsluga?.id === u.id}
@@ -1929,7 +1936,19 @@ export default function SalonLanding() {
         )}
 
         {activeView === 'booking' && showForma && (
-          <div style={{ marginTop: '32px', background: '#161616', border: `0.5px solid ${goldBorder}`, borderRadius: '20px', padding: '28px', animation: 'fadeUp .4s ease' }}>
+          <div
+            ref={formaZakazivanjeRef}
+            id="salon-zakazivanje-forma"
+            style={{
+              marginTop: '32px',
+              background: '#161616',
+              border: `0.5px solid ${goldBorder}`,
+              borderRadius: '20px',
+              padding: '28px',
+              animation: 'fadeUp .4s ease',
+              scrollMarginTop: 88,
+            }}
+          >
             <h3 style={{ fontSize: '18px', fontWeight: 500, color: '#f5f0e8', marginBottom: '6px' }}>
               Zakaži termin {odabranaUsluga ? `— ${odabranaUsluga.naziv}` : ''}
             </h3>
