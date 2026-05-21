@@ -17,14 +17,18 @@ export const pushNotificationTemplates = {
     salonName: string,
     dateTime: string,
     serviceName: string
-  ): NotificationTemplate => ({
-    title: 'Termin potvrđen! ✅',
-    body: `${salonName} - ${serviceName} na ${dateTime}`,
-    data: {
-      type: 'appointment_confirmed',
-      action: 'open_appointment',
-    },
-  }),
+  ): NotificationTemplate => {
+    void dateTime
+    void serviceName
+    return {
+      title: `Termin vam je potvrđen — ${salonName}`,
+      body: 'Termin vam je potvrđen. Ukoliko dođe do izmena obavite ih najkasnije 6 sati pre vašeg termina kako bi izbegli blokiranje naloga. Zahvalan vam je Salon pro, odgovornost čini razliku.',
+      data: {
+        type: 'appointment_confirmed',
+        action: 'open_appointment',
+      },
+    }
+  },
 
   /**
    * Obaveštenje o promeni termina
@@ -172,15 +176,15 @@ export const whatsappTemplates = {
     serviceName: string,
     salonPhone: string
   ): string => `
-🎉 Termin je potvrđen!
+🎉 Termin vam je potvrđen!
 
 Salon: ${salonName}
 Usluga: ${serviceName}
 Datum i vreme: ${dateTime}
 
-Ako trebate da promenite termin, odgovorite na ovu poruku ili pozovite ${salonPhone}
+Ukoliko dođe do izmena obavite ih najkasnije 6 sati pre vašeg termina kako bi izbegli blokiranje naloga. Za promene odgovorite na poruku ili pozovite ${salonPhone}.
 
-Hvala što ste nam odabrali!
+Zahvalan vam je Salon pro, odgovornost čini razliku.
 `,
 
   /**
