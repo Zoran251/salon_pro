@@ -1,5 +1,7 @@
 // lib/notifications/notification-templates.ts
 
+import { potvrdaTerminaNotifikacijaTelo } from '@/lib/notifications/klijent-inbox-kopije'
+
 export interface NotificationTemplate {
   title: string
   body: string
@@ -22,7 +24,7 @@ export const pushNotificationTemplates = {
     void serviceName
     return {
       title: `Termin vam je potvrđen — ${salonName}`,
-      body: 'Termin vam je potvrđen. Ukoliko dođe do izmena obavite ih najkasnije 6 sati pre vašeg termina kako bi izbegli blokiranje naloga. Zahvalan vam je Salon pro, odgovornost čini razliku.',
+      body: potvrdaTerminaNotifikacijaTelo,
       data: {
         type: 'appointment_confirmed',
         action: 'open_appointment',

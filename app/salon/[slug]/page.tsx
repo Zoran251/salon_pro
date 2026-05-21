@@ -2539,7 +2539,7 @@ export default function SalonLanding() {
                                     {n.title}
                                   </div>
                                   <div style={{ fontSize: 11, color: 'rgba(245,240,232,.42)', marginTop: 4, lineHeight: 1.45 }}>
-                                    {skratiTekst(n.body, 120)}
+                                    {skratiTekst(n.body, n.tip === 'appointment_confirmed' ? 400 : 120)}
                                   </div>
                                 </div>
                                 {!n.read_at ? (

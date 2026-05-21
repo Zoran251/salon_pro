@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
 import { ensureSalonClientForCustomer } from '@/lib/ensure-customer-salon-client'
+import { normalizujNotifikacijeZaKupca } from '@/lib/notifications/klijent-inbox-kopije'
 import { SUPABASE_PUBLIC_ENV_MISSING } from '@/lib/supabase-service-role-hint'
 
 function getAnonClient() {
@@ -163,7 +164,7 @@ export async function GET(request: Request) {
           ? loyaltyData
           : { visits_count: 0, progress_percent: 0, reward_ready: false },
       appointments: allAppointments.slice(0, 6),
-      notifications: notifRows || [],
+      notifications: normalizujNotifikacijeZaKupca(notifRows || []),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Greška servera.'

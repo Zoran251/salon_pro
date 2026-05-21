@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { sendTransactionalEmail } from '@/lib/email/salon-admin-notify'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
+import { potvrdaTerminaNotifikacijaTelo } from '@/lib/notifications/klijent-inbox-kopije'
 import { rateLimitByIp } from '@/lib/rate-limit'
 import { SUPABASE_PUBLIC_ENV_MISSING } from '@/lib/supabase-service-role-hint'
 import { getAppRole } from '@/lib/user-role'
@@ -144,9 +145,6 @@ export async function POST(request: Request) {
       ? klijent.ime.trim()
       : String(termin.ime_klijenta || 'korisniče')
 
-  const upozorenjeCrnaLista =
-    'Termin vam je potvrđen. Ukoliko dođe do izmena obavite ih najkasnije 6 sati pre vašeg termina kako bi izbegli blokiranje naloga. Zahvalan vam je Salon pro, odgovornost čini razliku.'
-
   const text = [
     `Poštovani/a ${imeK},`,
     '',
@@ -155,7 +153,7 @@ export async function POST(request: Request) {
     ...(uslugaNaziv ? [`Usluga: ${uslugaNaziv}`] : []),
     `Datum i vreme: ${when}`,
     '',
-    upozorenjeCrnaLista,
+    potvrdaTerminaNotifikacijaTelo,
     '',
     '— SalonPro',
   ].join('\n')
