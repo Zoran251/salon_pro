@@ -144,6 +144,9 @@ export async function POST(request: Request) {
       ? klijent.ime.trim()
       : String(termin.ime_klijenta || 'korisniče')
 
+  const upozorenjeCrnaLista =
+    'Termin vam je potvrđen. Ukoliko dođe do izmena obavite ih najkasnije 6 sati pre vašeg termina kako bi izbegli blokiranje naloga. Zahvalan vam je Salon pro, odgovornost čini razliku.'
+
   const text = [
     `Poštovani/a ${imeK},`,
     '',
@@ -152,7 +155,7 @@ export async function POST(request: Request) {
     ...(uslugaNaziv ? [`Usluga: ${uslugaNaziv}`] : []),
     `Datum i vreme: ${when}`,
     '',
-    'Vidimo se!',
+    upozorenjeCrnaLista,
     '',
     '— SalonPro',
   ].join('\n')
