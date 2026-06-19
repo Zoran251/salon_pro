@@ -13,6 +13,7 @@ import {
   naivniBelgradDatumVremeUUtcIso,
   ujednacenoDatumVremeBelgrad,
 } from '@/lib/termin-belgrade-vreme'
+import { DEFAULT_BRAND_COLORS, hexToRgba } from '@/lib/hex-color'
 
 interface Usluga {
   id: string
@@ -35,6 +36,9 @@ interface Salon {
   opis?: string
   logo_url?: string
   boja_primarna?: string
+  boja_sekundarna?: string
+  boja_akcent?: string
+  boja_font?: string
   tip?: string
   radno_od?: string
   radno_do?: string
@@ -730,9 +734,13 @@ export default function SalonLanding() {
     </div>
   )
 
-  const gold = salon.boja_primarna || '#d4af37'
-  const goldFaint = 'rgba(212,175,55,.12)'
-  const goldBorder = 'rgba(212,175,55,.25)'
+  const gold = salon.boja_primarna || DEFAULT_BRAND_COLORS.primarna
+  const akcent = salon.boja_akcent || DEFAULT_BRAND_COLORS.akcent
+  const textBoja = salon.boja_font || DEFAULT_BRAND_COLORS.font
+  const bgSekundarna = salon.boja_sekundarna || DEFAULT_BRAND_COLORS.sekundarna
+  const goldFaint = hexToRgba(gold, 0.12)
+  const goldBorder = hexToRgba(gold, 0.25)
+  const textMuted = hexToRgba(textBoja, 0.45)
   const kupacReturnEnc = encodeURIComponent(`/salon/${slug}`)
   const salonHours = formatSalonHours(salon)
   const neprocitaneObavestenja =
@@ -757,7 +765,7 @@ export default function SalonLanding() {
     width: 'min(420px, 100%)',
     maxHeight: 'calc(100vh - 110px)',
     overflowY: 'auto',
-    background: '#121212',
+    background: bgSekundarna,
     border: `0.5px solid ${goldBorder}`,
     borderRadius: 18,
     boxShadow: '0 24px 70px rgba(0,0,0,.65)',
@@ -780,7 +788,7 @@ export default function SalonLanding() {
         width: 'min(300px, calc(100vw - 32px))',
         maxHeight: 420,
         overflowY: 'auto',
-        background: '#121212',
+        background: bgSekundarna,
         border: `0.5px solid ${goldBorder}`,
         borderRadius: 14,
         boxShadow: '0 20px 50px rgba(0,0,0,.55)',
@@ -805,7 +813,7 @@ export default function SalonLanding() {
         width: 'min(340px, calc(100vw - 32px))',
         maxHeight: 360,
         overflowY: 'auto',
-        background: '#121212',
+        background: bgSekundarna,
         border: `0.5px solid ${goldBorder}`,
         borderRadius: 14,
         boxShadow: '0 20px 50px rgba(0,0,0,.55)',
@@ -1533,7 +1541,7 @@ export default function SalonLanding() {
                         padding: '14px',
                         borderRadius: '12px',
                         border: `0.5px solid ${goldBorder}`,
-                        background: '#121212',
+                        background: bgSekundarna,
                       }}
                     >
                       <div style={{ fontSize: '13px', fontWeight: 600, color: '#f5f0e8', marginBottom: '10px' }}>Izmena termina</div>
@@ -2170,7 +2178,7 @@ export default function SalonLanding() {
   )
 
   return (
-    <main style={{ background: '#0a0a0a', minHeight: '100vh', color: '#f5f0e8', fontFamily: 'sans-serif' }}>
+    <main style={{ background: '#0a0a0a', minHeight: '100vh', color: textBoja, fontFamily: 'sans-serif' }}>
       <style>{`
         @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
         @keyframes salonToastIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}

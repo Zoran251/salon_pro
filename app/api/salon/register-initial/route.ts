@@ -99,6 +99,10 @@ export async function POST(request: Request) {
       grad,
       tip,
       aktivan: true,
+      boja_primarna: '#d4af37',
+      boja_sekundarna: '#121212',
+      boja_akcent: '#f5e17a',
+      boja_font: '#f5f0e8',
     }
     if (referalKodUnos) {
       insertPayload.referal_kod_prijava = referalKodUnos

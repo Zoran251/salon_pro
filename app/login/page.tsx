@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { authPasswordViaApi } from '@/lib/auth-via-api'
 import { formatAuthError } from '@/lib/format-auth-error'
 import { waitForClientSession } from '@/lib/wait-client-session'
+import { isPlatformAdminEmail } from '@/lib/platform-admin'
 
 export default function Login() {
   const [loading, setLoading] = useState(false)
@@ -30,7 +31,7 @@ export default function Login() {
       setLoading(false)
       return
     }
-    window.location.href = '/dashboard'
+    window.location.href = isPlatformAdminEmail(session.user.email) ? '/admin' : '/dashboard'
   }
 
   return (

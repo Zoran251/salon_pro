@@ -30,6 +30,9 @@ export type Database = {
           nedelja_zatvoreno: boolean | null
           logo_url: string | null
           boja_primarna: string | null
+          boja_sekundarna: string | null
+          boja_akcent: string | null
+          boja_font: string | null
           landing_page: string | null
           created_at: string | null
           referal_kod: string | null
@@ -58,6 +61,9 @@ export type Database = {
           nedelja_zatvoreno?: boolean | null
           logo_url?: string | null
           boja_primarna?: string | null
+          boja_sekundarna?: string | null
+          boja_akcent?: string | null
+          boja_font?: string | null
           landing_page?: string | null
           created_at?: string | null
           referal_kod?: string | null

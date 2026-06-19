@@ -158,6 +158,10 @@ function RegistracijaForm() {
         grad: forma.grad,
         tip: tipBaza,
         aktivan: true,
+        boja_primarna: '#d4af37',
+        boja_sekundarna: '#121212',
+        boja_akcent: '#f5e17a',
+        boja_font: '#f5f0e8',
         ...(referalBody ? { referal_kod_prijava: referalBody } : {}),
       }
 

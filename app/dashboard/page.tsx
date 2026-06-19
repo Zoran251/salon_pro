@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase'
 import { waitForClientSession } from '@/lib/wait-client-session'
 import { buildSalonSlug, fallbackSalonSlug } from '@/lib/slug'
 import { getAppRole } from '@/lib/user-role'
+import { isPlatformAdminEmail } from '@/lib/platform-admin'
+import { DEFAULT_BRAND_COLORS } from '@/lib/hex-color'
 import { getPublicSiteBase } from '@/lib/public-site-url'
 import {
   GODISNJA_CIJENA_EUR,
@@ -76,6 +78,9 @@ type ProfilForm = {
   nedelja_zatvoreno: boolean
   logo: string
   boja_primarna: string
+  boja_sekundarna: string
+  boja_akcent: string
+  boja_font: string
 }
 const defaultLojalnost: LojalnostForm = { aktivan: false, tip: 'popust', svaki_koji: 5, vrijednost: 20 }
 type ProfilTextField = {
@@ -232,7 +237,11 @@ export default function Dashboard() {
     naziv: '', opis: '', telefon: '', adresa: '', grad: '',
     radno_od: '', radno_do: '', radni_dani_od: '', radni_dani_do: '',
     subota_od: '', subota_do: '', nedelja_od: '', nedelja_do: '', nedelja_zatvoreno: false,
-    logo: '', boja_primarna: '#d4af37'
+    logo: '',
+    boja_primarna: DEFAULT_BRAND_COLORS.primarna,
+    boja_sekundarna: DEFAULT_BRAND_COLORS.sekundarna,
+    boja_akcent: DEFAULT_BRAND_COLORS.akcent,
+    boja_font: DEFAULT_BRAND_COLORS.font,
   })
   const [zaposleni, setZaposleni] = useState<ZaposleniRow[]>([])
   const [noviZaposleni, setNoviZaposleni] = useState({ ime: '', uloga: '', foto_url: '' })
@@ -390,6 +399,10 @@ export default function Dashboard() {
       if (salonError || !salonData) {
         console.error('Salon nije pronađen:', salonError)
         const { data: userData } = await supabase.auth.getUser()
+        if (isPlatformAdminEmail(userData.user?.email)) {
+          router.replace('/admin')
+          return
+        }
         const role = getAppRole(userData.user)
         if (role === 'customer') {
           router.replace('/')
@@ -436,7 +449,10 @@ export default function Dashboard() {
         nedelja_do: salonData.nedelja_do || '',
         nedelja_zatvoreno: Boolean(salonData.nedelja_zatvoreno),
         logo: salonData.logo_url || '',
-        boja_primarna: salonData.boja_primarna || '#d4af37'
+        boja_primarna: salonData.boja_primarna || DEFAULT_BRAND_COLORS.primarna,
+        boja_sekundarna: salonData.boja_sekundarna || DEFAULT_BRAND_COLORS.sekundarna,
+        boja_akcent: salonData.boja_akcent || DEFAULT_BRAND_COLORS.akcent,
+        boja_font: salonData.boja_font || DEFAULT_BRAND_COLORS.font,
       })
 
       // Učitaj usluge
@@ -704,6 +720,9 @@ export default function Dashboard() {
         nedelja_zatvoreno: profil.nedelja_zatvoreno,
         logo_url: profil.logo,
         boja_primarna: profil.boja_primarna,
+        boja_sekundarna: profil.boja_sekundarna,
+        boja_akcent: profil.boja_akcent,
+        boja_font: profil.boja_font,
       }
 
       const { error } = await supabase
@@ -1404,6 +1423,44 @@ export default function Dashboard() {
               value={profil.opis} placeholder="Kratki opis vašeg salona..."
               onChange={e => setProfil({ ...profil, opis: e.target.value })} />
           </div>
+        </div>
+      </div>
+
+      <div style={cardStyle}>
+        <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '20px' }}>Brend boje</h3>
+        <p style={{ fontSize: '12px', color: muted, marginBottom: '16px', lineHeight: 1.6 }}>
+          Boje se primjenjuju na javnoj stranici vašeg salona (/salon/slug).
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '14px' }}>
+          {([
+            { label: 'PRIMARNA', key: 'boja_primarna' as const },
+            { label: 'SEKUNDARNA', key: 'boja_sekundarna' as const },
+            { label: 'AKCENT', key: 'boja_akcent' as const },
+            { label: 'BOJA TEKSTA', key: 'boja_font' as const },
+          ]).map(f => (
+            <div key={f.key}>
+              <label style={labelStyle}>{f.label}</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <input
+                  type="color"
+                  value={profil[f.key]}
+                  onChange={e => setProfil({ ...profil, [f.key]: e.target.value })}
+                  style={{ width: '44px', height: '44px', padding: 0, border: `0.5px solid ${goldBorder}`, borderRadius: '10px', cursor: 'pointer', background: 'transparent' }}
+                />
+                <input
+                  style={{ ...inputStyle, flex: 1 }}
+                  value={profil[f.key]}
+                  placeholder="#d4af37"
+                  onChange={e => setProfil({ ...profil, [f.key]: e.target.value })}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', padding: '14px', borderRadius: '12px', background: profil.boja_sekundarna, border: `0.5px solid ${goldBorder}` }}>
+          <span style={{ padding: '8px 14px', borderRadius: '8px', background: profil.boja_primarna, color: '#0a0a0a', fontSize: '12px', fontWeight: 600 }}>Primarna</span>
+          <span style={{ padding: '8px 14px', borderRadius: '8px', background: profil.boja_akcent, color: '#0a0a0a', fontSize: '12px', fontWeight: 600 }}>Akcent</span>
+          <span style={{ padding: '8px 14px', borderRadius: '8px', color: profil.boja_font, fontSize: '13px' }}>Primjer teksta</span>
         </div>
       </div>
 
