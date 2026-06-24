@@ -396,39 +396,55 @@ export default function Dashboard() {
       setUcitavanje(true)
 
       // Učitaj salon podatke
-      const { data: salonData, error: salonError } = await supabase
+      let { data: salonData, error: salonError } = await supabase
         .from('saloni')
         .select('*')
         .eq('id', userId)
         .single()
 
       if (salonError || !salonData) {
-        console.error('Salon nije pronađen:', salonError)
+        console.error('Salon nije pronađen po ID-u:', salonError)
         const { data: userData } = await supabase.auth.getUser()
         if (userData.user?.email) setNalogEmail(userData.user.email)
-        if (isPlatformAdminEmail(userData.user?.email)) {
-          router.replace('/admin')
+        if (userData.user?.email) {
+          const { data: salonByEmail } = await supabase
+            .from('saloni')
+            .select('*')
+            .eq('email', userData.user.email)
+            .maybeSingle()
+          if (salonByEmail) {
+            salonData = salonByEmail
+            console.log('Salon pronađen po emailu:', salonByEmail.naziv)
+          } else {
+            if (isPlatformAdminEmail(userData.user?.email)) {
+              router.replace('/admin')
+              return
+            }
+            const role = getAppRole(userData.user)
+            if (role === 'customer') {
+              router.replace('/')
+              return
+            }
+            router.push('/registracija')
+            return
+          }
+        } else {
+          router.push('/login')
           return
         }
-        const role = getAppRole(userData.user)
-        if (role === 'customer') {
-          router.replace('/')
-          return
-        }
-        router.push('/registracija')
-        return
       }
 
+      const salonId = salonData.id
       let workingSlug = buildSalonSlug(salonData.slug || '')
       if (!workingSlug) {
         const landingPage = typeof salonData.landing_page === 'string' ? salonData.landing_page : ''
         const pathSlug = landingPage.split('/salon/')[1]?.split('?')[0] || ''
-        workingSlug = buildSalonSlug(pathSlug) || fallbackSalonSlug(salonData.naziv || userId)
+        workingSlug = buildSalonSlug(pathSlug) || fallbackSalonSlug(salonData.naziv || salonId)
 
         const { error: slugUpdateError } = await supabase
           .from('saloni')
           .update({ slug: workingSlug })
-          .eq('id', userId)
+          .eq('id', salonId)
 
         if (slugUpdateError) {
           console.error('Greška pri automatskom popravku sluga:', slugUpdateError)
@@ -469,7 +485,7 @@ export default function Dashboard() {
       const { data: uslugeData, error: uslugeErr } = await supabase
         .from('usluge')
         .select('*')
-        .eq('salon_id', userId)
+        .eq('salon_id', salonId)
         .order('created_at', { ascending: true })
 
       if (uslugeErr) {
@@ -480,7 +496,7 @@ export default function Dashboard() {
       const { data: zaposleniData, error: zaposleniErr } = await supabase
         .from('zaposleni')
         .select('*')
-        .eq('salon_id', userId)
+        .eq('salon_id', salonId)
         .order('created_at', { ascending: true })
 
       if (zaposleniErr) {
@@ -499,7 +515,7 @@ export default function Dashboard() {
       const { data: lagerData, error: lagerErr } = await supabase
         .from('lager')
         .select('*')
-        .eq('salon_id', userId)
+        .eq('salon_id', salonId)
         .order('created_at', { ascending: true })
 
       if (lagerErr) {
@@ -510,7 +526,7 @@ export default function Dashboard() {
       const { data: potrosnjaData, error: potrosnjaErr } = await supabase
         .from('usluga_lager_potrosnja')
         .select('id, usluga_id, lager_id, kolicina')
-        .eq('salon_id', userId)
+        .eq('salon_id', salonId)
         .order('created_at', { ascending: true })
 
       if (potrosnjaErr) {
@@ -539,7 +555,7 @@ export default function Dashboard() {
       const { data: terminiData, error: terminiErr } = await supabase
         .from('termini')
         .select('*')
-        .eq('salon_id', userId)
+        .eq('salon_id', salonId)
         .order('datum_vrijeme', { ascending: true })
 
       if (terminiErr) {
@@ -556,7 +572,7 @@ export default function Dashboard() {
       const { data: salonNotifData, error: salonNotifErr } = await supabase
         .from('salon_notifications')
         .select('id, title, body, created_at, appointment_id, read_at, tip')
-        .eq('salon_id', userId)
+        .eq('salon_id', salonId)
         .is('read_at', null)
         .order('created_at', { ascending: false })
         .limit(50)
@@ -571,7 +587,7 @@ export default function Dashboard() {
       const { data: rashodiData, error: rashodiErr } = await supabase
         .from('rashodi')
         .select('*')
-        .eq('salon_id', userId)
+        .eq('salon_id', salonId)
         .order('datum', { ascending: false })
       if (rashodiErr) {
         const missingTable = /relation .*rashodi.* does not exist/i.test(rashodiErr.message)
@@ -582,7 +598,7 @@ export default function Dashboard() {
       const { data: prefData, error: prefErr } = await supabase
         .from('saloni')
         .select('naziv, created_at')
-        .eq('preporucio_salon_id', userId)
+        .eq('preporucio_salon_id', salonId)
         .order('created_at', { ascending: true })
       if (prefErr) {
         const missingCol = /preporucio_salon_id|column .* does not exist|schema cache/i.test(prefErr.message)
@@ -595,7 +611,7 @@ export default function Dashboard() {
       const { data: lojalnostData } = await supabase
         .from('lojalnost')
         .select('*')
-        .eq('salon_id', userId)
+        .eq('salon_id', salonId)
         .single()
 
       setLojalnost(lojalnostData || defaultLojalnost)
@@ -3109,6 +3125,11 @@ export default function Dashboard() {
           SalonPro
         </Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {isPlatformAdminEmail(nalogEmail) && (
+            <Link href="/admin" style={{ width: '36px', height: '36px', borderRadius: '50%', border: `0.5px solid ${goldBorder}`, background: '#111', color: muted, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', fontSize: '16px' }} title="Admin panel">
+              ⚙
+            </Link>
+          )}
           <div ref={notifMenuRef} style={{ position: 'relative' }}>
             <button
               type="button"

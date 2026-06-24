@@ -204,7 +204,10 @@ export default function AdminPage() {
           <Link href="/" style={{ fontSize: '20px', fontWeight: 500, color: gold, textDecoration: 'none' }}>SalonPro</Link>
           <span style={{ fontSize: '13px', color: muted }}>Admin panel</span>
         </div>
-        <button onClick={odjava} style={{ background: 'transparent', border: `0.5px solid ${goldBorder}`, color: muted, padding: '8px 14px', borderRadius: '10px', cursor: 'pointer', fontSize: '13px' }}>Odjava</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Link href="/dashboard" style={{ background: 'transparent', border: `0.5px solid ${goldBorder}`, color: muted, padding: '8px 14px', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', textDecoration: 'none' }}>Dashboard</Link>
+          <button onClick={odjava} style={{ background: 'transparent', border: `0.5px solid ${goldBorder}`, color: muted, padding: '8px 14px', borderRadius: '10px', cursor: 'pointer', fontSize: '13px' }}>Odjava</button>
+        </div>
       </nav>
 
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
