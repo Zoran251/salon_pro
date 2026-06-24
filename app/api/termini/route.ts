@@ -4,6 +4,7 @@ import { sendSalonAdminEmail, sendTransactionalEmail } from '@/lib/email/salon-a
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
 import { getServerSupabaseClient } from '@/lib/server-supabase'
 import { storageTerminStatus } from '@/lib/termin-status'
+import { sendMulticastNotification } from '@/lib/notifications/firebase-config'
 import {
   formatDatumVrijemeBelgrad,
   naivniBelgradDatumVremeUUtcIso,
@@ -115,6 +116,27 @@ async function posaljiEmailNoviTermin(params: {
     })
   } catch (err) {
     console.error('[termini] Email novi termin:', err)
+  }
+}
+
+async function posaljiPushNotifikacijuSalonu(params: {
+  salonId: string
+  ime: string
+  datumVrijeme: string
+}) {
+  try {
+    const srv = getServerSupabaseClient()
+    if (!srv) return
+    const { data: tokens } = await srv.from('device_tokens').select('token').eq('salon_id', params.salonId)
+    const deviceTokens = (tokens || []).map(t => t.token).filter(Boolean) as string[]
+    if (deviceTokens.length === 0) return
+    const when = formatDatumVrijemeBelgrad(params.datumVrijeme)
+    await sendMulticastNotification(deviceTokens, 'Novi termin! 📅', `${params.ime} na ${when}`, {
+      type: 'new_appointment',
+      salon_id: params.salonId,
+    })
+  } catch (err) {
+    console.error('[termini] Push notifikacija:', err)
   }
 }
 
@@ -298,6 +320,11 @@ export async function POST(request: Request) {
         ime: imeKlijenta,
         uslugaId: uslugaIdZaObavestenje,
       })
+      void posaljiPushNotifikacijuSalonu({
+        salonId: String(salon_id),
+        ime: imeKlijenta,
+        datumVrijeme: datumVrijemeStr,
+      })
       return NextResponse.json({ success: true, termin_id: terminIdOut })
     }
 
@@ -343,6 +370,11 @@ export async function POST(request: Request) {
           datumVrijeme: datumVrijemeStr,
           ime: imeKlijenta,
           uslugaId: uslugaIdZaObavestenje,
+        })
+        void posaljiPushNotifikacijuSalonu({
+          salonId: String(salon_id),
+          ime: imeKlijenta,
+          datumVrijeme: datumVrijemeStr,
         })
         return NextResponse.json({ success: true, termin_id: terminIdOut })
       }

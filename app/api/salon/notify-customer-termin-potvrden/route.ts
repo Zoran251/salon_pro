@@ -6,6 +6,8 @@ import { rateLimitByIp } from '@/lib/rate-limit'
 import { SUPABASE_PUBLIC_ENV_MISSING } from '@/lib/supabase-service-role-hint'
 import { getAppRole } from '@/lib/user-role'
 import { formatDatumVrijemeBelgrad } from '@/lib/termin-belgrade-vreme'
+import { getServerSupabaseClient } from '@/lib/server-supabase'
+import { sendPushNotification, sendMulticastNotification } from '@/lib/notifications/firebase-config'
 
 function getAnonClient() {
   const { url: supabaseUrl, anonKey: supabaseAnonKey, ok } = getPublicSupabaseEnv()
@@ -107,7 +109,7 @@ export async function POST(request: Request) {
 
   const { data: klijent, error: cErr } = await userClient
     .from('salon_clients')
-    .select('email, ime')
+    .select('email, ime, auth_user_id')
     .eq('id', termin.client_id as string)
     .eq('salon_id', salonId)
     .maybeSingle()
@@ -168,6 +170,31 @@ export async function POST(request: Request) {
 
   if (!r.ok && !r.skipped) {
     return NextResponse.json({ error: 'Slanje mejla nije uspelo.' }, { status: 502 })
+  }
+
+  // Push notifikacija klijentu preko Firebase (ako je konfigurisano)
+  const authUserId = typeof klijent?.auth_user_id === 'string' ? klijent.auth_user_id : null
+  if (authUserId) {
+    try {
+      const serverClient = getServerSupabaseClient()
+      if (serverClient) {
+        const { data: tokens } = await serverClient
+          .from('device_tokens')
+          .select('token')
+          .eq('user_id', authUserId)
+        const deviceTokens = (tokens || []).map(t => t.token).filter(Boolean) as string[]
+        if (deviceTokens.length > 0) {
+          const pushBody = `${uslugaNaziv ? uslugaNaziv + ' — ' : ''}${when}`
+          void sendMulticastNotification(deviceTokens, `Termin potvrđen ✓ — ${salonNaziv}`, pushBody, {
+            type: 'appointment_confirmed',
+            salon_id: salonId,
+            termin_id: terminId,
+          })
+        }
+      }
+    } catch (pushErr) {
+      console.error('[notify-customer] Push error:', pushErr instanceof Error ? pushErr.message : pushErr)
+    }
   }
 
   return NextResponse.json({ ok: true, sent: r.ok, skipped: Boolean(r.skipped) })

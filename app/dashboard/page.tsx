@@ -165,7 +165,7 @@ function employeeInitials(name: string | null | undefined): string {
 const navItems = [
   { id: 'pregled', icon: '🏠', label: 'Pregled' },
   { id: 'analitika', icon: '📊', label: 'Analitika' },
-  { id: 'profil', icon: '👤', label: 'Profil' },
+  { id: 'nalog', icon: '👤', label: 'Nalog' },
   { id: 'usluge', icon: '💈', label: 'Usluge' },
   { id: 'zaposleni', icon: '✂️', label: 'Zaposleni' },
   { id: 'lager', icon: '📦', label: 'Lager' },
@@ -247,6 +247,12 @@ export default function Dashboard() {
   const [noviZaposleni, setNoviZaposleni] = useState({ ime: '', uloga: '', foto_url: '' })
   const [showNoviZaposleni, setShowNoviZaposleni] = useState(false)
   const [zaposleniGreska, setZaposleniGreska] = useState('')
+  const [nalogEmail, setNalogEmail] = useState('')
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [passwordData, setPasswordData] = useState({ current: '', new: '', confirm: '' })
+  const [passwordGreska, setPasswordGreska] = useState('')
+  const [passwordUspjeh, setPasswordUspjeh] = useState('')
+  const [passwordLoading, setPasswordLoading] = useState(false)
 
   const gold = '#d4af37'
   const goldFaint = 'rgba(212,175,55,.12)'
@@ -399,6 +405,7 @@ export default function Dashboard() {
       if (salonError || !salonData) {
         console.error('Salon nije pronađen:', salonError)
         const { data: userData } = await supabase.auth.getUser()
+        if (userData.user?.email) setNalogEmail(userData.user.email)
         if (isPlatformAdminEmail(userData.user?.email)) {
           router.replace('/admin')
           return
@@ -429,6 +436,9 @@ export default function Dashboard() {
           console.log('Slug automatski popravljen:', workingSlug)
         }
       }
+
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      if (currentUser?.email) setNalogEmail(currentUser.email)
 
       console.log('Salon učitan:', salonData.naziv)
       setResolvedSlug(workingSlug)
@@ -1223,6 +1233,34 @@ export default function Dashboard() {
     router.push('/')
   }
 
+  const promijeniLozinku = async () => {
+    setPasswordGreska('')
+    setPasswordUspjeh('')
+    if (!passwordData.new || passwordData.new.length < 6) {
+      setPasswordGreska('Nova lozinka mora imati najmanje 6 znakova.')
+      return
+    }
+    if (passwordData.new !== passwordData.confirm) {
+      setPasswordGreska('Lozinke se ne podudaraju.')
+      return
+    }
+    setPasswordLoading(true)
+    try {
+      const { error } = await supabase.auth.updateUser({ password: passwordData.new })
+      if (error) {
+        setPasswordGreska(error.message)
+        return
+      }
+      setPasswordUspjeh('Lozinka je uspješno promijenjena!')
+      setPasswordData({ current: '', new: '', confirm: '' })
+      setTimeout(() => { setShowPasswordModal(false); setPasswordUspjeh('') }, 2000)
+    } catch (e) {
+      setPasswordGreska(e instanceof Error ? e.message : 'Greška pri promjeni lozinke.')
+    } finally {
+      setPasswordLoading(false)
+    }
+  }
+
   // Stiilo definicije
   const inputStyle: React.CSSProperties = {
     outline: 'none', width: '100%', fontSize: '14px', background: '#1a1a1a',
@@ -1368,13 +1406,57 @@ export default function Dashboard() {
     </div>
   )
 
-  const renderProfil = () => (
+  const renderNalog = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {sauvano === 'profil' && (
         <div style={{ background: 'rgba(50,200,100,.1)', border: '0.5px solid rgba(50,200,100,.3)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: '#4caf81' }}>
-          ✓ Profil je uspešno sačuvan!
+          ✓ Podaci su uspešno sačuvani!
         </div>
       )}
+
+      <div style={cardStyle}>
+        <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '16px' }}>Nalog (account)</h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+          <div>
+            <label style={labelStyle}>EMAIL</label>
+            <div style={{ fontSize: '14px', color: text, padding: '8px 0' }}>{nalogEmail || 'Učitavanje…'}</div>
+          </div>
+          <button
+            style={btnOutline}
+            onClick={() => { setShowPasswordModal(true); setPasswordGreska(''); setPasswordUspjeh(''); setPasswordData({ current: '', new: '', confirm: '' }) }}
+          >
+            Promijeni lozinku
+          </button>
+        </div>
+      </div>
+
+      {showPasswordModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowPasswordModal(false) }}>
+          <div style={{ ...cardStyle, maxWidth: '420px', width: '100%' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '16px' }}>Promjena lozinke</h3>
+            {passwordGreska && (
+              <div style={{ background: 'rgba(220,50,50,.1)', border: '0.5px solid rgba(220,50,50,.3)', borderRadius: '10px', padding: '10px 12px', fontSize: '12px', color: '#ff6b6b', marginBottom: '12px' }}>{passwordGreska}</div>
+            )}
+            {passwordUspjeh && (
+              <div style={{ background: 'rgba(50,200,100,.1)', border: '0.5px solid rgba(50,200,100,.3)', borderRadius: '10px', padding: '10px 12px', fontSize: '12px', color: '#4caf81', marginBottom: '12px' }}>{passwordUspjeh}</div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <input style={inputStyle} type="password" placeholder="Nova lozinka (min 6 znakova)" value={passwordData.new}
+                onChange={e => setPasswordData({ ...passwordData, new: e.target.value })} />
+              <input style={inputStyle} type="password" placeholder="Potvrdi novu lozinku" value={passwordData.confirm}
+                onChange={e => setPasswordData({ ...passwordData, confirm: e.target.value })} />
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button style={{ ...btnGold, flex: 1 }} onClick={promijeniLozinku} disabled={passwordLoading}>
+                  {passwordLoading ? 'Čuvanje…' : 'Sačuvaj'}
+                </button>
+                <button style={btnOutline} onClick={() => setShowPasswordModal(false)}>Odustani</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={cardStyle}>
         <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '20px' }}>Logo salona</h3>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
@@ -2985,7 +3067,7 @@ export default function Dashboard() {
   )
 
   const sections: Record<string, () => React.ReactElement> = {
-    pregled: renderPregled, analitika: renderAnalitika, profil: renderProfil, usluge: renderUsluge,
+    pregled: renderPregled, analitika: renderAnalitika, nalog: renderNalog, usluge: renderUsluge,
     zaposleni: renderZaposleni, lager: renderLager, termini: renderTermini, stranica: renderStranica, lojalnost: renderLojalnost
   }
 

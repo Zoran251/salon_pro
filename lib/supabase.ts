@@ -317,6 +317,28 @@ export type Database = {
         Update: Partial<Database['public']['Tables']['salon_notifications']['Insert']>
         Relationships: []
       }
+      device_tokens: {
+        Row: {
+          id: string
+          user_id: string
+          token: string
+          platform: string
+          salon_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          token: string
+          platform?: string
+          salon_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['device_tokens']['Insert']>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
