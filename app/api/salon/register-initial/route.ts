@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_SECRET?.trim()
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_SECRET?.trim() ?? ''
   if (!serviceKey) {
     return NextResponse.json(
       { error: 'Server konfiguracija nepotpuna.' },
