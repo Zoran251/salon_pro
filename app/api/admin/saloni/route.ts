@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
   if (!hasServiceRoleKey()) {
     return NextResponse.json(
-      { error: 'SUPABASE_SERVICE_ROLE_KEY nije postavljen na serveru.' },
+      { error: 'SUPABASE_SERVICE_ROLE_SECRET nije postavljen na serveru.' },
       { status: 503 },
     )
   }
@@ -45,7 +45,7 @@ export async function PATCH(request: Request) {
 
   if (!hasServiceRoleKey()) {
     return NextResponse.json(
-      { error: 'SUPABASE_SERVICE_ROLE_KEY nije postavljen na serveru.' },
+      { error: 'SUPABASE_SERVICE_ROLE_SECRET nije postavljen na serveru.' },
       { status: 503 },
     )
   }

@@ -149,7 +149,7 @@ export async function DELETE(request: Request, context: RouteCtx) {
       return NextResponse.json(
         {
           error:
-            'Kasno otkazivanje zahteva administratorski ključ na serveru (SUPABASE_SERVICE_ROLE_KEY). Kontaktirajte podršku.',
+            'Kasno otkazivanje zahteva administratorski ključ na serveru (SUPABASE_SERVICE_ROLE_SECRET). Kontaktirajte podršku.',
         },
         { status: 503 }
       )

@@ -7,7 +7,7 @@ const ALLOWED_TABLES = ['saloni', 'usluge', 'lager', 'termini', 'zaposleni', 'ra
 export async function GET(request: Request) {
   const auth = await verifyPlatformAdmin(request)
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
-  if (!hasServiceRoleKey()) return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY nije postavljen.' }, { status: 503 })
+  if (!hasServiceRoleKey()) return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_SECRET nije postavljen.' }, { status: 503 })
 
   const admin = getServerSupabaseClient()
   if (!admin) return NextResponse.json({ error: 'Supabase env nedostaje.' }, { status: 500 })
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const auth = await verifyPlatformAdmin(request)
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
-  if (!hasServiceRoleKey()) return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY nije postavljen.' }, { status: 503 })
+  if (!hasServiceRoleKey()) return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_SECRET nije postavljen.' }, { status: 503 })
 
   const admin = getServerSupabaseClient()
   if (!admin) return NextResponse.json({ error: 'Supabase env nedostaje.' }, { status: 500 })
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const auth = await verifyPlatformAdmin(request)
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
-  if (!hasServiceRoleKey()) return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY nije postavljen.' }, { status: 503 })
+  if (!hasServiceRoleKey()) return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_SECRET nije postavljen.' }, { status: 503 })
 
   const admin = getServerSupabaseClient()
   if (!admin) return NextResponse.json({ error: 'Supabase env nedostaje.' }, { status: 500 })
@@ -89,7 +89,7 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   const auth = await verifyPlatformAdmin(request)
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
-  if (!hasServiceRoleKey()) return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY nije postavljen.' }, { status: 503 })
+  if (!hasServiceRoleKey()) return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_SECRET nije postavljen.' }, { status: 503 })
 
   const admin = getServerSupabaseClient()
   if (!admin) return NextResponse.json({ error: 'Supabase env nedostaje.' }, { status: 500 })

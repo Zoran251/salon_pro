@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { getPublicSupabaseEnv } from '@/lib/env-supabase'
 
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_SECRET
 
 /** Server-side client: prefers service role za RLS; inače anon key. */
 export function getServerSupabaseClient(): SupabaseClient | null {
