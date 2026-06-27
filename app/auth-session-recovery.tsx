@@ -30,6 +30,7 @@ async function registrujPush() {
  * Takođe registruje Web Push pretplatu za prijavljene korisnike.
  */
 export function AuthSessionRecovery() {
+  console.log('[ASR] renderovan')
   useEffect(() => {
     const clearLocalAuth = () => void supabase.auth.signOut({ scope: 'local' })
 
@@ -61,5 +62,5 @@ export function AuthSessionRecovery() {
     }
   }, [])
 
-  return null
+  return <script dangerouslySetInnerHTML={{ __html: 'console.log("[ASR] renderovan sa null")' }} />
 }
