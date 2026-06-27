@@ -62,51 +62,60 @@ export async function GET(request: Request) {
         })
       }
 
-      // Pošalji push notifikaciju
-      // Prvo probaj po client_id
+      // Pošalji push notifikaciju klijentu
       if (termin.client_id) {
-        const { data: tokens } = await srv
-          .from('device_tokens')
-          .select('endpoint, auth_key, p256dh_key')
-          .eq('user_id', termin.client_id)
-          .not('endpoint', 'is', null)
+        // Prvo dohvati auth_user_id iz salon_clients (termini.client_id je salon_clients.id)
+        const { data: klijentAuth } = await srv
+          .from('salon_clients')
+          .select('auth_user_id')
+          .eq('id', termin.client_id)
+          .maybeSingle()
 
-        if (tokens && tokens.length > 0) {
-          const result = await sendPushToSubscriptions(
-            tokens as Array<{ endpoint: string; auth_key: string; p256dh_key: string }>,
-            {
-              title: `Podsjetnik — ${salonNaziv}`,
-              body: 'Vaš termin je za 1h, hvala vam što koristite naše usluge.',
-              url: `/salon/${termin.salon_id}`,
-            },
-            async (endpoint) => {
-              await srv.from('device_tokens').delete().eq('endpoint', endpoint)
-            },
-          )
+        const authUserId = klijentAuth?.auth_user_id
+        if (authUserId) {
+          const { data: tokens } = await srv
+            .from('device_tokens')
+            .select('endpoint, auth_key, p256dh_key')
+            .eq('user_id', authUserId)
+            .not('endpoint', 'is', null)
 
-          // Ako nema push subscriptiona, probaj preko FCM (backward compatibility)
-          if (result.sent === 0 && termin.client_id) {
-            const { data: fcmTokens } = await srv
-              .from('device_tokens')
-              .select('token')
-              .eq('user_id', termin.client_id)
-              .is('endpoint', null)
+          if (tokens && tokens.length > 0) {
+            const result = await sendPushToSubscriptions(
+              tokens as Array<{ endpoint: string; auth_key: string; p256dh_key: string }>,
+              {
+                title: `Podsjetnik — ${salonNaziv}`,
+                body: 'Vaš termin je za 1h, hvala vam što koristite naše usluge.',
+                url: `/salon/${termin.salon_id}`,
+              },
+              async (endpoint) => {
+                await srv.from('device_tokens').delete().eq('endpoint', endpoint)
+              },
+            )
 
-            if (fcmTokens && fcmTokens.length > 0) {
-              try {
-                const { sendMulticastNotification } = await import('@/lib/notifications/firebase-config')
-                await sendMulticastNotification(
-                  fcmTokens.map(t => t.token).filter(Boolean) as string[],
-                  `Podsjetnik — ${salonNaziv}`,
-                  'Vaš termin je za 1h, hvala vam što koristite naše usluge.',
-                  { type: 'appointment_reminder', salon_id: termin.salon_id, termin_id: termin.id },
-                )
-                sentCount++
-              } catch { /* silent */ }
+            // Ako nema web push subscriptiona, probaj preko FCM (backward compatibility)
+            if (result.sent === 0 && authUserId) {
+              const { data: fcmTokens } = await srv
+                .from('device_tokens')
+                .select('token')
+                .eq('user_id', authUserId)
+                .is('endpoint', null)
+
+              if (fcmTokens && fcmTokens.length > 0) {
+                try {
+                  const { sendMulticastNotification } = await import('@/lib/notifications/firebase-config')
+                  await sendMulticastNotification(
+                    fcmTokens.map(t => t.token).filter(Boolean) as string[],
+                    `Podsjetnik — ${salonNaziv}`,
+                    'Vaš termin je za 1h, hvala vam što koristite naše usluge.',
+                    { type: 'appointment_reminder', salon_id: termin.salon_id, termin_id: termin.id },
+                  )
+                  sentCount++
+                } catch { /* silent */ }
+              }
             }
-          }
 
-          sentCount += result.sent
+            sentCount += result.sent
+          }
         }
       }
 
