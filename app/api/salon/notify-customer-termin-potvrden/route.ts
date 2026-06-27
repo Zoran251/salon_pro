@@ -147,7 +147,7 @@ export async function POST(request: Request) {
       : String(termin.ime_klijenta || 'korisniče')
 
   const upozorenjeCrnaLista =
-    'Termin vam je potvrđen. Ukoliko dođe do izmena obavite ih najkasnije 6 sati pre vašeg termina kako bi izbegli blokiranje naloga. Zahvalan vam je Salon pro, odgovornost čini razliku.'
+    'Vaš termin je potvrđen, ukoliko trebate izmjeniti nešto uradite to najkasnije 6h prije termina.'
 
   const text = [
     `Poštovani/a ${imeK},`,
@@ -184,8 +184,7 @@ export async function POST(request: Request) {
           .eq('user_id', authUserId)
         const deviceTokens = (tokens || []).map(t => t.token).filter(Boolean) as string[]
         if (deviceTokens.length > 0) {
-          const pushBody = `${uslugaNaziv ? uslugaNaziv + ' — ' : ''}${when}`
-          void sendMulticastNotification(deviceTokens, `Termin potvrđen ✓ — ${salonNaziv}`, pushBody, {
+          void sendMulticastNotification(deviceTokens, `Termin potvrđen — ${salonNaziv}`, 'Vaš termin je potvrđen, ukoliko trebate izmjeniti nešto uradite to najkasnije 6h prije termina.', {
             type: 'appointment_confirmed',
             salon_id: salonId,
             termin_id: terminId,

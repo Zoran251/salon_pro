@@ -16,15 +16,21 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const deviceToken = typeof body.token === 'string' ? body.token.trim() : ''
-    if (!deviceToken) return NextResponse.json({ error: 'Nedostaje device token.' }, { status: 400 })
+    const endpoint = typeof body.endpoint === 'string' ? body.endpoint.trim() : ''
+
+    if (!endpoint) return NextResponse.json({ error: 'Nedostaje endpoint.' }, { status: 400 })
 
     const userClient = createClient(url, anonKey, {
       auth: { persistSession: false, autoRefreshToken: false },
       global: { headers: { Authorization: `Bearer ${token}` } },
     })
 
-    const { error } = await userClient.from('device_tokens').delete().eq('token', deviceToken).eq('user_id', user.id)
+    const { error } = await userClient
+      .from('device_tokens')
+      .delete()
+      .eq('endpoint', endpoint)
+      .eq('user_id', user.id)
+
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
     return NextResponse.json({ success: true })

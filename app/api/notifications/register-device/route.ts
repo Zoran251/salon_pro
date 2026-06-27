@@ -16,26 +16,54 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const deviceToken = typeof body.token === 'string' ? body.token.trim() : ''
-    const platform = typeof body.platform === 'string' ? body.platform.trim() : 'web'
+    const endpoint = typeof body.endpoint === 'string' ? body.endpoint.trim() : ''
+    const authKey = typeof body.auth_key === 'string' ? body.auth_key.trim() : ''
+    const p256dhKey = typeof body.p256dh_key === 'string' ? body.p256dh_key.trim() : ''
     const salonId = typeof body.salon_id === 'string' ? body.salon_id.trim() : null
 
-    if (!deviceToken) return NextResponse.json({ error: 'Nedostaje device token.' }, { status: 400 })
+    if (!endpoint) return NextResponse.json({ error: 'Nedostaje endpoint.' }, { status: 400 })
 
     const userClient = createClient(url, anonKey, {
       auth: { persistSession: false, autoRefreshToken: false },
       global: { headers: { Authorization: `Bearer ${token}` } },
     })
 
-    const { error } = await userClient.from('device_tokens').upsert({
-      user_id: user.id,
-      token: deviceToken,
-      platform,
-      salon_id: salonId,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'token', ignoreDuplicates: false })
+    // Provjeri da li subscription već postoji po endpointu
+    const { data: existing } = await userClient
+      .from('device_tokens')
+      .select('id')
+      .eq('endpoint', endpoint)
+      .maybeSingle()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (existing) {
+      // Ažuriraj postojeći
+      const { error } = await userClient
+        .from('device_tokens')
+        .update({
+          auth_key: authKey,
+          p256dh_key: p256dhKey,
+          user_id: user.id,
+          salon_id: salonId,
+          platform: 'web',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id)
+
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    } else {
+      // Novi subscription
+      const { error } = await userClient.from('device_tokens').insert({
+        user_id: user.id,
+        token: endpoint,
+        endpoint,
+        auth_key: authKey,
+        p256dh_key: p256dhKey,
+        platform: 'web',
+        salon_id: salonId,
+      })
+
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    }
 
     return NextResponse.json({ success: true })
   } catch (e) {

@@ -72,6 +72,12 @@ export default async function RootLayout({
             __html: `window.__SALON_SUPABASE__=${supabaseBootstrap};window.__GOOGLE_MAPS_EMBED_KEY__=${mapsKey};`,
           }}
         />
+        <script
+          nonce={nonce}
+          dangerouslySetInnerHTML={{
+            __html: `if('serviceWorker'in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(function(e){console.error('[sw]',e)})})}`,
+          }}
+        />
       </head>
       <body className="min-h-full flex flex-col">
         <AuthSessionRecovery />

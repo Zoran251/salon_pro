@@ -79,7 +79,7 @@ export async function notifyAppointmentConfirmed(params: {
       ...(params.uslugaNaziv ? [`Usluga: ${params.uslugaNaziv}`] : []),
       `Datum i vrijeme: ${when}`,
       '',
-      'Hvala na povjerenju!',
+      'Vaš termin je potvrđen, ukoliko trebate izmjeniti nešto uradite to najkasnije 6h prije termina.',
       '— SalonPro',
     ].join('\n')
 
@@ -95,8 +95,8 @@ export async function notifyAppointmentConfirmed(params: {
     if (klijentTokens.length > 0) {
       await sendMulticastNotification(
         klijentTokens,
-        `Termin potvrđen ✓ — ${params.salonNaziv}`,
-        `${params.uslugaNaziv || 'Termin'} na ${when}`,
+        `Termin potvrđen — ${params.salonNaziv}`,
+        'Vaš termin je potvrđen, ukoliko trebate izmjeniti nešto uradite to najkasnije 6h prije termina.',
         { type: 'appointment_confirmed', salon_id: params.salonId },
       )
     }

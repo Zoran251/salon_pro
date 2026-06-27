@@ -21,8 +21,8 @@ export const pushNotificationTemplates = {
     void dateTime
     void serviceName
     return {
-      title: `Termin vam je potvrđen — ${salonName}`,
-      body: 'Termin vam je potvrđen. Ukoliko dođe do izmena obavite ih najkasnije 6 sati pre vašeg termina kako bi izbegli blokiranje naloga. Zahvalan vam je Salon pro, odgovornost čini razliku.',
+      title: `Termin potvrđen — ${salonName}`,
+      body: 'Vaš termin je potvrđen, ukoliko trebate izmjeniti nešto uradite to najkasnije 6h prije termina.',
       data: {
         type: 'appointment_confirmed',
         action: 'open_appointment',
@@ -68,8 +68,8 @@ export const pushNotificationTemplates = {
     salonName: string,
     timeUntilAppointment: string
   ): NotificationTemplate => ({
-    title: 'Podsetnik: Termin uskoro! ⏰',
-    body: `${salonName} - ${timeUntilAppointment}`,
+    title: `Podsjetnik — ${salonName}`,
+    body: 'Vaš termin je za 1h, hvala vam što koristite naše usluge.',
     data: {
       type: 'appointment_reminder',
       action: 'view_appointment',
@@ -182,9 +182,7 @@ Salon: ${salonName}
 Usluga: ${serviceName}
 Datum i vreme: ${dateTime}
 
-Ukoliko dođe do izmena obavite ih najkasnije 6 sati pre vašeg termina kako bi izbegli blokiranje naloga. Za promene odgovorite na poruku ili pozovite ${salonPhone}.
-
-Zahvalan vam je Salon pro, odgovornost čini razliku.
+Vaš termin je potvrđen, ukoliko trebate izmjeniti nešto uradite to najkasnije 6h prije termina.
 `,
 
   /**
@@ -231,13 +229,13 @@ Možete zakazati novi termin kapljom aplikacije ili poziva salon.
     dateTime: string,
     serviceName: string
   ): string => `
-⏰ Podsetnik: Vaš termin je uskoro!
+⏰ Vaš termin je za 1h!
 
 Salon: ${salonName}
 Usluga: ${serviceName}
 Vreme: ${dateTime}
 
-Molimo vas da stignet na vreme. Ako ne možete da dođete, otkazite termin.
+Hvala vam što koristite naše usluge.
 `,
 
   /**
