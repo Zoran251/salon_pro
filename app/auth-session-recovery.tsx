@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { isInvalidRefreshTokenError } from '@/lib/auth-refresh-errors'
+import { waitForClientSession } from '@/lib/wait-client-session'
 
 async function registrujPush() {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) return
@@ -12,7 +13,7 @@ async function registrujPush() {
     if (reg) {
       const sub = await subscribeToPush(reg)
       if (sub) {
-        const { data: { session } } = await supabase.auth.getSession()
+        const session = await waitForClientSession()
         if (session?.access_token) {
           await sendSubscriptionToServer(sub, session.access_token)
         }
@@ -29,15 +30,12 @@ async function registrujPush() {
  * Takođe registruje Web Push pretplatu za prijavljene korisnike.
  */
 export function AuthSessionRecovery() {
-  const registrovan = useRef(false)
-
   useEffect(() => {
     const clearLocalAuth = () => void supabase.auth.signOut({ scope: 'local' })
 
     void supabase.auth.getSession().then(({ data, error }) => {
       if (error && isInvalidRefreshTokenError(error.message)) clearLocalAuth()
-      if (data.session?.user && !registrovan.current) {
-        registrovan.current = true
+      if (data.session?.user) {
         void registrujPush()
       }
     })
@@ -49,13 +47,18 @@ export function AuthSessionRecovery() {
       if ((event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') && !session) {
         clearLocalAuth()
       }
-      if (session?.user && !registrovan.current) {
-        registrovan.current = true
+      if (session?.user) {
         void registrujPush()
       }
     })
 
-    return () => subscription.unsubscribe()
+    // Fallback: probaj za 5s ako session još nije bio dostupan
+    const timer = setTimeout(() => void registrujPush(), 5000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timer)
+    }
   }, [])
 
   return null
