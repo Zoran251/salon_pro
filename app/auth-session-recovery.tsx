@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { isInvalidRefreshTokenError } from '@/lib/auth-refresh-errors'
 
-async function registrujPush(sessionUserId: string) {
+async function registrujPush() {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) return
   try {
     const { registerServiceWorker, subscribeToPush, sendSubscriptionToServer } = await import('@/lib/web-push/client')
@@ -14,7 +14,7 @@ async function registrujPush(sessionUserId: string) {
       if (sub) {
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.access_token) {
-          await sendSubscriptionToServer(sub, session.access_token, sessionUserId)
+          await sendSubscriptionToServer(sub, session.access_token)
         }
       }
     }
@@ -38,7 +38,7 @@ export function AuthSessionRecovery() {
       if (error && isInvalidRefreshTokenError(error.message)) clearLocalAuth()
       if (data.session?.user && !registrovan.current) {
         registrovan.current = true
-        void registrujPush(data.session.user.id)
+        void registrujPush()
       }
     })
 
@@ -51,7 +51,7 @@ export function AuthSessionRecovery() {
       }
       if (session?.user && !registrovan.current) {
         registrovan.current = true
-        void registrujPush(session.user.id)
+        void registrujPush()
       }
     })
 
