@@ -69,6 +69,7 @@ export default function AdminPage() {
   const [greska, setGreska] = useState('')
   const [uspjeh, setUspjeh] = useState('')
   const [cuvanje, setCuvanje] = useState(false)
+  const [jeNovi, setJeNovi] = useState(false)
 
   const gold = '#d4af37'
   const goldBorder = 'rgba(212,175,55,.25)'
@@ -107,6 +108,7 @@ export default function AdminPage() {
 
   const promijeniTabelu = async (tab: AdminTab) => {
     setAktivnaTabela(tab)
+    setJeNovi(false)
     setGreska('')
     setUspjeh('')
     try {
@@ -121,12 +123,14 @@ export default function AdminPage() {
       flat[k] = v === null || v === undefined ? '' : String(v)
     }
     setForma(flat)
+    setJeNovi(false)
     setGreska('')
     setUspjeh('')
   }
 
   const noviRed = () => {
     setForma({})
+    setJeNovi(true)
     setGreska('')
     setUspjeh('')
   }
@@ -254,7 +258,7 @@ export default function AdminPage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {Object.keys(forma).length === 0 && !podaci.some(r => r.id === forma.id) ? (
+            {Object.keys(forma).length === 0 && !jeNovi && !podaci.some(r => r.id === forma.id) ? (
               <div style={{ ...cardStyle, textAlign: 'center', padding: '48px 24px' }}>
                 <div style={{ fontSize: '32px', marginBottom: '12px' }}>📋</div>
                 <p style={{ color: muted, fontSize: '14px' }}>Izaberite red za uređivanje ili kreirajte novi.</p>
