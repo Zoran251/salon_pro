@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -70,6 +70,8 @@ export default function AdminPage() {
   const [uspjeh, setUspjeh] = useState('')
   const [cuvanje, setCuvanje] = useState(false)
   const [jeNovi, setJeNovi] = useState(false)
+  const [selektovanSalon, setSelektovanSalon] = useState<{ id: string; naziv: string } | null>(null)
+  const selektovanSalonRef = useRef<{ id: string; naziv: string } | null>(null)
 
   const gold = '#d4af37'
   const goldBorder = 'rgba(212,175,55,.25)'
@@ -83,9 +85,17 @@ export default function AdminPage() {
   const ucitajPodatke = useCallback(async (token: string, tabela: string) => {
     const data = await apiGet(token, tabela)
     setPodaci(data)
-    setForma({})
     setGreska('')
     setUspjeh('')
+    if (tabela === 'saloni') {
+      setForma({})
+      setSelektovanSalon(null)
+      selektovanSalonRef.current = null
+    } else if (selektovanSalonRef.current) {
+      setForma({ salon_id: selektovanSalonRef.current.id })
+    } else {
+      setForma({})
+    }
   }, [])
 
   useEffect(() => {
@@ -104,7 +114,8 @@ export default function AdminPage() {
     }
     void init()
     return () => { cancelled = true }
-  }, [router, ucitajPodatke])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router])
 
   const promijeniTabelu = async (tab: AdminTab) => {
     setAktivnaTabela(tab)
@@ -126,10 +137,19 @@ export default function AdminPage() {
     setJeNovi(false)
     setGreska('')
     setUspjeh('')
+    if (aktivnaTabela === 'saloni') {
+      const s = { id: String(row.id), naziv: String((row as Record<string, unknown>).naziv || row.id) }
+      setSelektovanSalon(s)
+      selektovanSalonRef.current = s
+    }
   }
 
   const noviRed = () => {
-    setForma({})
+    if (aktivnaTabela !== 'saloni' && selektovanSalonRef.current) {
+      setForma({ salon_id: selektovanSalonRef.current.id })
+    } else {
+      setForma({})
+    }
     setJeNovi(true)
     setGreska('')
     setUspjeh('')
@@ -229,6 +249,11 @@ export default function AdminPage() {
 
         {greska && <div style={{ background: 'rgba(220,50,50,.1)', border: '0.5px solid rgba(220,50,50,.3)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: '#ff6b6b' }}>{greska}</div>}
         {uspjeh && <div style={{ background: 'rgba(50,200,100,.1)', border: '0.5px solid rgba(50,200,100,.3)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: '#4caf81' }}>{uspjeh}</div>}
+        {aktivnaTabela !== 'saloni' && selektovanSalon && (
+          <div style={{ background: 'rgba(212,175,55,.06)', border: `0.5px solid ${goldBorder}`, borderRadius: '12px', padding: '10px 16px', fontSize: '13px', color: gold }}>
+            Salon: <strong>{selektovanSalon.naziv}</strong> ({selektovanSalon.id.slice(0, 8)}…)
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) minmax(400px, 1.5fr)', gap: '20px' }}>
           <div style={cardStyle}>
