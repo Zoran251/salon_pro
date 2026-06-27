@@ -7,7 +7,7 @@ import { SUPABASE_PUBLIC_ENV_MISSING } from '@/lib/supabase-service-role-hint'
 import { getAppRole } from '@/lib/user-role'
 import { formatDatumVrijemeBelgrad } from '@/lib/termin-belgrade-vreme'
 import { getServerSupabaseClient } from '@/lib/server-supabase'
-import { sendPushNotification, sendMulticastNotification } from '@/lib/notifications/firebase-config'
+import { sendPushToSubscriptions } from '@/lib/web-push/server'
 
 function getAnonClient() {
   const { url: supabaseUrl, anonKey: supabaseAnonKey, ok } = getPublicSupabaseEnv()
@@ -172,23 +172,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Slanje mejla nije uspelo.' }, { status: 502 })
   }
 
-  // Push notifikacija klijentu preko Firebase (ako je konfigurisano)
+  // Push notifikacija klijentu preko Web Push
   const authUserId = typeof klijent?.auth_user_id === 'string' ? klijent.auth_user_id : null
   if (authUserId) {
     try {
       const serverClient = getServerSupabaseClient()
       if (serverClient) {
-        const { data: tokens } = await serverClient
+        const { data: subscriptions } = await serverClient
           .from('device_tokens')
-          .select('token')
+          .select('endpoint, auth_key, p256dh_key')
           .eq('user_id', authUserId)
-        const deviceTokens = (tokens || []).map(t => t.token).filter(Boolean) as string[]
-        if (deviceTokens.length > 0) {
-          void sendMulticastNotification(deviceTokens, `Termin potvrđen — ${salonNaziv}`, 'Vaš termin je potvrđen, ukoliko trebate izmjeniti nešto uradite to najkasnije 6h prije termina.', {
-            type: 'appointment_confirmed',
-            salon_id: salonId,
-            termin_id: terminId,
-          })
+          .not('endpoint', 'is', null)
+        if (subscriptions && subscriptions.length > 0) {
+          await sendPushToSubscriptions(
+            subscriptions as Array<{ endpoint: string; auth_key: string; p256dh_key: string }>,
+            {
+              title: `Termin potvrđen — ${salonNaziv}`,
+              body: 'Vaš termin je potvrđen, ukoliko trebate izmjeniti nešto uradite to najkasnije 6h prije termina.',
+              url: `/salon/${salonId}`,
+            },
+            async (endpoint) => {
+              await serverClient.from('device_tokens').delete().eq('endpoint', endpoint)
+            },
+          )
         }
       }
     } catch (pushErr) {

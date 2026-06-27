@@ -347,6 +347,24 @@ export default function Dashboard() {
       loaded = true
       setAutentifikovan(true)
       await ucitajPodatke(userId)
+
+      ;(async () => {
+        try {
+          const { registerServiceWorker, subscribeToPush, sendSubscriptionToServer } = await import('@/lib/web-push/client')
+          const reg = await registerServiceWorker()
+          if (reg) {
+            const sub = await subscribeToPush(reg)
+            if (sub) {
+              const { data: { session } } = await supabase.auth.getSession()
+              if (session?.access_token) {
+                await sendSubscriptionToServer(sub, session.access_token, userId)
+              }
+            }
+          }
+        } catch (e) {
+          console.error('[push] Greška pri registraciji:', e)
+        }
+      })()
     }
 
     const {
