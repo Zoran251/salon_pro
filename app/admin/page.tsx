@@ -176,7 +176,7 @@ export default function AdminPage() {
     if (podaci.length === 0 && Object.keys(forma).length === 0) {
       const defaults: Record<AdminTab, string[]> = {
         saloni: ['id', 'naziv', 'slug', 'email', 'telefon', 'grad', 'tip', 'aktivan', 'opis', 'adresa', 'radno_od', 'radno_do', 'logo_url', 'boja_primarna', 'boja_sekundarna', 'boja_akcent', 'boja_font'],
-        usluge: ['id', 'salon_id', 'naziv', 'cijena', 'trajanje', 'opis', 'kategorija', 'aktivan'],
+        usluge: ['id', 'salon_id', 'naziv', 'cijena', 'trajanje', 'opis', 'kategorija', 'aktivan', 'slika_url'],
         lager: ['id', 'salon_id', 'naziv', 'kategorija', 'kolicina', 'minimum', 'jedinica'],
         termini: ['id', 'salon_id', 'client_id', 'zaposleni_id', 'usluga_id', 'ime_klijenta', 'telefon_klijenta', 'datum_vrijeme', 'napomena', 'status'],
         zaposleni: ['id', 'salon_id', 'ime', 'uloga', 'foto_url', 'aktivan'],
@@ -335,7 +335,39 @@ export default function AdminPage() {
                         )
                       }
 
+                      const isSlika = f === 'logo_url' || f === 'foto_url' || f === 'slika_url'
                       const isNumeric = f === 'cijena' || f === 'iznos' || f === 'kolicina' || f === 'minimum' || f === 'svaki_koji' || f === 'vrijednost' || f === 'trajanje'
+
+                      if (isSlika) {
+                        return (
+                          <div key={f} style={{ gridColumn: '1/-1' }}>
+                            <label style={labelStyle}>{f.toUpperCase()}</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                              {(forma[f]?.startsWith('data:image/') || forma[f]?.startsWith('http')) && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={forma[f]} alt="preview" style={{ width: '64px', height: '64px', borderRadius: '10px', objectFit: 'cover', border: `0.5px solid ${goldBorder}` }} />
+                              )}
+                              <label style={{ background: 'transparent', color: muted, border: `0.5px solid ${goldBorder}`, padding: '10px 16px', borderRadius: '10px', fontSize: '12px', cursor: 'pointer', display: 'inline-block', textAlign: 'center', fontFamily: 'sans-serif' }}>
+                                Izaberi fajl
+                                <input type="file" accept="image/*" style={{ display: 'none' }}
+                                  onChange={e => {
+                                    const file = e.target.files?.[0]
+                                    if (!file) return
+                                    if (file.size > 5 * 1024 * 1024) { alert('Maksimalna veličina je 5MB.'); return }
+                                    const reader = new FileReader()
+                                    reader.onload = ev => setForma({ ...forma, [f]: ev.target?.result as string })
+                                    reader.readAsDataURL(file)
+                                    e.target.value = ''
+                                  }} />
+                              </label>
+                              {forma[f] && (
+                                <button style={{ background: 'transparent', color: muted, border: `0.5px solid ${goldBorder}`, padding: '10px 12px', borderRadius: '10px', fontSize: '12px', cursor: 'pointer', fontFamily: 'sans-serif' }} onClick={() => setForma({ ...forma, [f]: '' })}>Ukloni</button>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      }
+
                       return (
                         <div key={f}>
                           <label style={labelStyle}>{f.toUpperCase()}</label>
