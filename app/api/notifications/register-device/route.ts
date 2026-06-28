@@ -51,10 +51,10 @@ export async function POST(request: Request) {
 
       if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     } else {
-      // Novi subscription
+      // Novi Web Push subscription (token se ostavlja null — legacy FCM)
       const { error } = await userClient.from('device_tokens').insert({
         user_id: user.id,
-        token: endpoint,
+        token: null,
         endpoint,
         auth_key: authKey,
         p256dh_key: p256dhKey,

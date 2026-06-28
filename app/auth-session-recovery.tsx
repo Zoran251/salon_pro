@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { isInvalidRefreshTokenError } from '@/lib/auth-refresh-errors'
 import { waitForClientSession } from '@/lib/wait-client-session'
@@ -24,21 +24,21 @@ async function registrujPush() {
   }
 }
 
-/**
- * Čisti oštećenu / isteklu sesiju u localStorage (npr. „Invalid Refresh Token: Refresh Token Not Found”).
- * Nije greška PostgreSQL veza — Auth token u pregledniku ne odgovara projektu na Supabase-u.
- * Takođe registruje Web Push pretplatu za prijavljene korisnike.
- */
 export function AuthSessionRecovery() {
-  console.log('[ASR] renderovan')
+  const registrovan = useRef(false)
+
   useEffect(() => {
     const clearLocalAuth = () => void supabase.auth.signOut({ scope: 'local' })
 
+    const pokreniRegistraciju = () => {
+      if (registrovan.current) return
+      registrovan.current = true
+      void registrujPush()
+    }
+
     void supabase.auth.getSession().then(({ data, error }) => {
       if (error && isInvalidRefreshTokenError(error.message)) clearLocalAuth()
-      if (data.session?.user) {
-        void registrujPush()
-      }
+      if (data.session?.user) pokreniRegistraciju()
     })
 
     const {
@@ -48,13 +48,10 @@ export function AuthSessionRecovery() {
       if ((event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') && !session) {
         clearLocalAuth()
       }
-      if (session?.user) {
-        void registrujPush()
-      }
+      if (session?.user) pokreniRegistraciju()
     })
 
-    // Fallback: probaj za 5s ako session još nije bio dostupan
-    const timer = setTimeout(() => void registrujPush(), 5000)
+    const timer = setTimeout(pokreniRegistraciju, 5000)
 
     return () => {
       subscription.unsubscribe()
@@ -62,5 +59,5 @@ export function AuthSessionRecovery() {
     }
   }, [])
 
-  return <script dangerouslySetInnerHTML={{ __html: 'console.log("[ASR] renderovan sa null")' }} />
+  return null
 }
