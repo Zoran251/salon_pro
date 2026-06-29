@@ -42,54 +42,14 @@ function classifyTerminPoslovnaGreška(msg: string): 'radno' | 'preklapanje' | n
   return null
 }
 
-async function pronadjiAlternativneTermine(
+async function pronadjiZauzeteTermine(
   supabase: ReturnType<typeof createClient>,
   salon_id: string,
   datumStr: string,
-  requestedTimeIso: string,
   zaposleni_id: string | null,
 ): Promise<string[]> {
   try {
-    const { data: salon } = await supabase
-      .from('saloni')
-      .select('radno_od, radno_do, radni_dani_od, radni_dani_do, subota_od, subota_do, nedelja_od, nedelja_do, nedelja_zatvoreno')
-      .eq('id', salon_id)
-      .single()
-
-    if (!salon) return []
-
     const datum = datumStr.split('T')[0]
-    const datumDate = new Date(datum + 'T12:00:00+02:00')
-    const dow = datumDate.getDay()
-
-    if (dow === 0 && salon.nedelja_zatvoreno) return []
-
-    let od: string | null = null
-    let do_: string | null = null
-
-    if (dow === 0) {
-      od = salon.nedelja_od || salon.radno_od || null
-      do_ = salon.nedelja_do || salon.radno_do || null
-    } else if (dow === 6) {
-      od = salon.subota_od || salon.radni_dani_od || salon.radno_od || null
-      do_ = salon.subota_do || salon.radni_dani_do || salon.radno_do || null
-    } else {
-      od = salon.radni_dani_od || salon.radno_od || null
-      do_ = salon.radni_dani_do || salon.radno_do || null
-    }
-
-    if (!od || !do_) return []
-
-    const [oh, om] = od.split(':').map(Number)
-    const [dh, dm] = do_.split(':').map(Number)
-    const otvorenoMin = oh * 60 + (om || 0)
-    const zatvorenoMin = dh * 60 + (dm || 0)
-    if (zatvorenoMin <= otvorenoMin) return []
-
-    const requestedDate = new Date(requestedTimeIso)
-    const requestedBeograd = new Date(requestedDate.toLocaleString('en-US', { timeZone: 'Europe/Belgrade' }))
-    const requestedMin = requestedBeograd.getHours() * 60 + requestedBeograd.getMinutes()
-
     const dayStart = datum + 'T00:00:00.000Z'
     const dayEnd = datum + 'T23:59:59.999Z'
 
@@ -106,31 +66,18 @@ async function pronadjiAlternativneTermine(
     }
 
     const { data: appointments } = await query
+    if (!appointments) return []
 
-    const bookedMinutes = new Set<number>()
-    if (appointments) {
-      for (const apt of appointments) {
-        const aptDate = new Date(apt.datum_vrijeme)
-        const aptBeograd = new Date(aptDate.toLocaleString('en-US', { timeZone: 'Europe/Belgrade' }))
-        const aptMin = aptBeograd.getHours() * 60 + aptBeograd.getMinutes()
-        const rounded = Math.floor(aptMin / 30) * 30
-        bookedMinutes.add(rounded)
-      }
+    const booked = new Set<string>()
+    for (const apt of appointments) {
+      const d = new Date(apt.datum_vrijeme)
+      const bg = new Date(d.toLocaleString('en-US', { timeZone: 'Europe/Belgrade' }))
+      const h = String(bg.getHours()).padStart(2, '0')
+      const m = String(bg.getMinutes()).padStart(2, '0')
+      booked.add(`${h}:${m}`)
     }
 
-    const alternatives: { time: string; diff: number }[] = []
-    for (let m = otvorenoMin; m < zatvorenoMin; m += 30) {
-      if (!bookedMinutes.has(m)) {
-        const h = Math.floor(m / 60)
-        const min = m % 60
-        const time = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`
-        const diff = Math.abs(m - requestedMin)
-        alternatives.push({ time, diff })
-      }
-    }
-
-    alternatives.sort((a, b) => a.diff - b.diff)
-    return alternatives.slice(0, 6).map(a => a.time)
+    return Array.from(booked).sort()
   } catch {
     return []
   }
@@ -430,14 +377,13 @@ export async function POST(request: Request) {
       )
     }
     if (biz === 'preklapanje') {
-      const alternatives = await pronadjiAlternativneTermine(
-        userClient, String(salon_id), String(datum_vrijeme), datumVrijemeStr, zaposleni_id ? String(zaposleni_id) : null,
+      const zauzeti = await pronadjiZauzeteTermine(
+        userClient, String(salon_id), String(datum_vrijeme), zaposleni_id ? String(zaposleni_id) : null,
       )
       return NextResponse.json(
         {
-          error: 'Željeni termin je zauzet. Izaberite jedan od slobodnih termina ispod.',
-          alternatives,
-          alternatives_slobodni: alternatives.length > 0,
+          error: 'Željeni termin je zauzet. Slobodni termini su oni koji nisu na spisku ispod.',
+          zauzeti_termini: zauzeti,
         },
         { status: 409 }
       )
@@ -487,14 +433,13 @@ export async function POST(request: Request) {
         )
       }
       if (legacyBiz === 'preklapanje') {
-        const alternatives = await pronadjiAlternativneTermine(
-          userClient, String(salon_id), String(datum_vrijeme), datumVrijemeStr, null,
+        const zauzeti = await pronadjiZauzeteTermine(
+          userClient, String(salon_id), String(datum_vrijeme), null,
         )
         return NextResponse.json(
           {
-            error: 'Željeni termin je zauzet. Izaberite jedan od slobodnih termina ispod.',
-            alternatives,
-            alternatives_slobodni: alternatives.length > 0,
+            error: 'Željeni termin je zauzet. Slobodni termini su oni koji nisu na spisku ispod.',
+            zauzeti_termini: zauzeti,
           },
           { status: 409 }
         )

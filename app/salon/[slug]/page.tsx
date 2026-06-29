@@ -210,7 +210,7 @@ export default function SalonLanding() {
   /** Poslednja greška GET /api/clients/me (npr. nalog nije povezan sa salonom). */
   const [clientMeError, setClientMeError] = useState('')
   const [forma, setForma] = useState({ ime: '', telefon: '', datum: '', vrijeme: '', zaposleni_id: '', napomena: '' })
-  const [alternativeTimes, setAlternativeTimes] = useState<string[]>([])
+  const [zauzetiTermini, setZauzetiTermini] = useState<string[]>([])
   const [profilUredi, setProfilUredi] = useState(false)
   const [profilEdit, setProfilEdit] = useState({ ime: '', telefon: '', email: '' })
   const [profilSnimiLoading, setProfilSnimiLoading] = useState(false)
@@ -919,11 +919,11 @@ export default function SalonLanding() {
           ...(emailZaTermin ? { email: emailZaTermin } : {}),
         }),
       })
-      const data = (await res.json()) as { error?: string; success?: boolean; termin_id?: string | null; alternatives?: string[] }
+      const data = (await res.json()) as { error?: string; success?: boolean; termin_id?: string | null; zauzeti_termini?: string[] }
       if (data.error) {
         setGreska(data.error)
-        if (data.alternatives && data.alternatives.length > 0) {
-          setAlternativeTimes(data.alternatives)
+        if (data.zauzeti_termini && data.zauzeti_termini.length > 0) {
+          setZauzetiTermini(data.zauzeti_termini)
         }
         setLoading(false)
         return
@@ -2044,35 +2044,30 @@ export default function SalonLanding() {
                 ⚠️ {greska}
               </div>
             )}
-            {alternativeTimes.length > 0 && (
+            {zauzetiTermini.length > 0 && (
               <div style={{ marginBottom: '14px' }}>
                 <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.5)', marginBottom: '8px' }}>
-                  Slobodni termini za ovaj dan:
+                  Zauzeti termini za ovaj dan:
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {alternativeTimes.map((vrijeme) => (
-                    <button
+                  {zauzetiTermini.map((vrijeme) => (
+                    <span
                       key={vrijeme}
-                      type="button"
-                      onClick={() => {
-                        setForma({ ...forma, vrijeme })
-                        setGreska('')
-                        setAlternativeTimes([])
-                      }}
                       style={{
-                        background: `${goldFaint}`,
-                        border: `0.5px solid ${goldBorder}`,
+                        background: 'rgba(220,50,50,.15)',
+                        border: '0.5px solid rgba(220,50,50,.3)',
                         borderRadius: '8px',
                         padding: '8px 14px',
-                        color: gold,
+                        color: '#ff6b6b',
                         fontSize: '13px',
-                        cursor: 'pointer',
-                        fontFamily: 'sans-serif',
                       }}
                     >
                       {vrijeme}
-                    </button>
+                    </span>
                   ))}
+                </div>
+                <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.4)', marginTop: '10px' }}>
+                  Izaberite vrijeme koje nije na spisku iznad i pokušajte ponovo.
                 </div>
               </div>
             )}
