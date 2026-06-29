@@ -919,11 +919,12 @@ export default function SalonLanding() {
           ...(emailZaTermin ? { email: emailZaTermin } : {}),
         }),
       })
-      const data = (await res.json()) as { error?: string; success?: boolean; termin_id?: string | null; zauzeti_termini?: string[] }
+      type PostOdg = { error?: string; success?: boolean; termin_id?: string | null; alternative_times?: string[] }
+      const data = (await res.json()) as PostOdg
       if (data.error) {
         setGreska(data.error)
-        if (data.zauzeti_termini && data.zauzeti_termini.length > 0) {
-          setZauzetiTermini(data.zauzeti_termini)
+        if (data.alternative_times && data.alternative_times.length > 0) {
+          setZauzetiTermini(data.alternative_times)
         }
         setLoading(false)
         return
@@ -2047,27 +2048,32 @@ export default function SalonLanding() {
             {zauzetiTermini.length > 0 && (
               <div style={{ marginBottom: '14px' }}>
                 <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.5)', marginBottom: '8px' }}>
-                  Zauzeti termini za ovaj dan:
+                  Predlažemo sljedeće slobodne termine:
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   {zauzetiTermini.map((vrijeme) => (
-                    <span
+                    <button
                       key={vrijeme}
+                      type="button"
+                      onClick={() => {
+                        setForma({ ...forma, vrijeme })
+                        setGreska('')
+                        setZauzetiTermini([])
+                      }}
                       style={{
-                        background: 'rgba(220,50,50,.15)',
-                        border: '0.5px solid rgba(220,50,50,.3)',
+                        background: `${goldFaint}`,
+                        border: `0.5px solid ${goldBorder}`,
                         borderRadius: '8px',
                         padding: '8px 14px',
-                        color: '#ff6b6b',
+                        color: gold,
                         fontSize: '13px',
+                        cursor: 'pointer',
+                        fontFamily: 'sans-serif',
                       }}
                     >
                       {vrijeme}
-                    </span>
+                    </button>
                   ))}
-                </div>
-                <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.4)', marginTop: '10px' }}>
-                  Izaberite vrijeme koje nije na spisku iznad i pokušajte ponovo.
                 </div>
               </div>
             )}
