@@ -210,6 +210,7 @@ export default function SalonLanding() {
   /** Poslednja greška GET /api/clients/me (npr. nalog nije povezan sa salonom). */
   const [clientMeError, setClientMeError] = useState('')
   const [forma, setForma] = useState({ ime: '', telefon: '', datum: '', vrijeme: '', zaposleni_id: '', napomena: '' })
+  const [alternativeTimes, setAlternativeTimes] = useState<string[]>([])
   const [profilUredi, setProfilUredi] = useState(false)
   const [profilEdit, setProfilEdit] = useState({ ime: '', telefon: '', email: '' })
   const [profilSnimiLoading, setProfilSnimiLoading] = useState(false)
@@ -889,6 +890,7 @@ export default function SalonLanding() {
     }
     setLoading(true)
     setGreska('')
+    setAlternativeTimes([])
     try {
       const datumVrijeme =
         naivniBelgradDatumVremeUUtcIso(`${forma.datum}T${forma.vrijeme}:00`) ??
@@ -917,9 +919,12 @@ export default function SalonLanding() {
           ...(emailZaTermin ? { email: emailZaTermin } : {}),
         }),
       })
-      const data = (await res.json()) as { error?: string; success?: boolean; termin_id?: string | null }
+      const data = (await res.json()) as { error?: string; success?: boolean; termin_id?: string | null; alternatives?: string[] }
       if (data.error) {
         setGreska(data.error)
+        if (data.alternatives && data.alternatives.length > 0) {
+          setAlternativeTimes(data.alternatives)
+        }
         setLoading(false)
         return
       }
@@ -2037,6 +2042,38 @@ export default function SalonLanding() {
             {greska && (
               <div style={{ background: 'rgba(220,50,50,.1)', border: '0.5px solid rgba(220,50,50,.3)', borderRadius: '10px', padding: '12px 16px', marginBottom: '14px', fontSize: '13px', color: '#ff6b6b' }}>
                 ⚠️ {greska}
+              </div>
+            )}
+            {alternativeTimes.length > 0 && (
+              <div style={{ marginBottom: '14px' }}>
+                <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.5)', marginBottom: '8px' }}>
+                  Slobodni termini za ovaj dan:
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {alternativeTimes.map((vrijeme) => (
+                    <button
+                      key={vrijeme}
+                      type="button"
+                      onClick={() => {
+                        setForma({ ...forma, vrijeme })
+                        setGreska('')
+                        setAlternativeTimes([])
+                      }}
+                      style={{
+                        background: `${goldFaint}`,
+                        border: `0.5px solid ${goldBorder}`,
+                        borderRadius: '8px',
+                        padding: '8px 14px',
+                        color: gold,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        fontFamily: 'sans-serif',
+                      }}
+                    >
+                      {vrijeme}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
