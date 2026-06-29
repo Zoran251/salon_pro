@@ -211,6 +211,7 @@ export default function SalonLanding() {
   const [clientMeError, setClientMeError] = useState('')
   const [forma, setForma] = useState({ ime: '', telefon: '', datum: '', vrijeme: '', zaposleni_id: '', napomena: '' })
   const [zauzetiTermini, setZauzetiTermini] = useState<string[]>([])
+  const [dostupniTermini, setDostupniTermini] = useState<string[]>([])
   const [profilUredi, setProfilUredi] = useState(false)
   const [profilEdit, setProfilEdit] = useState({ ime: '', telefon: '', email: '' })
   const [profilSnimiLoading, setProfilSnimiLoading] = useState(false)
@@ -365,6 +366,55 @@ export default function SalonLanding() {
 
     fetchSalon()
   }, [slug])
+
+  // Generiši dostupne termine kad se promijeni datum ili usluga
+  useEffect(() => {
+    if (!salon || !forma.datum || !odabranaUsluga) {
+      setDostupniTermini([])
+      return
+    }
+
+    const trajanje = Math.max(5, Math.min(480, odabranaUsluga.trajanje || 30))
+    const datum = new Date(forma.datum + 'T12:00:00+02:00')
+    const dow = datum.getDay()
+
+    if (dow === 0 && salon.nedelja_zatvoreno) {
+      setDostupniTermini([])
+      return
+    }
+
+    let od: string | null = null
+    let do_: string | null = null
+
+    if (dow === 0) {
+      od = salon.nedelja_od || salon.radno_od || null
+      do_ = salon.nedelja_do || salon.radno_do || null
+    } else if (dow === 6) {
+      od = salon.subota_od || salon.radni_dani_od || salon.radno_od || null
+      do_ = salon.subota_do || salon.radni_dani_do || salon.radno_do || null
+    } else {
+      od = salon.radni_dani_od || salon.radno_od || null
+      do_ = salon.radni_dani_do || salon.radno_do || null
+    }
+
+    if (!od || !do_) {
+      setDostupniTermini([])
+      return
+    }
+
+    const [oh, om] = od.split(':').map(Number)
+    const [dh, dm] = do_.split(':').map(Number)
+    const otvorenoMin = oh * 60 + (om || 0)
+    const zatvorenoMin = dh * 60 + (dm || 0)
+
+    const slots: string[] = []
+    for (let m = otvorenoMin; m + trajanje <= zatvorenoMin; m += 30) {
+      const h = Math.floor(m / 60)
+      const min = m % 60
+      slots.push(`${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`)
+    }
+    setDostupniTermini(slots)
+  }, [forma.datum, odabranaUsluga?.id, salon])
 
   useEffect(() => {
     if (!salon?.id) return
@@ -1976,7 +2026,6 @@ export default function SalonLanding() {
                 { label: 'IME I PREZIME *', key: 'ime', placeholder: 'Ana Marković', type: 'text' },
                 { label: 'TELEFON *', key: 'telefon', placeholder: '+381 60 000 000', type: 'tel' },
                 { label: 'DATUM *', key: 'datum', placeholder: '', type: 'date' },
-                { label: 'VREME *', key: 'vrijeme', placeholder: '', type: 'time' },
               ].map((f) => (
                 <div key={f.key}>
                   <label style={{ fontSize: '11px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '5px', letterSpacing: '.3px' }}>{f.label}</label>
@@ -1990,6 +2039,40 @@ export default function SalonLanding() {
                   />
                 </div>
               ))}
+              <div style={{ gridColumn: '1/-1' }}>
+                <label style={{ fontSize: '11px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '5px', letterSpacing: '.3px' }}>VREME *</label>
+                {dostupniTermini.length > 0 ? (
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {dostupniTermini.map((v) => {
+                      const selected = forma.vrijeme === v
+                      return (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => setForma({ ...forma, vrijeme: selected ? '' : v })}
+                          style={{
+                            background: selected ? gold : '#1a1a1a',
+                            border: selected ? `0.5px solid ${gold}` : '0.5px solid rgba(212,175,55,.2)',
+                            borderRadius: '8px',
+                            padding: '10px 14px',
+                            color: selected ? '#0a0a0a' : '#f5f0e8',
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            fontFamily: 'sans-serif',
+                            fontWeight: selected ? 600 : 400,
+                          }}
+                        >
+                          {v}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.3)', padding: '12px 14px' }}>
+                    {forma.datum && odabranaUsluga ? 'Nema slobodnih termina za ovaj dan.' : 'Izaberite datum i uslugu.'}
+                  </div>
+                )}
+              </div>
               {aktivniZaposleni.length > 0 && (
                 <div style={{ gridColumn: '1/-1' }}>
                   <label style={{ fontSize: '11px', color: 'rgba(245,240,232,.4)', display: 'block', marginBottom: '5px', letterSpacing: '.3px' }}>
