@@ -95,15 +95,17 @@ export async function GET(request: NextRequest) {
 
   const { data: appointments } = await query as any
 
+  const fmtTime = new Intl.DateTimeFormat('en', { hour: 'numeric', minute: 'numeric', hourCycle: 'h23', timeZone: 'Europe/Belgrade' })
+
   const bookedMinutes = new Set<number>()
   if (appointments) {
     for (const apt of appointments) {
       const d = new Date(apt.datum_vrijeme)
-      const bg = new Date(d.toLocaleString('en-US', { timeZone: 'Europe/Belgrade' }))
-      const startMin = bg.getHours() * 60 + bg.getMinutes()
+      const [h, m] = fmtTime.format(d).split(':').map(Number)
+      const startMin = h * 60 + (m || 0)
       const aptTrajanje = apt.usluga_id ? await getUslugaTrajanje(supabase, apt.usluga_id, salon_id) : 30
-      for (let m = startMin; m < startMin + aptTrajanje; m++) {
-        bookedMinutes.add(m)
+      for (let mm = startMin; mm < startMin + aptTrajanje; mm++) {
+        bookedMinutes.add(mm)
       }
     }
   }
