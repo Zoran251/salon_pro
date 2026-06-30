@@ -4,6 +4,17 @@ import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
+let trajanjeCache: Record<string, number> = {}
+
+async function getUslugaTrajanje(supabase: any, usluga_id: string, salon_id: string): Promise<number> {
+  const key = `${salon_id}_${usluga_id}`
+  if (trajanjeCache[key] !== undefined) return trajanjeCache[key]
+  const { data } = await supabase.from('usluge').select('trajanje').eq('id', usluga_id).eq('salon_id', salon_id).maybeSingle() as any
+  const t = data?.trajanje ? Math.max(5, Math.min(480, Number(data.trajanje))) : 30
+  trajanjeCache[key] = t
+  return t
+}
+
 export async function GET(request: NextRequest) {
   const salon_id = request.nextUrl.searchParams.get('salon_id')
   const datum = request.nextUrl.searchParams.get('datum')
@@ -72,7 +83,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from('termini')
-    .select('datum_vrijeme')
+    .select('datum_vrijeme, usluga_id')
     .eq('salon_id', salon_id)
     .gte('datum_vrijeme', dayStart)
     .lt('datum_vrijeme', dayEnd)
@@ -90,14 +101,15 @@ export async function GET(request: NextRequest) {
       const d = new Date(apt.datum_vrijeme)
       const bg = new Date(d.toLocaleString('en-US', { timeZone: 'Europe/Belgrade' }))
       const startMin = bg.getHours() * 60 + bg.getMinutes()
-      for (let m = startMin; m < startMin + trajanje; m++) {
+      const aptTrajanje = apt.usluga_id ? await getUslugaTrajanje(supabase, apt.usluga_id, salon_id) : 30
+      for (let m = startMin; m < startMin + aptTrajanje; m++) {
         bookedMinutes.add(m)
       }
     }
   }
 
   const available: string[] = []
-  for (let m = otvorenoMin; m + trajanje <= zatvorenoMin; m += 30) {
+  for (let m = otvorenoMin; m + trajanje <= zatvorenoMin; m += trajanje) {
     let preklapaSe = false
     for (let offset = 0; offset < trajanje; offset++) {
       if (bookedMinutes.has(m + offset)) {
