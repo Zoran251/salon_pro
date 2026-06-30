@@ -780,12 +780,15 @@ export default function Dashboard() {
       if (!error) {
         setSacuvano('profil')
         setTimeout(() => setSacuvano(''), 3000)
-        console.log('Profil sačuvan!')
       } else {
         console.error('Greška pri čuvanju:', error)
+        setSacuvano('greska')
+        setTimeout(() => setSacuvano(''), 4000)
       }
     } catch (err) {
       console.error('Catch error:', err)
+      setSacuvano('greska')
+      setTimeout(() => setSacuvano(''), 4000)
     }
   }
 
@@ -1448,6 +1451,11 @@ export default function Dashboard() {
       {sauvano === 'profil' && (
         <div style={{ background: 'rgba(50,200,100,.1)', border: '0.5px solid rgba(50,200,100,.3)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: '#4caf81' }}>
           ✓ Podaci su uspešno sačuvani!
+        </div>
+      )}
+      {sauvano === 'greska' && (
+        <div style={{ background: 'rgba(220,50,50,.1)', border: '0.5px solid rgba(220,50,50,.3)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: '#ff6b6b' }}>
+          ✗ Greška pri čuvanju podataka. Provjerite da li je migracija pokrenuta u Supabase bazi.
         </div>
       )}
 
