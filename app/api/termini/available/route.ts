@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getPublicSupabaseEnv } from '@/lib/env-supabase'
-import { createClient } from '@supabase/supabase-js'
+import { getServerSupabaseClient } from '@/lib/server-supabase'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,12 +13,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'salon_id i datum su obavezni' }, { status: 400 })
   }
 
-  const { url, anonKey, ok } = getPublicSupabaseEnv()
-  if (!ok) return NextResponse.json({ error: 'Server config error' }, { status: 500 })
-
-  const supabase = createClient(url, anonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+  const supabase = getServerSupabaseClient()
+  if (!supabase) return NextResponse.json({ error: 'Server config error' }, { status: 500 })
 
   const { data: rawSalon } = await supabase
     .from('saloni')
