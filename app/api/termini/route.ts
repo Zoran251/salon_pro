@@ -43,7 +43,7 @@ function classifyTerminPoslovnaGreška(msg: string): 'radno' | 'preklapanje' | n
 }
 
 async function pronadjiAlternativneTermine(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   salon_id: string,
   datumStr: string,
   requestedTimeIso: string,
@@ -53,31 +53,32 @@ async function pronadjiAlternativneTermine(
   try {
     const datum = datumStr.split('T')[0]
 
-    const { data: salon } = await supabase
+    const queryResult: any = await supabase
       .from('saloni')
       .select('radno_od, radno_do, radni_dani_od, radni_dani_do, subota_od, subota_do, nedelja_od, nedelja_do, nedelja_zatvoreno')
       .eq('id', salon_id)
       .single()
+    const rawSalon: any = queryResult.data
 
-    if (!salon) return []
+    if (!rawSalon) return []
 
     const datumDate = new Date(datum + 'T12:00:00+02:00')
     const dow = datumDate.getDay()
 
-    if (dow === 0 && salon.nedelja_zatvoreno) return []
+    if (dow === 0 && rawSalon.nedelja_zatvoreno) return []
 
     let od: string | null = null
     let do_: string | null = null
 
     if (dow === 0) {
-      od = salon.nedelja_od || salon.radno_od || null
-      do_ = salon.nedelja_do || salon.radno_do || null
+      od = rawSalon.nedelja_od || rawSalon.radno_od || null
+      do_ = rawSalon.nedelja_do || rawSalon.radno_do || null
     } else if (dow === 6) {
-      od = salon.subota_od || salon.radni_dani_od || salon.radno_od || null
-      do_ = salon.subota_do || salon.radni_dani_do || salon.radno_do || null
+      od = rawSalon.subota_od || rawSalon.radni_dani_od || rawSalon.radno_od || null
+      do_ = rawSalon.subota_do || rawSalon.radni_dani_do || rawSalon.radno_do || null
     } else {
-      od = salon.radni_dani_od || salon.radno_od || null
-      do_ = salon.radni_dani_do || salon.radno_do || null
+      od = rawSalon.radni_dani_od || rawSalon.radno_od || null
+      do_ = rawSalon.radni_dani_do || rawSalon.radno_do || null
     }
 
     if (!od || !do_) return []
@@ -91,12 +92,13 @@ async function pronadjiAlternativneTermine(
     // Dohvati trajanje usluge (podrazumijevano 30min)
     let trajanje = 30
     if (usluga_id) {
-      const { data: usluga } = await supabase
+      const res2: any = await supabase
         .from('usluge')
         .select('trajanje')
         .eq('id', usluga_id)
         .eq('salon_id', salon_id)
         .maybeSingle()
+      const usluga: any = res2.data
       if (usluga?.trajanje) trajanje = Math.max(5, Math.min(480, Number(usluga.trajanje)))
     }
 
@@ -119,7 +121,7 @@ async function pronadjiAlternativneTermine(
       query = query.eq('zaposleni_id', zaposleni_id)
     }
 
-    const { data: appointments } = await query
+    const { data: appointments }: { data: any[] | null } = await query as any
 
     const bookedRanges: { start: number; end: number }[] = []
     if (appointments) {

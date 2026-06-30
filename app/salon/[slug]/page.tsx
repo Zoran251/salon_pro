@@ -212,6 +212,7 @@ export default function SalonLanding() {
   const [forma, setForma] = useState({ ime: '', telefon: '', datum: '', vrijeme: '', zaposleni_id: '', napomena: '' })
   const [zauzetiTermini, setZauzetiTermini] = useState<string[]>([])
   const [dostupniTermini, setDostupniTermini] = useState<string[]>([])
+  const [, setAlternativeTimes] = useState<string[]>([])
   const [profilUredi, setProfilUredi] = useState(false)
   const [profilEdit, setProfilEdit] = useState({ ime: '', telefon: '', email: '' })
   const [profilSnimiLoading, setProfilSnimiLoading] = useState(false)
@@ -369,7 +370,13 @@ export default function SalonLanding() {
 
   // Generiši dostupne termine kad se promijeni datum ili usluga
   useEffect(() => {
-    if (!salon || !forma.datum || !odabranaUsluga) {
+    if (!forma.datum || !odabranaUsluga) {
+      setDostupniTermini([])
+      return
+    }
+
+    const salonData: Salon | null = salon
+    if (!salonData) {
       setDostupniTermini([])
       return
     }
@@ -378,7 +385,7 @@ export default function SalonLanding() {
     const datum = new Date(forma.datum + 'T12:00:00+02:00')
     const dow = datum.getDay()
 
-    if (dow === 0 && salon.nedelja_zatvoreno) {
+    if (dow === 0 && salonData.nedelja_zatvoreno) {
       setDostupniTermini([])
       return
     }
@@ -387,14 +394,14 @@ export default function SalonLanding() {
     let do_: string | null = null
 
     if (dow === 0) {
-      od = salon.nedelja_od || salon.radno_od || null
-      do_ = salon.nedelja_do || salon.radno_do || null
+      od = salonData.nedelja_od || salonData.radno_od || null
+      do_ = salonData.nedelja_do || salonData.radno_do || null
     } else if (dow === 6) {
-      od = salon.subota_od || salon.radni_dani_od || salon.radno_od || null
-      do_ = salon.subota_do || salon.radni_dani_do || salon.radno_do || null
+      od = salonData.subota_od || salonData.radni_dani_od || salonData.radno_od || null
+      do_ = salonData.subota_do || salonData.radni_dani_do || salonData.radno_do || null
     } else {
-      od = salon.radni_dani_od || salon.radno_od || null
-      do_ = salon.radni_dani_do || salon.radno_do || null
+      od = salonData.radni_dani_od || salonData.radno_od || null
+      do_ = salonData.radni_dani_do || salonData.radno_do || null
     }
 
     if (!od || !do_) {
