@@ -15,4 +15,5 @@ where id in (
   ) t where t.rn > 1
 );
 
+alter table public.device_tokens drop constraint if exists device_tokens_endpoint_unique;
 alter table public.device_tokens add constraint device_tokens_endpoint_unique unique (endpoint);
