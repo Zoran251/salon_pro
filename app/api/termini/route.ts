@@ -430,12 +430,17 @@ export async function POST(request: Request) {
     const datumVrijemeStr =
       naivniBelgradDatumVremeUUtcIso(String(datum_vrijeme).trim()) ?? String(datum_vrijeme).trim()
 
-    // Dohvati auto_confirm prije RPC poziva
-    const { data: salonCfg } = await userClient
-      .from('saloni')
-      .select('auto_confirm, naziv')
-      .eq('id', salon_id)
-      .single()
+    // Dohvati auto_confirm (server client da zaobiđe RLS — kupac nema SELECT na saloni)
+    const srvClient = getServerSupabaseClient()
+    let salonCfg: { auto_confirm: boolean; naziv: string } | null = null
+    if (srvClient) {
+      const { data } = await srvClient
+        .from('saloni')
+        .select('auto_confirm, naziv')
+        .eq('id', salon_id)
+        .single()
+      salonCfg = data as { auto_confirm: boolean; naziv: string } | null
+    }
 
     const bookingPayload = {
       p_salon_id: salon_id,
