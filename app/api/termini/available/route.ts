@@ -4,17 +4,6 @@ import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
-let trajanjeCache: Record<string, number> = {}
-
-async function getUslugaTrajanje(supabase: any, usluga_id: string, salon_id: string): Promise<number> {
-  const key = `${salon_id}_${usluga_id}`
-  if (trajanjeCache[key] !== undefined) return trajanjeCache[key]
-  const { data } = await supabase.from('usluge').select('trajanje').eq('id', usluga_id).eq('salon_id', salon_id).maybeSingle() as any
-  const t = data?.trajanje ? Math.max(5, Math.min(480, Number(data.trajanje))) : 30
-  trajanjeCache[key] = t
-  return t
-}
-
 export async function GET(request: NextRequest) {
   const salon_id = request.nextUrl.searchParams.get('salon_id')
   const datum = request.nextUrl.searchParams.get('datum')
@@ -95,6 +84,18 @@ export async function GET(request: NextRequest) {
 
   const { data: appointments } = await query as any
 
+  /* Učitaj trajanje svih usluga koje se pojavljuju u terminima odjednom */
+  const uslugaIds = [...new Set((appointments || []).map((a: any) => a.usluga_id).filter(Boolean))]
+  const trajanja: Record<string, number> = {}
+  if (uslugaIds.length > 0) {
+    const { data: usluge } = await supabase.from('usluge').select('id, trajanje').in('id', uslugaIds) as any
+    if (usluge) {
+      for (const u of usluge) {
+        trajanja[u.id] = u.trajanje ? Math.max(5, Math.min(480, Number(u.trajanje))) : 30
+      }
+    }
+  }
+
   const fmtTime = new Intl.DateTimeFormat('en', { hour: 'numeric', minute: 'numeric', hourCycle: 'h23', timeZone: 'Europe/Belgrade' })
 
   const bookedMinutes = new Set<number>()
@@ -103,7 +104,7 @@ export async function GET(request: NextRequest) {
       const d = new Date(apt.datum_vrijeme)
       const [h, m] = fmtTime.format(d).split(':').map(Number)
       const startMin = h * 60 + (m || 0)
-      const aptTrajanje = apt.usluga_id ? await getUslugaTrajanje(supabase, apt.usluga_id, salon_id) : 30
+      const aptTrajanje = apt.usluga_id ? (trajanja[apt.usluga_id] || 30) : 30
       for (let mm = startMin; mm < startMin + aptTrajanje; mm++) {
         bookedMinutes.add(mm)
       }
