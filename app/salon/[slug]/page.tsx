@@ -368,60 +368,25 @@ export default function SalonLanding() {
     fetchSalon()
   }, [slug])
 
-  // Generiši dostupne termine kad se promijeni datum ili usluga
+  // Dohvati slobodne termine sa servera (uvažava radno vrijeme i postojeće rezervacije)
   useEffect(() => {
-    if (!forma.datum || !odabranaUsluga) {
+    if (!forma.datum || !odabranaUsluga || !salon?.id) {
       setDostupniTermini([])
       return
     }
 
-    const salonData: Salon | null = salon
-    if (!salonData) {
-      setDostupniTermini([])
-      return
-    }
+    const params = new URLSearchParams({
+      salon_id: salon.id,
+      datum: forma.datum,
+      usluga_id: odabranaUsluga.id,
+    })
+    if (forma.zaposleni_id) params.set('zaposleni_id', forma.zaposleni_id)
 
-    const trajanje = Math.max(5, Math.min(480, odabranaUsluga.trajanje || 30))
-    const datum = new Date(forma.datum + 'T12:00:00+02:00')
-    const dow = datum.getDay()
-
-    if (dow === 0 && salonData.nedelja_zatvoreno) {
-      setDostupniTermini([])
-      return
-    }
-
-    let od: string | null = null
-    let do_: string | null = null
-
-    if (dow === 0) {
-      od = salonData.nedelja_od || salonData.radno_od || null
-      do_ = salonData.nedelja_do || salonData.radno_do || null
-    } else if (dow === 6) {
-      od = salonData.subota_od || salonData.radni_dani_od || salonData.radno_od || null
-      do_ = salonData.subota_do || salonData.radni_dani_do || salonData.radno_do || null
-    } else {
-      od = salonData.radni_dani_od || salonData.radno_od || null
-      do_ = salonData.radni_dani_do || salonData.radno_do || null
-    }
-
-    if (!od || !do_) {
-      setDostupniTermini([])
-      return
-    }
-
-    const [oh, om] = od.split(':').map(Number)
-    const [dh, dm] = do_.split(':').map(Number)
-    const otvorenoMin = oh * 60 + (om || 0)
-    const zatvorenoMin = dh * 60 + (dm || 0)
-
-    const slots: string[] = []
-    for (let m = otvorenoMin; m + trajanje <= zatvorenoMin; m += 30) {
-      const h = Math.floor(m / 60)
-      const min = m % 60
-      slots.push(`${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`)
-    }
-    setDostupniTermini(slots)
-  }, [forma.datum, odabranaUsluga?.id, salon])
+    fetch(`/api/termini/available?${params}`)
+      .then(r => r.json())
+      .then(data => setDostupniTermini(data.available || []))
+      .catch(() => setDostupniTermini([]))
+  }, [forma.datum, forma.zaposleni_id, odabranaUsluga?.id, salon?.id])
 
   useEffect(() => {
     if (!salon?.id) return
