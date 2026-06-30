@@ -76,6 +76,7 @@ type ProfilForm = {
   nedelja_od: string
   nedelja_do: string
   nedelja_zatvoreno: boolean
+  auto_confirm: boolean
   logo: string
   boja_primarna: string
   boja_sekundarna: string
@@ -236,7 +237,7 @@ export default function Dashboard() {
   const [profil, setProfil] = useState<ProfilForm>({
     naziv: '', opis: '', telefon: '', adresa: '', grad: '',
     radno_od: '', radno_do: '', radni_dani_od: '', radni_dani_do: '',
-    subota_od: '', subota_do: '', nedelja_od: '', nedelja_do: '', nedelja_zatvoreno: false,
+    subota_od: '', subota_do: '', nedelja_od: '', nedelja_do: '', nedelja_zatvoreno: false, auto_confirm: false,
     logo: '',
     boja_primarna: DEFAULT_BRAND_COLORS.primarna,
     boja_sekundarna: DEFAULT_BRAND_COLORS.sekundarna,
@@ -492,6 +493,7 @@ export default function Dashboard() {
         nedelja_od: salonData.nedelja_od || '',
         nedelja_do: salonData.nedelja_do || '',
         nedelja_zatvoreno: Boolean(salonData.nedelja_zatvoreno),
+        auto_confirm: Boolean((salonData as Record<string, unknown>).auto_confirm),
         logo: salonData.logo_url || '',
         boja_primarna: salonData.boja_primarna || DEFAULT_BRAND_COLORS.primarna,
         boja_sekundarna: salonData.boja_sekundarna || DEFAULT_BRAND_COLORS.sekundarna,
@@ -762,6 +764,7 @@ export default function Dashboard() {
         nedelja_od: nedeljaOd,
         nedelja_do: nedeljaDo,
         nedelja_zatvoreno: profil.nedelja_zatvoreno,
+        auto_confirm: profil.auto_confirm,
         logo_url: profil.logo,
         boja_primarna: profil.boja_primarna,
         boja_sekundarna: profil.boja_sekundarna,
@@ -771,7 +774,7 @@ export default function Dashboard() {
 
       const { error } = await supabase
         .from('saloni')
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', user.id)
 
       if (!error) {
@@ -1623,6 +1626,24 @@ export default function Dashboard() {
             </>
           )}
         </div>
+      </div>
+
+      <div style={cardStyle}>
+        <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '12px' }}>Potvrda termina</h3>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', color: text, fontSize: '13px' }}>
+          <input
+            type="checkbox"
+            checked={profil.auto_confirm}
+            onChange={e => setProfil({ ...profil, auto_confirm: e.target.checked })}
+            style={{ width: '18px', height: '18px', accentColor: gold, cursor: 'pointer' }}
+          />
+          <div>
+            <div style={{ fontWeight: 500 }}>Automatska potvrda termina</div>
+            <div style={{ fontSize: '11px', color: muted, marginTop: '2px' }}>
+              Novi termini se automatski potvrđuju bez ručnog odobrenja
+            </div>
+          </div>
+        </label>
       </div>
 
       <button style={{...btnGold, padding:'14px', borderRadius:'12px', fontSize:'14px', width:'100%'}} onClick={sacuvajProfil}>

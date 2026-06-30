@@ -44,18 +44,18 @@ export function AuthSessionRecovery() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') return
+      if (event === 'SIGNED_OUT') {
+        registrovan.current = false
+        return
+      }
       if ((event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') && !session) {
         clearLocalAuth()
       }
       if (session?.user) pokreniRegistraciju()
     })
 
-    const timer = setTimeout(pokreniRegistraciju, 5000)
-
     return () => {
       subscription.unsubscribe()
-      clearTimeout(timer)
     }
   }, [])
 

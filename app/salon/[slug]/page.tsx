@@ -210,6 +210,7 @@ export default function SalonLanding() {
   /** Poslednja greška GET /api/clients/me (npr. nalog nije povezan sa salonom). */
   const [clientMeError, setClientMeError] = useState('')
   const [forma, setForma] = useState({ ime: '', telefon: '', datum: '', vrijeme: '', zaposleni_id: '', napomena: '' })
+  const [pushSubscribed, setPushSubscribed] = useState(false)
   const [zauzetiTermini, setZauzetiTermini] = useState<string[]>([])
   const [dostupniTermini, setDostupniTermini] = useState<string[]>([])
   const [, setAlternativeTimes] = useState<string[]>([])
@@ -1406,6 +1407,62 @@ export default function SalonLanding() {
               )}
             </div>
 
+            <div style={{ background: '#161616', border: `0.5px solid ${goldBorder}`, borderRadius: '18px', padding: '22px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                <div>
+                  <h3 style={{ fontSize: '15px', fontWeight: 500, color: '#f5f0e8', marginBottom: '4px' }}>Push obavještenja</h3>
+                  <p style={{ fontSize: '12px', color: 'rgba(245,240,232,.5)', lineHeight: 1.5 }}>
+                    Primajte obavještenja direktno u pregledniku (potvrda termina, podsjetnik, otkazivanje)
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const { registerServiceWorker, subscribeToPush, sendSubscriptionToServer, unsubscribeFromPush } = await import('@/lib/web-push/client')
+                      if (pushSubscribed) {
+                        const reg = await registerServiceWorker()
+                        if (reg) {
+                          const session = (await import('@/lib/supabase')).supabase.auth.getSession()
+                          const token = (await session).data.session?.access_token
+                          if (token) await unsubscribeFromPush(reg, token)
+                        }
+                        setPushSubscribed(false)
+                      } else {
+                        const reg = await registerServiceWorker()
+                        if (reg) {
+                          const sub = await subscribeToPush(reg)
+                          if (sub) {
+                            const session = (await import('@/lib/supabase')).supabase.auth.getSession()
+                            const token = (await session).data.session?.access_token
+                            if (token) {
+                              await sendSubscriptionToServer(sub, token)
+                              setPushSubscribed(true)
+                            }
+                          }
+                        }
+                      }
+                    } catch (e) {
+                      console.error('[push] greška:', e)
+                    }
+                  }}
+                  style={{
+                    flexShrink: 0,
+                    background: pushSubscribed ? 'rgba(50,200,100,.15)' : 'transparent',
+                    color: pushSubscribed ? '#4caf81' : gold,
+                    border: pushSubscribed ? '0.5px solid rgba(50,200,100,.3)' : `0.5px solid ${goldBorder}`,
+                    padding: '10px 18px',
+                    borderRadius: '10px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {pushSubscribed ? '✓ Omogućena' : 'Omogući'}
+                </button>
+              </div>
+            </div>
+
             {clientSummary && obavestenja.length > 0 && (
               <div style={{ background: '#161616', border: `0.5px solid ${goldBorder}`, borderRadius: '18px', padding: '22px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
@@ -1910,6 +1967,43 @@ export default function SalonLanding() {
             <div style={{ fontSize: '32px', marginBottom: '8px' }}>🎉</div>
             <div style={{ fontSize: '16px', fontWeight: 500, color: '#4caf81', marginBottom: '4px' }}>Termin je zakazan!</div>
             <div style={{ fontSize: '13px', color: 'rgba(245,240,232,.5)' }}>Salon će vas kontaktirati za potvrdu.</div>
+            {!pushSubscribed && klijentUlogovan && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const { registerServiceWorker, subscribeToPush, sendSubscriptionToServer } = await import('@/lib/web-push/client')
+                    const reg = await registerServiceWorker()
+                    if (reg) {
+                      const sub = await subscribeToPush(reg)
+                      if (sub) {
+                        const session = (await import('@/lib/supabase')).supabase.auth.getSession()
+                        const token = (await session).data.session?.access_token
+                        if (token) {
+                          await sendSubscriptionToServer(sub, token)
+                          setPushSubscribed(true)
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    console.error('[push] greška:', e)
+                  }
+                }}
+                style={{
+                  marginTop: '14px',
+                  background: 'transparent',
+                  color: '#4caf81',
+                  border: '0.5px solid rgba(50,200,100,.3)',
+                  padding: '10px 18px',
+                  borderRadius: '10px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                🔔 Primaj obavještenja o statusu termina
+              </button>
+            )}
           </div>
         )}
 

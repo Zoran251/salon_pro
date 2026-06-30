@@ -5,6 +5,7 @@ import { getPublicSupabaseEnv } from '@/lib/env-supabase'
 import { getServerSupabaseClient } from '@/lib/server-supabase'
 import { storageTerminStatus } from '@/lib/termin-status'
 import { sendMulticastNotification } from '@/lib/notifications/firebase-config'
+import { sendPushToSubscriptions } from '@/lib/web-push/server'
 import {
   formatDatumVrijemeBelgrad,
   naivniBelgradDatumVremeUUtcIso,
@@ -250,6 +251,36 @@ async function posaljiPushNotifikacijuSalonu(params: {
   }
 }
 
+/** Ako salon ima auto_confirm, postavi termin na potvrđen i pošalji push kupcu */
+async function autoConfirmTermin(
+  srv: any,
+  terminId: string | null,
+  salonId: string,
+  authUserId: string | null,
+  salonNaziv: string,
+) {
+  if (!terminId || !authUserId) return
+  await srv.from('termini').update({ status: 'potvrđen' }).eq('id', terminId).eq('salon_id', salonId)
+  const { data: subs } = await srv
+    .from('device_tokens')
+    .select('endpoint, auth_key, p256dh_key')
+    .eq('user_id', authUserId)
+    .not('endpoint', 'is', null)
+  if (subs && subs.length > 0) {
+    await sendPushToSubscriptions(
+      subs as Array<{ endpoint: string; auth_key: string; p256dh_key: string }>,
+      {
+        title: `Termin potvrđen — ${salonNaziv}`,
+        body: 'Vaš termin je automatski potvrđen. Hvala na povjerenju!',
+        url: `/salon/${salonId}`,
+      },
+      async (endpoint) => {
+        await srv.from('device_tokens').delete().eq('endpoint', endpoint)
+      },
+    )
+  }
+}
+
 async function posaljiEmailKorisnikuNakonZakazivanja(params: {
   toEmail: string
   salonId: string
@@ -399,6 +430,13 @@ export async function POST(request: Request) {
     const datumVrijemeStr =
       naivniBelgradDatumVremeUUtcIso(String(datum_vrijeme).trim()) ?? String(datum_vrijeme).trim()
 
+    // Dohvati auto_confirm prije RPC poziva
+    const { data: salonCfg } = await userClient
+      .from('saloni')
+      .select('auto_confirm, naziv')
+      .eq('id', salon_id)
+      .single()
+
     const bookingPayload = {
       p_salon_id: salon_id,
       p_client_id: clientId,
@@ -435,6 +473,12 @@ export async function POST(request: Request) {
         ime: imeKlijenta,
         datumVrijeme: datumVrijemeStr,
       })
+      if (salonCfg?.auto_confirm) {
+        const srv = getServerSupabaseClient()
+        if (srv) {
+          void autoConfirmTermin(srv, terminIdOut, String(salon_id), authUserId, salonCfg.naziv || 'Salon')
+        }
+      }
       return NextResponse.json({ success: true, termin_id: terminIdOut })
     }
 
@@ -496,6 +540,12 @@ export async function POST(request: Request) {
           ime: imeKlijenta,
           datumVrijeme: datumVrijemeStr,
         })
+        if (salonCfg?.auto_confirm) {
+          const srv = getServerSupabaseClient()
+          if (srv) {
+            void autoConfirmTermin(srv, terminIdOut, String(salon_id), authUserId, salonCfg.naziv || 'Salon')
+          }
+        }
         return NextResponse.json({ success: true, termin_id: terminIdOut })
       }
       const legacyBiz = classifyTerminPoslovnaGreška(legacyBookingError.message)
