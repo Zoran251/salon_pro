@@ -194,6 +194,13 @@ export default function SalonLanding() {
   const [lojalnost, setLojalnost] = useState<Lojalnost | null>(null)
   const [pageLoading, setPageLoading] = useState(true)
   const [showForma, setShowForma] = useState(false)
+  const [salonSlike, setSalonSlike] = useState<{ id: string; url: string; opis: string; redoslijed: number }[]>([])
+  const [recenzije, setRecenzije] = useState<{ id: string; client_id: string; ocjena: number; komentar: string; odgovor: string; odgovor_created_at: string | null; created_at: string; salon_clients: { ime: string } | null }[]>([])
+  const [showRecenzijaModal, setShowRecenzijaModal] = useState(false)
+  const [recOcjena, setRecOcjena] = useState(5)
+  const [recKomentar, setRecKomentar] = useState('')
+  const [recSalje, setRecSalje] = useState(false)
+  const [searchUslugeLanding, setSearchUslugeLanding] = useState('')
   const [odabranaUsluga, setOdabranaUsluga] = useState<Usluga | null>(null)
   const [loading, setLoading] = useState(false)
   const [uspjeh, setUspjeh] = useState(false)
@@ -359,6 +366,21 @@ export default function SalonLanding() {
           .single()
 
         setLojalnost(lojalnostData || null)
+
+        // Učitaj galeriju slika
+        const { data: slikeData } = await (supabase.from('salon_slike') as any)
+          .select('id, url, opis, redoslijed')
+          .eq('salon_id', salonData.id)
+          .order('redoslijed', { ascending: true })
+          .order('created_at', { ascending: true })
+        setSalonSlike(slikeData || [])
+
+        // Učitaj recenzije
+        const { data: recData } = await (supabase.from('recenzije') as any)
+          .select('id, client_id, ocjena, komentar, odgovor, odgovor_created_at, created_at, salon_clients ( ime )')
+          .eq('salon_id', salonData.id)
+          .order('created_at', { ascending: false })
+        setRecenzije((recData || []) as typeof recenzije)
       } catch (err) {
         console.error('Greška pri učitavanju:', err)
       } finally {
@@ -763,6 +785,9 @@ export default function SalonLanding() {
   const textBoja = salon.boja_font || DEFAULT_BRAND_COLORS.font
   const bgSekundarna = salon.boja_sekundarna || DEFAULT_BRAND_COLORS.sekundarna
   const goldFaint = hexToRgba(gold, 0.12)
+  const prosjecnaOcjena = recenzije.length > 0
+    ? (recenzije.reduce((sum, r) => sum + r.ocjena, 0) / recenzije.length).toFixed(1)
+    : '0.0'
   const goldBorder = hexToRgba(gold, 0.25)
   const textMuted = hexToRgba(textBoja, 0.45)
   const kupacReturnEnc = encodeURIComponent(`/salon/${slug}`)
@@ -2013,8 +2038,22 @@ export default function SalonLanding() {
             <p style={{ fontSize: '13px', color: 'rgba(245,240,232,.4)', marginBottom: '24px' }}>
               Za termin kliknite na željenu karticu.
             </p>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+              <input
+                type="text"
+                placeholder="🔍 Pretraži usluge..."
+                value={searchUslugeLanding}
+                onChange={e => setSearchUslugeLanding(e.target.value)}
+                style={{ width: '100%', maxWidth: '400px', background: 'rgba(255,255,255,.06)', border: '0.5px solid rgba(255,255,255,.1)', borderRadius: '10px', padding: '10px 14px', fontSize: '14px', color: '#f5f0e8', textAlign: 'center', boxSizing: 'border-box', outline: 'none' }}
+              />
+            </div>
             <div className="usluge-grid">
-              {usluge.map((u) => {
+              {usluge
+                .filter(u => {
+                  if (!searchUslugeLanding.trim()) return true
+                  return (u.naziv || '').toLowerCase().includes(searchUslugeLanding.toLowerCase())
+                })
+                .map((u) => {
                 const ini = (u.naziv || '?').trim().charAt(0).toUpperCase() || '•'
                 return (
                 <div
@@ -2955,6 +2994,73 @@ export default function SalonLanding() {
       </div>
 
       <div className="content-pad" style={{ maxWidth: '900px', margin: '0 auto', padding: '0 48px 60px' }}>
+        {/* Galerija slika */}
+        {salonSlike.length > 0 && (
+          <div style={{ marginTop: '32px', marginBottom: '32px' }}>
+            <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', paddingBottom: '8px' }}>
+              {salonSlike.map(s => (
+                <div key={s.id} style={{ flex: '0 0 auto', scrollSnapAlign: 'start', width: '280px', height: '200px', borderRadius: '12px', overflow: 'hidden' }}>
+                  <img src={s.url} alt={s.opis || 'Slika salona'} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Recenzije */}
+        {recenzije.length > 0 && (
+          <div style={{ marginBottom: '32px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 500, color: '#f5f0e8', marginBottom: '16px' }}>
+              ⭐ Recenzije <span style={{ fontSize: '14px', color: 'rgba(245,240,232,.35)', fontWeight: 400 }}>({prosjecnaOcjena} · {recenzije.length})</span>
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {recenzije.slice(0, 5).map(r => (
+                <div key={r.id} style={{ background: 'rgba(255,255,255,.03)', border: '0.5px solid rgba(255,255,255,.06)', borderRadius: '12px', padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: '15px', color: gold, letterSpacing: '2px' }}>
+                      {Array.from({ length: 5 }, (_, i) => i < r.ocjena ? '★' : '☆').join('')}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.3)' }}>
+                      {r.salon_clients?.ime || 'Kupac'} · {new Date(r.created_at).toLocaleDateString('sr')}
+                    </div>
+                  </div>
+                  {r.komentar && (
+                    <div style={{ fontSize: '13px', color: 'rgba(245,240,232,.7)', marginTop: '8px', lineHeight: 1.5 }}>{r.komentar}</div>
+                  )}
+                  {r.odgovor && (
+                    <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(212,175,55,.05)', borderRadius: '8px', border: '0.5px solid rgba(212,175,55,.1)' }}>
+                      <div style={{ fontSize: '11px', color: gold, marginBottom: '2px' }}>Odgovor salona:</div>
+                      <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.5)', fontStyle: 'italic' }}>{r.odgovor}</div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {/* Ostavi recenziju dugme - samo za ulogovane kupce */}
+            {klijentUlogovan && (
+              <button
+                onClick={() => setShowRecenzijaModal(true)}
+                style={{ marginTop: '16px', background: 'transparent', color: gold, border: `0.5px solid ${gold}`, padding: '10px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                ✏️ Ostavi recenziju
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Ako nema recenzija ali je kupac ulogovan, ipak prikazi dugme */}
+        {recenzije.length === 0 && klijentUlogovan && (
+          <div style={{ marginBottom: '32px', textAlign: 'center' }}>
+            <p style={{ fontSize: '13px', color: 'rgba(245,240,232,.4)', marginBottom: '12px' }}>Budite prvi koji će ostaviti recenziju!</p>
+            <button
+              onClick={() => setShowRecenzijaModal(true)}
+              style={{ background: 'transparent', color: gold, border: `0.5px solid ${gold}`, padding: '10px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+            >
+              ✏️ Ostavi recenziju
+            </button>
+          </div>
+        )}
+
         {renderMainColumn()}
 
         <div style={{ marginTop: '48px', paddingTop: '24px', borderTop: '0.5px solid rgba(212,175,55,.1)', textAlign: 'center' }}>
@@ -3191,6 +3297,106 @@ export default function SalonLanding() {
                   Zatvori
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal za recenziju */}
+      {showRecenzijaModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 300,
+            background: 'rgba(0,0,0,.72)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          }}
+          onClick={() => setShowRecenzijaModal(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: 420, width: '100%',
+              background: '#141414',
+              border: '0.5px solid rgba(212,175,55,.2)',
+              borderRadius: 18, padding: '22px 20px',
+            }}
+          >
+            <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#f5f0e8', marginBottom: '16px' }}>
+              ✏️ Ostavi recenziju
+            </h3>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '16px', fontSize: '28px' }}>
+              {[1,2,3,4,5].map(i => (
+                <span
+                  key={i}
+                  onClick={() => setRecOcjena(i)}
+                  style={{ cursor: 'pointer', color: i <= recOcjena ? gold : 'rgba(255,255,255,.15)', transition: 'color .2s' }}
+                >
+                  ★
+                </span>
+              ))}
+            </div>
+            <textarea
+              placeholder="Tvoje mišljenje (opciono)..."
+              value={recKomentar}
+              onChange={e => setRecKomentar(e.target.value)}
+              rows={4}
+              style={{
+                width: '100%', background: '#1a1a1a', border: '0.5px solid rgba(255,255,255,.1)',
+                borderRadius: 10, padding: '12px 14px', fontSize: '13px', color: '#f5f0e8',
+                resize: 'vertical', boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ display: 'flex', gap: '10px', marginTop: '16px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowRecenzijaModal(false)}
+                style={{
+                  background: 'transparent', color: 'rgba(245,240,232,.5)', border: '0.5px solid rgba(255,255,255,.15)',
+                  borderRadius: 10, padding: '10px 18px', fontSize: '13px', cursor: 'pointer',
+                }}
+              >
+                Odustani
+              </button>
+              <button
+                disabled={recSalje}
+                onClick={async () => {
+                  setRecSalje(true)
+                  try {
+                    const res = await fetch('/api/recenzije', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        salon_id: salon?.id,
+                        ocjena: recOcjena,
+                        komentar: recKomentar.trim(),
+                      }),
+                    })
+                    if (!res.ok) throw new Error('Greška')
+                    setShowRecenzijaModal(false)
+                    setRecOcjena(5)
+                    setRecKomentar('')
+                    // Osvježi recenzije
+                    if (salon?.id) {
+                      const { data: recData } = await (supabase.from('recenzije') as any)
+                        .select('id, client_id, ocjena, komentar, odgovor, odgovor_created_at, created_at, salon_clients ( ime )')
+                        .eq('salon_id', salon.id)
+                        .order('created_at', { ascending: false })
+                      setRecenzije((recData || []) as typeof recenzije)
+                    }
+                  } catch (err) {
+                    console.error(err)
+                  } finally {
+                    setRecSalje(false)
+                  }
+                }}
+                style={{
+                  background: `linear-gradient(135deg,${gold},#b8960c)`,
+                  color: '#0a0a0a', border: 'none', borderRadius: 10,
+                  padding: '10px 22px', fontSize: '13px', fontWeight: 600, cursor: recSalje ? 'not-allowed' : 'pointer',
+                  opacity: recSalje ? 0.6 : 1,
+                }}
+              >
+                {recSalje ? 'Slanje...' : 'Pošalji'}
+              </button>
             </div>
           </div>
         </div>

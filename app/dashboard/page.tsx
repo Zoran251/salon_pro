@@ -171,6 +171,8 @@ const navItems = [
   { id: 'zaposleni', icon: '✂️', label: 'Zaposleni' },
   { id: 'lager', icon: '📦', label: 'Lager' },
   { id: 'termini', icon: '📅', label: 'Termini' },
+  { id: 'slike', icon: '🖼️', label: 'Galerija' },
+  { id: 'recenzije', icon: '⭐', label: 'Recenzije' },
   { id: 'stranica', icon: '🔗', label: 'Moja stranica' },
   { id: 'lojalnost', icon: '🎁', label: 'Lojalnost' },
 ]
@@ -227,6 +229,15 @@ export default function Dashboard() {
   const [rashodi, setRashodi] = useState<RashodRow[]>([])
   const [analitikaPeriod, setAnalitikaPeriod] = useState<AnalitikaPeriod>('mesec')
   const [preporuceneSalone, setPreporuceneSalone] = useState<{ naziv: string; created_at: string | null }[]>([])
+  const [searchUsluge, setSearchUsluge] = useState('')
+  const [searchLager, setSearchLager] = useState('')
+  const [searchZaposleni, setSearchZaposleni] = useState('')
+  const [salonSlike, setSalonSlike] = useState<{ id: string; url: string; opis: string; redoslijed: number }[]>([])
+  const [slikeLoading, setSlikeLoading] = useState(true)
+  const [recenzije, setRecenzije] = useState<{ id: string; client_id: string; ocjena: number; komentar: string; odgovor: string; odgovor_created_at: string | null; created_at: string; salon_clients: { ime: string } | null }[]>([])
+  const [recenzijeLoading, setRecenzijeLoading] = useState(true)
+  const [recenzijaOdgovorId, setRecenzijaOdgovorId] = useState<string | null>(null)
+  const [recenzijaOdgovorText, setRecenzijaOdgovorText] = useState('')
   const [referalKopiran, setReferalKopiran] = useState(false)
   const [analitikaZaposleniDetaljKljuc, setAnalitikaZaposleniDetaljKljuc] = useState<string | null>(null)
   const [analitikaKlijentDetaljKljuc, setAnalitikaKlijentDetaljKljuc] = useState<string | null>(null)
@@ -635,6 +646,23 @@ export default function Dashboard() {
         .single()
 
       setLojalnost(lojalnostData || defaultLojalnost)
+
+      // Učitaj slike
+      const { data: slikeData } = await (supabase.from('salon_slike') as any)
+        .select('id, url, opis, redoslijed')
+        .eq('salon_id', salonId)
+        .order('redoslijed', { ascending: true })
+        .order('created_at', { ascending: true })
+      setSalonSlike(slikeData || [])
+      setSlikeLoading(false)
+
+      // Učitaj recenzije
+      const { data: recData } = await (supabase.from('recenzije') as any)
+        .select('id, client_id, ocjena, komentar, odgovor, odgovor_created_at, created_at, salon_clients ( ime )')
+        .eq('salon_id', salonId)
+        .order('created_at', { ascending: false })
+      setRecenzije((recData || []) as typeof recenzije)
+      setRecenzijeLoading(false)
 
       console.log('Svi podaci su uspešno učitani')
     } catch (err) {
@@ -1738,8 +1766,23 @@ export default function Dashboard() {
             .dash-usluga-lager{font-size:10px;color:rgba(245,240,232,.45);margin-top:6px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
             .dash-usluga-hint{font-size:9px;color:rgba(245,240,232,.32);line-height:1.45;}
           `}</style>
+          <input
+            type="text"
+            placeholder="🔍 Pretraži usluge..."
+            value={searchUsluge}
+            onChange={e => setSearchUsluge(e.target.value)}
+            style={{ width: '100%', background: '#1a1a1a', border: '0.5px solid rgba(212,175,55,.2)', borderRadius: '10px', padding: '10px 14px', fontSize: '13px', color: text, marginBottom: '10px', boxSizing: 'border-box' }}
+          />
           <div className="dash-usluge-grid">
-            {usluge.map((u) => {
+            {usluge
+              .filter(u => {
+                if (!searchUsluge.trim()) return true
+                const t = searchUsluge.toLowerCase()
+                return (u.naziv || '').toLowerCase().includes(t)
+                  || (u.kategorija || '').toLowerCase().includes(t)
+                  || (u.opis || '').toLowerCase().includes(t)
+              })
+              .map((u) => {
               const busy = uslugaSlikaBusyId === u.id
               const inicijal = (u.naziv || '?').trim().charAt(0).toUpperCase() || '•'
               return (
@@ -1978,13 +2021,26 @@ export default function Dashboard() {
           ⚠️ {zaposleniGreska}
         </div>
       )}
+      <input
+        type="text"
+        placeholder="🔍 Pretraži zaposlene..."
+        value={searchZaposleni}
+        onChange={e => setSearchZaposleni(e.target.value)}
+        style={{ width: '100%', background: '#1a1a1a', border: '0.5px solid rgba(212,175,55,.2)', borderRadius: '10px', padding: '10px 14px', fontSize: '13px', color: text, boxSizing: 'border-box' }}
+      />
       {zaposleni.length === 0 && !showNoviZaposleni && (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '34px' }}>
           <div style={{ fontSize: '30px', marginBottom: '10px' }}>✂️</div>
           <p style={{ fontSize: '14px', color: muted }}>Dodaj zaposlene da bi kupci mogli da biraju osobu za termin.</p>
         </div>
       )}
-      {zaposleni.map((z) => (
+      {zaposleni
+        .filter(z => {
+          if (!searchZaposleni.trim()) return true
+          const t = searchZaposleni.toLowerCase()
+          return (z.ime || '').toLowerCase().includes(t) || (z.uloga || '').toLowerCase().includes(t)
+        })
+        .map((z) => (
         <div key={z.id} style={{ ...cardStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', opacity: z.aktivan ? 1 : 0.58 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
             {renderEmployeeAvatar(z, 46)}
@@ -2040,13 +2096,26 @@ export default function Dashboard() {
 
   const renderLager = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <input
+        type="text"
+        placeholder="🔍 Pretraži lager..."
+        value={searchLager}
+        onChange={e => setSearchLager(e.target.value)}
+        style={{ width: '100%', background: '#1a1a1a', border: '0.5px solid rgba(212,175,55,.2)', borderRadius: '10px', padding: '10px 14px', fontSize: '13px', color: text, boxSizing: 'border-box' }}
+      />
       {lager.length === 0 && !showNoviLager && (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '40px' }}>
           <div style={{ fontSize: '32px', marginBottom: '12px' }}>📦</div>
           <p style={{ fontSize: '14px', color: muted }}>Lager je prazan. Dodaj prvi artikal.</p>
         </div>
       )}
-      {lager.map(l => (
+      {lager
+        .filter(l => {
+          if (!searchLager.trim()) return true
+          const t = searchLager.toLowerCase()
+          return (l.naziv || '').toLowerCase().includes(t) || (l.kategorija || '').toLowerCase().includes(t)
+        })
+        .map(l => (
         <div
           key={l.id}
           style={{
@@ -3129,9 +3198,192 @@ export default function Dashboard() {
     </div>
   )
 
+  const renderSlike = () => {
+    const [uploading, setUploading] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const uploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      if (!file || !salon?.id) return
+      setUploading(true)
+      try {
+        const ext = file.name.split('.').pop()
+        const path = `galerija/${salon.id}/${Date.now()}.${ext}`
+        const { error: uploadErr } = await supabase.storage.from('salon_images').upload(path, file)
+        if (uploadErr) throw uploadErr
+        const { data: { publicUrl } } = supabase.storage.from('salon_images').getPublicUrl(path)
+
+        const { error: insertErr } = await (supabase.from('salon_slike') as any).insert({
+          salon_id: salon.id,
+          url: publicUrl,
+          opis: '',
+          redoslijed: 0,
+        })
+        if (insertErr) throw insertErr
+
+          const { data: refreshed } = await (supabase.from('salon_slike') as any)
+            .select('id, url, opis, redoslijed')
+            .eq('salon_id', salon.id)
+            .order('redoslijed', { ascending: true })
+            .order('created_at', { ascending: true })
+          setSalonSlike(refreshed || [])
+      } catch (err) {
+        console.error('Upload error:', err)
+      } finally {
+        setUploading(false)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
+    }
+
+    const deleteImage = async (id: string) => {
+      if (!salon?.id) return
+      try {
+        await (supabase.from('salon_slike') as any).delete().eq('id', id).eq('salon_id', salon.id)
+        setSalonSlike(prev => prev.filter(s => s.id !== id))
+      } catch (err) {
+        console.error('Delete error:', err)
+      }
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={cardStyle}>
+          <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '16px' }}>Galerija slika</h3>
+          <p style={{ fontSize: '12px', color: muted, lineHeight: 1.55, marginBottom: '16px' }}>
+            Dodaj slike svog salona. One će biti prikazane na tvojoj javnoj stranici kao slideshow.
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={uploadImage}
+          />
+          <button style={btnGold} disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+            {uploading ? 'Dodavanje...' : '➕ Dodaj sliku'}
+          </button>
+        </div>
+        {slikeLoading ? (
+          <p style={{ fontSize: '13px', color: muted }}>Učitavanje...</p>
+        ) : salonSlike.length === 0 ? (
+          <div style={{ ...cardStyle, textAlign: 'center', padding: '40px' }}>
+            <div style={{ fontSize: '32px', marginBottom: '12px' }}>🖼️</div>
+            <p style={{ fontSize: '14px', color: muted }}>Još nema slika. Dodaj prvu!</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: '12px' }}>
+            {salonSlike.map(s => (
+              <div key={s.id} style={{ ...cardStyle, padding: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ width: '100%', aspectRatio: '1', borderRadius: '8px', overflow: 'hidden', background: '#1a1a1a' }}>
+                  <img src={s.url} alt={s.opis || 'Slika salona'} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                </div>
+                <button style={btnOutline} onClick={() => deleteImage(s.id)}>Obriši</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const renderRecenzije = () => {
+    const sendOdgovor = async (recenzijaId: string) => {
+      if (!recenzijaOdgovorText.trim()) return
+      try {
+        const res = await fetch(`/api/recenzije/${recenzijaId}/odgovor`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ odgovor: recenzijaOdgovorText.trim() }),
+        })
+        if (!res.ok) throw new Error('Greška pri slanju odgovora')
+        setRecenzije(prev => prev.map(r => r.id === recenzijaId ? { ...r, odgovor: recenzijaOdgovorText.trim(), odgovor_created_at: new Date().toISOString() } : r))
+        setRecenzijaOdgovorId(null)
+        setRecenzijaOdgovorText('')
+      } catch (err) {
+        console.error(err)
+      }
+    }
+
+    const deleteRecenzija = async (id: string) => {
+      try {
+        const res = await fetch(`/api/recenzije/${id}`, { method: 'DELETE' })
+        if (!res.ok) throw new Error('Greška pri brisanju')
+        setRecenzije(prev => prev.filter(r => r.id !== id))
+      } catch (err) {
+        console.error(err)
+      }
+    }
+
+    const zvjezdice = (ocjena: number) => '★'.repeat(ocjena) + '☆'.repeat(5 - ocjena)
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={cardStyle}>
+          <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '8px' }}>⭐ Recenzije</h3>
+          <p style={{ fontSize: '12px', color: muted, lineHeight: 1.55 }}>
+            Ovdje vidiš, odgovaraš i brišeš recenzije koje su ostavili kupci.
+          </p>
+        </div>
+        {recenzijeLoading ? (
+          <p style={{ fontSize: '13px', color: muted }}>Učitavanje...</p>
+        ) : recenzije.length === 0 ? (
+          <div style={{ ...cardStyle, textAlign: 'center', padding: '40px' }}>
+            <div style={{ fontSize: '32px', marginBottom: '12px' }}>⭐</div>
+            <p style={{ fontSize: '14px', color: muted }}>Još nema recenzija.</p>
+          </div>
+        ) : (
+          recenzije.map(r => (
+            <div key={r.id} style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 500, color: gold }}>{zvjezdice(r.ocjena)}</div>
+                  <div style={{ fontSize: '13px', color: text, marginTop: '4px' }}>{r.salon_clients?.ime || 'Nepoznati kupac'}</div>
+                  <div style={{ fontSize: '11px', color: muted, marginTop: '2px' }}>{new Date(r.created_at).toLocaleDateString('sr')}</div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button style={btnOutline} onClick={() => deleteRecenzija(r.id)}>Obriši</button>
+                </div>
+              </div>
+              {r.komentar && (
+                <div style={{ fontSize: '13px', color: 'rgba(245,240,232,.8)', marginTop: '10px', lineHeight: 1.5 }}>{r.komentar}</div>
+              )}
+              {r.odgovor && (
+                <div style={{ marginTop: '10px', padding: '10px 12px', background: 'rgba(212,175,55,.06)', borderRadius: '8px', border: '0.5px solid rgba(212,175,55,.15)' }}>
+                  <div style={{ fontSize: '11px', color: gold, marginBottom: '4px', fontWeight: 500 }}>Tvoj odgovor:</div>
+                  <div style={{ fontSize: '12px', color: 'rgba(245,240,232,.7)', fontStyle: 'italic' }}>{r.odgovor}</div>
+                </div>
+              )}
+              {recenzijaOdgovorId === r.id ? (
+                <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <textarea
+                    placeholder="Napiši odgovor..."
+                    value={recenzijaOdgovorText}
+                    onChange={e => setRecenzijaOdgovorText(e.target.value)}
+                    rows={3}
+                    style={{ width: '100%', background: '#1a1a1a', border: '0.5px solid rgba(212,175,55,.2)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: text, resize: 'vertical' }}
+                  />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button style={btnGold} onClick={() => sendOdgovor(r.id)}>Pošalji</button>
+                    <button style={btnOutline} onClick={() => { setRecenzijaOdgovorId(null); setRecenzijaOdgovorText('') }}>Odustani</button>
+                  </div>
+                </div>
+              ) : !r.odgovor && (
+                <button style={{ ...btnOutline, marginTop: '10px', fontSize: '12px' }} onClick={() => setRecenzijaOdgovorId(r.id)}>
+                  Odgovori
+                </button>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    )
+  }
+
   const sections: Record<string, () => React.ReactElement> = {
     pregled: renderPregled, analitika: renderAnalitika, nalog: renderNalog, usluge: renderUsluge,
-    zaposleni: renderZaposleni, lager: renderLager, termini: renderTermini, stranica: renderStranica, lojalnost: renderLojalnost
+    zaposleni: renderZaposleni, lager: renderLager, termini: renderTermini,
+    slike: renderSlike, recenzije: renderRecenzije,
+    stranica: renderStranica, lojalnost: renderLojalnost
   }
 
   // Ako nije autentifikovan - loading screen
