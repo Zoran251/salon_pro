@@ -3361,19 +3361,26 @@ export default function SalonLanding() {
                 onClick={async () => {
                   setRecSalje(true)
                   try {
+                    const { data: sessionData } = await supabase.auth.getSession()
+                    const token = sessionData.session?.access_token
+                    if (!token) throw new Error('Niste prijavljeni.')
                     const res = await fetch('/api/recenzije', {
                       method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
+                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                       body: JSON.stringify({
                         salon_id: salon?.id,
                         ocjena: recOcjena,
                         komentar: recKomentar.trim(),
                       }),
                     })
-                    if (!res.ok) throw new Error('Greška')
+                    if (!res.ok) {
+                      const errData = (await res.json()) as { error?: string }
+                      throw new Error(errData.error || 'Greška')
+                    }
                     setShowRecenzijaModal(false)
                     setRecOcjena(5)
                     setRecKomentar('')
+                    setInAppToast({ title: 'Hvala!', body: 'Recenzija je uspješno postavljena.' })
                     // Osvježi recenzije
                     if (salon?.id) {
                       const { data: recData } = await (supabase.from('recenzije') as any)
@@ -3383,7 +3390,7 @@ export default function SalonLanding() {
                       setRecenzije((recData || []) as typeof recenzije)
                     }
                   } catch (err) {
-                    console.error(err)
+                    setInAppToast({ title: 'Greška', body: err instanceof Error ? err.message : 'Greška pri slanju recenzije.' })
                   } finally {
                     setRecSalje(false)
                   }

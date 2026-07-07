@@ -171,7 +171,6 @@ const navItems = [
   { id: 'zaposleni', icon: '✂️', label: 'Zaposleni' },
   { id: 'lager', icon: '📦', label: 'Lager' },
   { id: 'termini', icon: '📅', label: 'Termini' },
-  { id: 'slike', icon: '🖼️', label: 'Galerija' },
   { id: 'recenzije', icon: '⭐', label: 'Recenzije' },
   { id: 'stranica', icon: '🔗', label: 'Moja stranica' },
   { id: 'lojalnost', icon: '🎁', label: 'Lojalnost' },
@@ -206,6 +205,8 @@ export default function Dashboard() {
   /** Dva skrivena inputa: nova usluga (uvek cilj „nova”) i postojeća (cilj = id pre klika). */
   const uslugaSlikaNovaInputRef = useRef<HTMLInputElement>(null)
   const uslugaSlikaPostojecaInputRef = useRef<HTMLInputElement>(null)
+  const galerijaInputRef = useRef<HTMLInputElement>(null)
+  const [galerijaUploading, setGalerijaUploading] = useState(false)
   const uslugaSlikaPostojecaCiljRef = useRef<string | null>(null)
   const [uslugaSlikaBusyId, setUslugaSlikaBusyId] = useState<string | null>(null)
   const [novaUslugaLager, setNovaUslugaLager] = useState<NovaUslugaLagerItem[]>([])
@@ -1280,6 +1281,44 @@ export default function Dashboard() {
     }
   }
 
+  const uploadGalerijaSliku = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !salon?.id) return
+    setGalerijaUploading(true)
+    try {
+      const ext = file.name.split('.').pop()
+      const path = `galerija/${salon.id}/${Date.now()}.${ext}`
+      const { error: uploadErr } = await supabase.storage.from('salon_images').upload(path, file)
+      if (uploadErr) throw uploadErr
+      const { data: { publicUrl } } = supabase.storage.from('salon_images').getPublicUrl(path)
+      const { error: insertErr } = await (supabase.from('salon_slike') as any).insert({
+        salon_id: salon.id, url: publicUrl, opis: '', redoslijed: 0,
+      })
+      if (insertErr) throw insertErr
+      const { data: refreshed } = await (supabase.from('salon_slike') as any)
+        .select('id, url, opis, redoslijed')
+        .eq('salon_id', salon.id)
+        .order('redoslijed', { ascending: true })
+        .order('created_at', { ascending: true })
+      setSalonSlike(refreshed || [])
+    } catch (err) {
+      console.error('Upload error:', err)
+    } finally {
+      setGalerijaUploading(false)
+      if (galerijaInputRef.current) galerijaInputRef.current.value = ''
+    }
+  }
+
+  const obrisiGalerijuSliku = async (id: string) => {
+    if (!salon?.id) return
+    try {
+      await (supabase.from('salon_slike') as any).delete().eq('id', id).eq('salon_id', salon.id)
+      setSalonSlike(prev => prev.filter(s => s.id !== id))
+    } catch (err) {
+      console.error('Delete error:', err)
+    }
+  }
+
   const handleZaposleniFotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -1680,6 +1719,39 @@ export default function Dashboard() {
             </div>
           </div>
         </label>
+      </div>
+
+      {/* Galerija slika */}
+      <div style={cardStyle}>
+        <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '12px' }}>🖼️ Galerija slika</h3>
+        <p style={{ fontSize: '12px', color: muted, lineHeight: 1.55, marginBottom: '16px' }}>
+          Slike će biti prikazane na tvojoj javnoj stranici kao slideshow.
+        </p>
+        <input
+          ref={galerijaInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={uploadGalerijaSliku}
+        />
+        <button style={btnGold} disabled={galerijaUploading} onClick={() => galerijaInputRef.current?.click()}>
+          {galerijaUploading ? 'Dodavanje...' : '➕ Dodaj sliku'}
+        </button>
+        {salonSlike.length > 0 && (
+          <div style={{ display: 'flex', gap: '10px', marginTop: '14px', flexWrap: 'wrap' }}>
+            {salonSlike.map(s => (
+              <div key={s.id} style={{ position: 'relative', width: '100px', height: '100px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0 }}>
+                <img src={s.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <button
+                  onClick={() => obrisiGalerijuSliku(s.id)}
+                  style={{ position: 'absolute', top: '4px', right: '4px', width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(0,0,0,.6)', border: 'none', color: '#fff', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <button style={{...btnGold, padding:'14px', borderRadius:'12px', fontSize:'14px', width:'100%'}} onClick={sacuvajProfil}>
@@ -3198,94 +3270,6 @@ export default function Dashboard() {
     </div>
   )
 
-  const renderSlike = () => {
-    const [uploading, setUploading] = useState(false)
-    const fileInputRef = useRef<HTMLInputElement>(null)
-
-    const uploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]
-      if (!file || !salon?.id) return
-      setUploading(true)
-      try {
-        const ext = file.name.split('.').pop()
-        const path = `galerija/${salon.id}/${Date.now()}.${ext}`
-        const { error: uploadErr } = await supabase.storage.from('salon_images').upload(path, file)
-        if (uploadErr) throw uploadErr
-        const { data: { publicUrl } } = supabase.storage.from('salon_images').getPublicUrl(path)
-
-        const { error: insertErr } = await (supabase.from('salon_slike') as any).insert({
-          salon_id: salon.id,
-          url: publicUrl,
-          opis: '',
-          redoslijed: 0,
-        })
-        if (insertErr) throw insertErr
-
-          const { data: refreshed } = await (supabase.from('salon_slike') as any)
-            .select('id, url, opis, redoslijed')
-            .eq('salon_id', salon.id)
-            .order('redoslijed', { ascending: true })
-            .order('created_at', { ascending: true })
-          setSalonSlike(refreshed || [])
-      } catch (err) {
-        console.error('Upload error:', err)
-      } finally {
-        setUploading(false)
-        if (fileInputRef.current) fileInputRef.current.value = ''
-      }
-    }
-
-    const deleteImage = async (id: string) => {
-      if (!salon?.id) return
-      try {
-        await (supabase.from('salon_slike') as any).delete().eq('id', id).eq('salon_id', salon.id)
-        setSalonSlike(prev => prev.filter(s => s.id !== id))
-      } catch (err) {
-        console.error('Delete error:', err)
-      }
-    }
-
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div style={cardStyle}>
-          <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '16px' }}>Galerija slika</h3>
-          <p style={{ fontSize: '12px', color: muted, lineHeight: 1.55, marginBottom: '16px' }}>
-            Dodaj slike svog salona. One će biti prikazane na tvojoj javnoj stranici kao slideshow.
-          </p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={uploadImage}
-          />
-          <button style={btnGold} disabled={uploading} onClick={() => fileInputRef.current?.click()}>
-            {uploading ? 'Dodavanje...' : '➕ Dodaj sliku'}
-          </button>
-        </div>
-        {slikeLoading ? (
-          <p style={{ fontSize: '13px', color: muted }}>Učitavanje...</p>
-        ) : salonSlike.length === 0 ? (
-          <div style={{ ...cardStyle, textAlign: 'center', padding: '40px' }}>
-            <div style={{ fontSize: '32px', marginBottom: '12px' }}>🖼️</div>
-            <p style={{ fontSize: '14px', color: muted }}>Još nema slika. Dodaj prvu!</p>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: '12px' }}>
-            {salonSlike.map(s => (
-              <div key={s.id} style={{ ...cardStyle, padding: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ width: '100%', aspectRatio: '1', borderRadius: '8px', overflow: 'hidden', background: '#1a1a1a' }}>
-                  <img src={s.url} alt={s.opis || 'Slika salona'} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                </div>
-                <button style={btnOutline} onClick={() => deleteImage(s.id)}>Obriši</button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  }
-
   const renderRecenzije = () => {
     const sendOdgovor = async (recenzijaId: string) => {
       if (!recenzijaOdgovorText.trim()) return
@@ -3382,7 +3366,7 @@ export default function Dashboard() {
   const sections: Record<string, () => React.ReactElement> = {
     pregled: renderPregled, analitika: renderAnalitika, nalog: renderNalog, usluge: renderUsluge,
     zaposleni: renderZaposleni, lager: renderLager, termini: renderTermini,
-    slike: renderSlike, recenzije: renderRecenzije,
+    recenzije: renderRecenzije,
     stranica: renderStranica, lojalnost: renderLojalnost
   }
 
