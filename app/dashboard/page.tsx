@@ -201,12 +201,15 @@ export default function Dashboard() {
   const [qrLoading, setQrLoading] = useState(false)
   const [qrError, setQrError] = useState('')
   // ...ostatak state-a ostaje isti...
-  const [novaUsluga, setNovaUsluga] = useState({ naziv: '', cijena: '', trajanje: '', opis: '', slika_url: '' })
+  const [novaUsluga, setNovaUsluga] = useState({ naziv: '', cijena: '', trajanje: '', opis: '', slika_url: '', valuta: 'RSD' })
   /** Dva skrivena inputa: nova usluga (uvek cilj „nova”) i postojeća (cilj = id pre klika). */
   const uslugaSlikaNovaInputRef = useRef<HTMLInputElement>(null)
   const uslugaSlikaPostojecaInputRef = useRef<HTMLInputElement>(null)
   const galerijaInputRef = useRef<HTMLInputElement>(null)
+  const galerijaSlikaInputRef = useRef<HTMLInputElement>(null)
   const [galerijaUploading, setGalerijaUploading] = useState(false)
+  const [showNovaGalSlika, setShowNovaGalSlika] = useState(false)
+  const [novaGalSlika, setNovaGalSlika] = useState({ opis: '', url: '' })
   const uslugaSlikaPostojecaCiljRef = useRef<string | null>(null)
   const [uslugaSlikaBusyId, setUslugaSlikaBusyId] = useState<string | null>(null)
   const [novaUslugaLager, setNovaUslugaLager] = useState<NovaUslugaLagerItem[]>([])
@@ -862,7 +865,7 @@ export default function Dashboard() {
         return
       }
 
-      const { data, error } = await supabase.from('usluge').insert({
+      const { data, error } = await (supabase.from('usluge') as any).insert({
         salon_id: salon.id,
         naziv,
         cijena,
@@ -870,6 +873,7 @@ export default function Dashboard() {
         opis: novaUsluga.opis.trim(),
         aktivan: true,
         slika_url: novaUsluga.slika_url?.trim() || null,
+        valuta: novaUsluga.valuta,
       }).select().single()
 
       if (error || !data) {
@@ -911,7 +915,7 @@ export default function Dashboard() {
 
       setUsluge((prev) => [...prev, data])
       setUslugaLager((prev) => [...prev, ...novaPotrosnja])
-      setNovaUsluga({ naziv: '', cijena: '', trajanje: '', opis: '', slika_url: '' })
+      setNovaUsluga({ naziv: '', cijena: '', trajanje: '', opis: '', slika_url: '', valuta: 'RSD' })
       setNovaUslugaLager([])
       setShowNovaUsluga(false)
     } catch {
@@ -1728,29 +1732,100 @@ export default function Dashboard() {
           Slike će biti prikazane na tvojoj javnoj stranici kao slideshow.
         </p>
         <input
-          ref={galerijaInputRef}
+          ref={galerijaSlikaInputRef}
           type="file"
           accept="image/*"
           style={{ display: 'none' }}
-          onChange={uploadGalerijaSliku}
+          onChange={async (e) => {
+            const file = e.target.files?.[0]
+            if (!file || !salon?.id) return
+            setGalerijaUploading(true)
+            try {
+              const ext = file.name.split('.').pop()
+              const path = `galerija/${salon.id}/${Date.now()}.${ext}`
+              const { error: uploadErr } = await supabase.storage.from('salon_images').upload(path, file)
+              if (uploadErr) throw uploadErr
+              const { data: { publicUrl } } = supabase.storage.from('salon_images').getPublicUrl(path)
+              setNovaGalSlika(prev => ({ ...prev, url: publicUrl }))
+            } catch (err) {
+              console.error('Upload error:', err)
+            } finally {
+              setGalerijaUploading(false)
+              if (galerijaSlikaInputRef.current) galerijaSlikaInputRef.current.value = ''
+            }
+          }}
         />
-        <button style={btnGold} disabled={galerijaUploading} onClick={() => galerijaInputRef.current?.click()}>
-          {galerijaUploading ? 'Dodavanje...' : '➕ Dodaj sliku'}
-        </button>
-        {salonSlike.length > 0 && (
-          <div style={{ display: 'flex', gap: '10px', marginTop: '14px', flexWrap: 'wrap' }}>
-            {salonSlike.map(s => (
-              <div key={s.id} style={{ position: 'relative', width: '100px', height: '100px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0 }}>
-                <img src={s.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                <button
-                  onClick={() => obrisiGalerijuSliku(s.id)}
-                  style={{ position: 'absolute', top: '4px', right: '4px', width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(0,0,0,.6)', border: 'none', color: '#fff', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
+        {/* Lista postojećih slika */}
+        {salonSlike.map(s => (
+          <div key={s.id} style={{ ...cardStyle, padding: '12px', display: 'flex', gap: '14px', alignItems: 'center', marginBottom: '10px' }}>
+            <div style={{ width: '80px', height: '60px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, background: '#1a1a1a' }}>
+              <img src={s.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            </div>
+            <div style={{ flex: 1, fontSize: '13px', color: text }}>{s.opis || '—'}</div>
+            <button style={btnOutline} onClick={() => obrisiGalerijuSliku(s.id)}>Obriši</button>
           </div>
+        ))}
+        {/* Forma za novu sliku */}
+        {showNovaGalSlika ? (
+          <div style={{ ...cardStyle, marginTop: '12px' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 500, color: text, marginBottom: '12px' }}>Nova slika</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '14px' }}>
+              <div>
+                <label style={labelStyle}>OPIS (opciono)</label>
+                <input style={inputStyle} placeholder="Npr. Unutrašnjost salona" value={novaGalSlika.opis} onChange={(e) => setNovaGalSlika(prev => ({ ...prev, opis: e.target.value }))} />
+              </div>
+              <div>
+                <label style={labelStyle}>SLIKA</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '6px' }}>
+                  <div
+                    onClick={() => galerijaSlikaInputRef.current?.click()}
+                    style={{ width: '120px', height: '75px', borderRadius: '10px', overflow: 'hidden', border: `0.5px solid ${goldBorder}`, background: goldFaint, flexShrink: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    {novaGalSlika.url ? (
+                      <img src={novaGalSlika.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    ) : (
+                      <span style={{ fontSize: '28px', color: 'rgba(212,175,55,.3)' }}>📷</span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <button type="button" style={{ ...btnGold, padding: '9px 14px', fontSize: '12px', alignSelf: 'flex-start' }} onClick={() => galerijaSlikaInputRef.current?.click()}>
+                      Izaberi sliku
+                    </button>
+                    {novaGalSlika.url && (
+                      <button type="button" style={{ ...btnOutline, padding: '9px 14px', fontSize: '12px', alignSelf: 'flex-start' }} onClick={() => setNovaGalSlika({ opis: '', url: '' })}>
+                        Ukloni pregled
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button style={btnGold} disabled={!novaGalSlika.url} onClick={async () => {
+                if (!salon?.id || !novaGalSlika.url) return
+                await (supabase.from('salon_slike') as any).insert({
+                  salon_id: salon.id, url: novaGalSlika.url, opis: novaGalSlika.opis.trim(), redoslijed: 0,
+                })
+                const { data: refreshed } = await (supabase.from('salon_slike') as any)
+                  .select('id, url, opis, redoslijed')
+                  .eq('salon_id', salon.id)
+                  .order('redoslijed', { ascending: true })
+                  .order('created_at', { ascending: true })
+                setSalonSlike(refreshed || [])
+                setShowNovaGalSlika(false)
+                setNovaGalSlika({ opis: '', url: '' })
+              }}>
+                Sačuvaj
+              </button>
+              <button style={btnOutline} onClick={() => { setShowNovaGalSlika(false); setNovaGalSlika({ opis: '', url: '' }) }}>
+                Odustani
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button style={{ ...btnGold, marginTop: '12px' }} onClick={() => setShowNovaGalSlika(true)}>
+            ➕ Dodaj sliku
+          </button>
         )}
       </div>
 
@@ -1879,7 +1954,7 @@ export default function Dashboard() {
                   <div className="dash-usluga-body">
                     <div className="dash-usluga-title">{u.naziv}</div>
                     <div className="dash-usluga-meta">
-                      {u.trajanje} min · {Number(u.cijena).toLocaleString()} RSD
+                      {u.trajanje} min · {Number(u.cijena).toLocaleString()} {(u as any).valuta || 'RSD'}
                     </div>
                     {u.opis ? <div className="dash-usluga-opis">{u.opis}</div> : null}
                     {uslugaLager.filter((p) => p.usluga_id === u.id).length > 0 ? (
@@ -1919,7 +1994,22 @@ export default function Dashboard() {
           <h3 style={{ fontSize: '14px', fontWeight: 500, color: text, marginBottom: '16px' }}>Nova usluga</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: '12px', marginBottom: '14px' }}>
             <div><label style={labelStyle}>NAZIV</label><input style={inputStyle} placeholder="Šišanje" value={novaUsluga.naziv} onChange={(e) => setNovaUsluga((prev) => ({ ...prev, naziv: e.target.value }))} /></div>
-            <div><label style={labelStyle}>CIJENA (RSD)</label><input style={inputStyle} placeholder="1500" value={novaUsluga.cijena} onChange={(e) => setNovaUsluga((prev) => ({ ...prev, cijena: e.target.value }))} /></div>
+            <div>
+              <label style={labelStyle}>CIJENA</label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input style={{...inputStyle, flex: 1}} placeholder="1500" value={novaUsluga.cijena} onChange={(e) => setNovaUsluga((prev) => ({ ...prev, cijena: e.target.value }))} />
+                <select
+                  style={{...inputStyle, width: '80px', flexShrink: 0}}
+                  value={novaUsluga.valuta}
+                  onChange={(e) => setNovaUsluga((prev) => ({ ...prev, valuta: e.target.value }))}
+                >
+                  <option value="RSD">RSD</option>
+                  <option value="KM">KM</option>
+                  <option value="EUR">EUR</option>
+                  <option value="USD">USD</option>
+                </select>
+              </div>
+            </div>
             <div><label style={labelStyle}>TRAJANJE (min)</label><input style={inputStyle} placeholder="45" value={novaUsluga.trajanje} onChange={(e) => setNovaUsluga((prev) => ({ ...prev, trajanje: e.target.value }))} /></div>
             <div style={{ gridColumn: '1/-1' }}><label style={labelStyle}>OPIS (opciono)</label><input style={inputStyle} placeholder="Kratki opis usluge" value={novaUsluga.opis} onChange={(e) => setNovaUsluga((prev) => ({ ...prev, opis: e.target.value }))} /></div>
           </div>
@@ -2065,7 +2155,7 @@ export default function Dashboard() {
                 setShowNovaUsluga(false)
                 setUslugaGreska('')
                 setNovaUslugaLager([])
-                setNovaUsluga({ naziv: '', cijena: '', trajanje: '', opis: '', slika_url: '' })
+      setNovaUsluga({ naziv: '', cijena: '', trajanje: '', opis: '', slika_url: '', valuta: 'RSD' })
               }}
             >
               Odustani

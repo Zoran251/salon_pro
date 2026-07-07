@@ -2075,7 +2075,7 @@ export default function SalonLanding() {
                     }
                   }}
                   aria-pressed={odabranaUsluga?.id === u.id}
-                  aria-label={`${u.naziv}, ${Number(u.cijena).toLocaleString('sr-Latn-RS')} dinara, ${u.trajanje} minuta`}
+                  aria-label={`${u.naziv}, ${Number(u.cijena).toLocaleString('sr-Latn-RS')} ${(u as any).valuta || 'RSD'}, ${u.trajanje} minuta`}
                 >
                   <div className="usluga-card-media">
                     {u.slika_url ? (
@@ -2090,7 +2090,7 @@ export default function SalonLanding() {
                   <div className="usluga-card-body">
                     <div className="usluga-card-row">
                       <div className="usluga-card-naziv">{u.naziv}</div>
-                      <div className="usluga-card-cijena">{Number(u.cijena).toLocaleString('sr-Latn-RS')} RSD</div>
+                      <div className="usluga-card-cijena">{Number(u.cijena).toLocaleString('sr-Latn-RS')} {(u as any).valuta || 'RSD'}</div>
                     </div>
                     <div className="usluga-card-meta">
                       {(u.kategorija?.trim() || 'Ostalo')} · {u.trajanje} min
@@ -3195,7 +3195,7 @@ export default function SalonLanding() {
                     </div>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <span style={{ fontWeight: 600, display: 'block' }}>{u.naziv}</span>
-                      <span style={{ display: 'block', marginTop: 4, color: gold, fontWeight: 600 }}>{Number(u.cijena).toLocaleString('sr-Latn-RS')} RSD</span>
+                      <span style={{ display: 'block', marginTop: 4, color: gold, fontWeight: 600 }}>{Number(u.cijena).toLocaleString('sr-Latn-RS')} {(u as any).valuta || 'RSD'}</span>
                       <div style={{ fontSize: '11px', color: 'rgba(245,240,232,.38)', marginTop: '4px' }}>{u.trajanje} min</div>
                     </div>
                   </button>
