@@ -31,7 +31,7 @@ create policy "Klijent insert recenzija"
   on public.recenzije
   for insert
   with check (
-    client_id in (select id from public.salon_clients where user_id = auth.uid())
+    client_id in (select id from public.salon_clients where auth_user_id = auth.uid())
   );
 
 drop policy if exists "Klijent update svoje recenzije" on public.recenzije;
@@ -39,10 +39,10 @@ create policy "Klijent update svoje recenzije"
   on public.recenzije
   for update
   using (
-    client_id in (select id from public.salon_clients where user_id = auth.uid())
+    client_id in (select id from public.salon_clients where auth_user_id = auth.uid())
   )
   with check (
-    client_id in (select id from public.salon_clients where user_id = auth.uid())
+    client_id in (select id from public.salon_clients where auth_user_id = auth.uid())
   );
 
 drop policy if exists "Javni select recenzije" on public.recenzije;
