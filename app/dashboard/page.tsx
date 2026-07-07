@@ -235,6 +235,8 @@ export default function Dashboard() {
   const [searchZaposleni, setSearchZaposleni] = useState('')
   const [salonSlike, setSalonSlike] = useState<{ id: string; url: string; opis: string; redoslijed: number }[]>([])
   const [slikeLoading, setSlikeLoading] = useState(true)
+  const [noveGalerijaSlike, setNoveGalerijaSlike] = useState<{ url: string }[]>([])
+  const [obrisaneGalerijaIds, setObrisaneGalerijaIds] = useState<Set<string>>(new Set())
   const [recenzije, setRecenzije] = useState<{ id: string; client_id: string; ocjena: number; komentar: string; odgovor: string; odgovor_created_at: string | null; created_at: string; salon_clients: { ime: string } | null }[]>([])
   const [recenzijeLoading, setRecenzijeLoading] = useState(true)
   const [recenzijaOdgovorId, setRecenzijaOdgovorId] = useState<string | null>(null)
@@ -807,6 +809,28 @@ export default function Dashboard() {
         .eq('id', user.id)
 
       if (!error) {
+        // Sačuvaj promjene u galeriju
+        if (obrisaneGalerijaIds.size > 0) {
+          for (const id of obrisaneGalerijaIds) {
+            await (supabase.from('salon_slike') as any).delete().eq('id', id)
+          }
+        }
+        if (noveGalerijaSlike.length > 0 && salon?.id) {
+          await (supabase.from('salon_slike') as any).insert(
+            noveGalerijaSlike.map(s => ({ salon_id: salon.id, url: s.url, opis: '', redoslijed: 0 }))
+          )
+        }
+        if (obrisaneGalerijaIds.size > 0 || noveGalerijaSlike.length > 0) {
+          const { data: refreshed } = await (supabase.from('salon_slike') as any)
+            .select('id, url, opis, redoslijed')
+            .eq('salon_id', salon?.id)
+            .order('redoslijed', { ascending: true })
+            .order('created_at', { ascending: true })
+          setSalonSlike(refreshed || [])
+        }
+        setNoveGalerijaSlike([])
+        setObrisaneGalerijaIds(new Set())
+
         setSacuvano('profil')
         setTimeout(() => setSacuvano(''), 3000)
       } else {
@@ -1291,16 +1315,7 @@ export default function Dashboard() {
       const { error: uploadErr } = await supabase.storage.from('salon_images').upload(path, file)
       if (uploadErr) throw uploadErr
       const { data: { publicUrl } } = supabase.storage.from('salon_images').getPublicUrl(path)
-      const { error: insertErr } = await (supabase.from('salon_slike') as any).insert({
-        salon_id: salon.id, url: publicUrl, opis: '', redoslijed: 0,
-      })
-      if (insertErr) throw insertErr
-      const { data: refreshed } = await (supabase.from('salon_slike') as any)
-        .select('id, url, opis, redoslijed')
-        .eq('salon_id', salon.id)
-        .order('redoslijed', { ascending: true })
-        .order('created_at', { ascending: true })
-      setSalonSlike(refreshed || [])
+      setNoveGalerijaSlike(prev => [...prev, { url: publicUrl }])
     } catch (err) {
       console.error('Upload error:', err)
     } finally {
@@ -1310,13 +1325,7 @@ export default function Dashboard() {
   }
 
   const obrisiGalerijuSliku = async (id: string) => {
-    if (!salon?.id) return
-    try {
-      await (supabase.from('salon_slike') as any).delete().eq('id', id).eq('salon_id', salon.id)
-      setSalonSlike(prev => prev.filter(s => s.id !== id))
-    } catch (err) {
-      console.error('Delete error:', err)
-    }
+    setObrisaneGalerijaIds(prev => new Set([...prev, id]))
   }
 
   const handleZaposleniFotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1737,9 +1746,9 @@ export default function Dashboard() {
         <button style={btnGold} disabled={galerijaUploading} onClick={() => galerijaInputRef.current?.click()}>
           {galerijaUploading ? 'Dodavanje...' : '➕ Dodaj sliku'}
         </button>
-        {salonSlike.length > 0 && (
+        {(salonSlike.filter(s => !obrisaneGalerijaIds.has(s.id)).length > 0 || noveGalerijaSlike.length > 0) && (
           <div style={{ display: 'flex', gap: '10px', marginTop: '14px', flexWrap: 'wrap' }}>
-            {salonSlike.map(s => (
+            {salonSlike.filter(s => !obrisaneGalerijaIds.has(s.id)).map(s => (
               <div key={s.id} style={{ position: 'relative', width: '100px', height: '100px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0 }}>
                 <img src={s.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 <button
@@ -1748,6 +1757,18 @@ export default function Dashboard() {
                 >
                   ✕
                 </button>
+              </div>
+            ))}
+            {noveGalerijaSlike.map((s, i) => (
+              <div key={`nova-${i}`} style={{ position: 'relative', width: '100px', height: '100px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0, border: '2px solid rgba(50,200,100,.4)' }}>
+                <img src={s.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <button
+                  onClick={() => setNoveGalerijaSlike(prev => prev.filter((_, idx) => idx !== i))}
+                  style={{ position: 'absolute', top: '4px', right: '4px', width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(0,0,0,.6)', border: 'none', color: '#fff', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  ✕
+                </button>
+                <div style={{ position: 'absolute', bottom: '4px', left: '4px', fontSize: '9px', background: 'rgba(50,200,100,.6)', color: '#fff', padding: '2px 6px', borderRadius: '4px' }}>Nova</div>
               </div>
             ))}
           </div>
