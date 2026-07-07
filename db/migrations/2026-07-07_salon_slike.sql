@@ -15,7 +15,7 @@ drop policy if exists "Vlasnik moze sve na salon_slike" on public.salon_slike;
 create policy "Vlasnik moze sve na salon_slike"
   on public.salon_slike
   using (
-    salon_id in (select id from public.saloni where user_id = auth.uid())
+    salon_id = auth.uid()
   );
 
 drop policy if exists "Javni select salon_slike" on public.salon_slike;

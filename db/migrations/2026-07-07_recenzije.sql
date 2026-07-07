@@ -22,7 +22,7 @@ drop policy if exists "Vlasnik moze sve na recenzije" on public.recenzije;
 create policy "Vlasnik moze sve na recenzije"
   on public.recenzije
   using (
-    salon_id in (select id from public.saloni where user_id = auth.uid())
+    salon_id = auth.uid()
   );
 
 -- autentifikovani klijent insertuje / cita svoje
