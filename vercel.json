@@ -6,7 +6,7 @@
   "crons": [
     {
       "path": "/api/cron/termin-reminder",
-      "schedule": "0 9 * * *"
+      "schedule": "*/30 * * * *"
     }
   ]
 }

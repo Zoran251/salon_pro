@@ -19,15 +19,16 @@ export async function GET(request: Request) {
   const { data: { url, anonKey, ok } } = { data: getPublicSupabaseEnv() }
   if (!ok) return NextResponse.json({ error: 'Supabase env missing' }, { status: 500 })
 
-  // Pronađi termine koji počinju za 55-65 minuta (1h +/- 5min)
+  // Pronađi potvrđene termine koji počinju za 45-75 minuta i još nisu dobili podsjetnik
   const now = new Date()
-  const fromTime = new Date(now.getTime() + 55 * 60 * 1000).toISOString()
-  const toTime = new Date(now.getTime() + 65 * 60 * 1000).toISOString()
+  const fromTime = new Date(now.getTime() + 45 * 60 * 1000).toISOString()
+  const toTime = new Date(now.getTime() + 75 * 60 * 1000).toISOString()
 
   const { data: termini, error: tErr } = await srv
     .from('termini')
     .select('id, datum_vrijeme, ime_klijenta, client_id, salon_id, usluga_id')
     .eq('status', 'potvrđen')
+    .eq('podsjetnik_poslan', false)
     .gte('datum_vrijeme', fromTime)
     .lt('datum_vrijeme', toTime)
     .limit(50)
@@ -139,6 +140,9 @@ export async function GET(request: Request) {
           },
         )
       }
+
+      // Označi da je podsjetnik poslan (bez obzira na uspjeh pusha, da se ne ponavlja)
+      await srv.from('termini').update({ podsjetnik_poslan: true }).eq('id', termin.id)
     } catch (err) {
       console.error('[cron-termin-reminder] Greška za termin', termin.id, err)
     }
