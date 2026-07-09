@@ -14,9 +14,8 @@ alter table public.salon_slike enable row level security;
 drop policy if exists "Vlasnik moze sve na salon_slike" on public.salon_slike;
 create policy "Vlasnik moze sve na salon_slike"
   on public.salon_slike
-  using (
-    salon_id = auth.uid()
-  );
+  using (salon_id = auth.uid())
+  with check (salon_id = auth.uid());
 
 drop policy if exists "Javni select salon_slike" on public.salon_slike;
 create policy "Javni select salon_slike"
