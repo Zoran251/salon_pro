@@ -1709,28 +1709,22 @@ export default function Dashboard() {
           type="file"
           accept="image/*"
           style={{ display: 'none' }}
-          onChange={async (e) => {
+          onChange={(e) => {
             const file = e.target.files?.[0]
-            if (!file || !salon?.id) return
+            if (!file) return
             if (file.size > 5 * 1024 * 1024) {
               alert('Slika je prevelika. Maksimalno 5 MB.')
               if (galerijaSlikaInputRef.current) galerijaSlikaInputRef.current.value = ''
               return
             }
             setGalerijaUploading(true)
-            try {
-              const ext = file.name.split('.').pop()
-              const path = `galerija/${salon.id}/${Date.now()}.${ext}`
-              const { error: uploadErr } = await supabase.storage.from('salon_images').upload(path, file)
-              if (uploadErr) { alert('Greška pri uploadu: ' + uploadErr.message); throw uploadErr }
-              const { data: { publicUrl } } = supabase.storage.from('salon_images').getPublicUrl(path)
-              setNovaGalSlika(prev => ({ ...prev, url: publicUrl }))
-            } catch (err) {
-              console.error('Upload error:', err)
-            } finally {
+            const reader = new FileReader()
+            reader.onload = (ev) => {
+              setNovaGalSlika(prev => ({ ...prev, url: String(ev.target?.result || '') }))
               setGalerijaUploading(false)
-              if (galerijaSlikaInputRef.current) galerijaSlikaInputRef.current.value = ''
             }
+            reader.onerror = () => { alert('Greška pri učitavanju slike.'); setGalerijaUploading(false) }
+            reader.readAsDataURL(file)
           }}
         />
         {/* Lista postojećih slika */}
