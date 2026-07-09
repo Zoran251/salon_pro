@@ -195,6 +195,7 @@ export default function SalonLanding() {
   const [pageLoading, setPageLoading] = useState(true)
   const [showForma, setShowForma] = useState(false)
   const [salonSlike, setSalonSlike] = useState<{ id: string; url: string; opis: string; redoslijed: number }[]>([])
+  const [galerijaIndex, setGalerijaIndex] = useState(0)
   const [recenzije, setRecenzije] = useState<{ id: string; client_id: string; ocjena: number; komentar: string; odgovor: string; odgovor_created_at: string | null; created_at: string; salon_clients: { ime: string } | null }[]>([])
   const [showRecenzijaModal, setShowRecenzijaModal] = useState(false)
   const [recOcjena, setRecOcjena] = useState(5)
@@ -399,6 +400,15 @@ export default function SalonLanding() {
 
     fetchSalon()
   }, [slug])
+
+  // Slideshow auto-advance
+  useEffect(() => {
+    if (salonSlike.length < 2) return
+    const timer = setInterval(() => {
+      setGalerijaIndex(i => (i + 1) % salonSlike.length)
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [salonSlike.length])
 
   // Dohvati slobodne termine sa servera (uvažava radno vrijeme i postojeće rezervacije)
   useEffect(() => {
@@ -3006,20 +3016,29 @@ export default function SalonLanding() {
         {/* Galerija slika */}
         {salonSlike.length > 0 && (
           <div style={{ marginTop: '32px', marginBottom: '32px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: 500, color: '#f5f0e8', marginBottom: '16px' }}>🏆 Istaknuti radovi</h3>
-            <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', paddingBottom: '8px' }}>
-              {salonSlike.map(s => (
-                <div key={s.id} style={{ flex: '0 0 auto', scrollSnapAlign: 'start', width: '300px', borderRadius: '12px', overflow: 'hidden', background: '#0a0a0a' }}>
-                  <div style={{ width: '100%', height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <img src={s.url} alt={s.opis || 'Slika salona'} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }} />
-                  </div>
-                  {s.opis && (
-                    <div style={{ padding: '10px 14px', fontSize: '13px', color: 'rgba(245,240,232,.65)', borderTop: '0.5px solid rgba(255,255,255,.05)' }}>
-                      {s.opis}
-                    </div>
-                  )}
+            <h3 style={{ fontSize: '18px', fontWeight: 500, color: '#f5f0e8', marginBottom: '20px' }}>🏆 Istaknuti radovi</h3>
+            <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+              <div style={{ width: '100%', height: '350px', borderRadius: '14px', overflow: 'hidden', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                {salonSlike.map((s, i) => (
+                  <img key={s.id} src={s.url} alt={s.opis || 'Slika salona'}
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', position: 'absolute', transition: 'opacity .6s ease', opacity: i === galerijaIndex ? 1 : 0 }}
+                  />
+                ))}
+              </div>
+              {salonSlike[galerijaIndex]?.opis && (
+                <div style={{ textAlign: 'center', fontSize: '13px', color: 'rgba(245,240,232,.55)', marginTop: '12px' }}>
+                  {salonSlike[galerijaIndex].opis}
                 </div>
-              ))}
+              )}
+              {salonSlike.length > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '14px' }}>
+                  {salonSlike.map((_, i) => (
+                    <button key={i} onClick={() => setGalerijaIndex(i)}
+                      style={{ width: '8px', height: '8px', borderRadius: '50%', border: 'none', padding: 0, cursor: 'pointer', background: i === galerijaIndex ? gold : 'rgba(255,255,255,.15)', transition: 'background .3s' }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

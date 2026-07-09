@@ -1699,9 +1699,9 @@ export default function Dashboard() {
       </div>
 
       {/* Galerija slika */}
-      <div style={cardStyle}>
+      <div style={{ ...cardStyle, maxWidth: '520px' }}>
         <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '12px' }}>🏆 Istaknuti radovi</h3>
-        <p style={{ fontSize: '12px', color: muted, lineHeight: 1.55, marginBottom: '16px' }}>
+        <p style={{ fontSize: '12px', color: muted, lineHeight: 1.55, marginBottom: '14px' }}>
           Slike će biti prikazane na tvojoj javnoj stranici. Maksimalna veličina: 5 MB.
         </p>
         <input
@@ -1728,84 +1728,66 @@ export default function Dashboard() {
           }}
         />
         {/* Lista postojećih slika */}
-        {salonSlike.map(s => (
-          <div key={s.id} style={{ ...cardStyle, padding: '12px', marginBottom: '10px' }}>
-            <div style={{ width: '100%', borderRadius: '8px', overflow: 'hidden', background: '#1a1a1a', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80px' }}>
-              <img src={s.url} alt="" style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+          {salonSlike.map(s => (
+            <div key={s.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', background: '#1e1e1e', borderRadius: '10px', padding: '10px' }}>
+              <div style={{ width: '70px', height: '52px', borderRadius: '6px', overflow: 'hidden', flexShrink: 0, background: '#111' }}>
+                <img src={s.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              </div>
+              <div style={{ flex: 1, fontSize: '12px', color: text, fontWeight: s.opis ? 500 : 400 }}>{s.opis || '—'}</div>
+              <button style={{ ...btnOutline, padding: '6px 12px', fontSize: '11px' }} onClick={() => obrisiGalerijuSliku(s.id)}>Obriši</button>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-              <div style={{ fontSize: '13px', color: text, fontWeight: s.opis ? 500 : 400 }}>{s.opis || '—'}</div>
-              <button style={btnOutline} onClick={() => obrisiGalerijuSliku(s.id)}>Obriši</button>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
         {/* Forma za novu sliku */}
         {showNovaGalSlika ? (
-          <div style={{ ...cardStyle, marginTop: '12px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 500, color: text, marginBottom: '12px' }}>Nova slika</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '14px' }}>
-              <div>
-                <label style={labelStyle}>OPIS (opciono)</label>
-                <input style={inputStyle} placeholder="Npr. Unutrašnjost salona" value={novaGalSlika.opis} onChange={(e) => setNovaGalSlika(prev => ({ ...prev, opis: e.target.value }))} />
+          <div style={{ background: '#1e1e1e', borderRadius: '10px', padding: '14px' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+              <div
+                onClick={() => galerijaSlikaInputRef.current?.click()}
+                style={{ width: '90px', height: '60px', borderRadius: '8px', overflow: 'hidden', border: `0.5px solid ${goldBorder}`, background: goldFaint, flexShrink: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                {novaGalSlika.url ? (
+                  <img src={novaGalSlika.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                ) : (
+                  <span style={{ fontSize: '22px', color: 'rgba(212,175,55,.3)' }}>📷</span>
+                )}
               </div>
-              <div>
-                <label style={labelStyle}>SLIKA</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '6px' }}>
-                  <div
-                    onClick={() => galerijaSlikaInputRef.current?.click()}
-                    style={{ width: '120px', height: '75px', borderRadius: '10px', overflow: 'hidden', border: `0.5px solid ${goldBorder}`, background: goldFaint, flexShrink: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    {novaGalSlika.url ? (
-                      <img src={novaGalSlika.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    ) : (
-                      <span style={{ fontSize: '28px', color: 'rgba(212,175,55,.3)' }}>📷</span>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <button type="button" style={{ ...btnGold, padding: '9px 14px', fontSize: '12px', alignSelf: 'flex-start' }} onClick={() => galerijaSlikaInputRef.current?.click()}>
-                      Izaberi sliku
-                    </button>
-                    {novaGalSlika.url && (
-                      <button type="button" style={{ ...btnOutline, padding: '9px 14px', fontSize: '12px', alignSelf: 'flex-start' }} onClick={() => setNovaGalSlika({ opis: '', url: '' })}>
-                        Ukloni pregled
-                      </button>
-                    )}
-                  </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <input style={inputStyle} placeholder="Opis (opciono)" value={novaGalSlika.opis} onChange={(e) => setNovaGalSlika(prev => ({ ...prev, opis: e.target.value }))} />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="button" style={{ ...btnGold, padding: '8px 14px', fontSize: '12px' }} disabled={!novaGalSlika.url} onClick={async () => {
+                    if (!salon?.id || !novaGalSlika.url) return
+                    try {
+                      const { error: insertErr } = await (supabase.from('salon_slike') as any).insert({
+                        salon_id: salon.id, url: novaGalSlika.url, opis: novaGalSlika.opis.trim(), redoslijed: 0,
+                      })
+                      if (insertErr) { alert('Greška: ' + insertErr.message); return }
+                      const { data: refreshed } = await (supabase.from('salon_slike') as any)
+                        .select('id, url, opis, redoslijed')
+                        .eq('salon_id', salon.id)
+                        .order('redoslijed', { ascending: true })
+                        .order('created_at', { ascending: true })
+                      setSalonSlike(refreshed || [])
+                      setShowNovaGalSlika(false)
+                      setNovaGalSlika({ opis: '', url: '' })
+                    } catch { alert('Greška pri čuvanju.') }
+                  }}>
+                    {galerijaUploading ? '…' : 'Sačuvaj'}
+                  </button>
+                  <button type="button" style={{ ...btnOutline, padding: '8px 14px', fontSize: '12px' }} onClick={() => { setShowNovaGalSlika(false); setNovaGalSlika({ opis: '', url: '' }) }}>
+                    Odustani
+                  </button>
                 </div>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button style={btnGold} disabled={!novaGalSlika.url} onClick={async () => {
-                if (!salon?.id || !novaGalSlika.url) return
-                try {
-                  const { error: insertErr } = await (supabase.from('salon_slike') as any).insert({
-                    salon_id: salon.id, url: novaGalSlika.url, opis: novaGalSlika.opis.trim(), redoslijed: 0,
-                  })
-                  if (insertErr) { alert('Greška pri čuvanju: ' + insertErr.message); return }
-                  const { data: refreshed } = await (supabase.from('salon_slike') as any)
-                    .select('id, url, opis, redoslijed')
-                    .eq('salon_id', salon.id)
-                    .order('redoslijed', { ascending: true })
-                    .order('created_at', { ascending: true })
-                  setSalonSlike(refreshed || [])
-                  setShowNovaGalSlika(false)
-                  setNovaGalSlika({ opis: '', url: '' })
-                } catch (err) {
-                  alert('Greška pri čuvanju slike.')
-                  console.error(err)
-                }
-              }}>
-                Sačuvaj
-              </button>
-              <button style={btnOutline} onClick={() => { setShowNovaGalSlika(false); setNovaGalSlika({ opis: '', url: '' }) }}>
-                Odustani
-              </button>
-            </div>
           </div>
         ) : (
-          <button style={{ ...btnGold, marginTop: '12px' }} onClick={() => setShowNovaGalSlika(true)}>
-            ➕ Dodaj sliku
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button style={{ ...btnGold, padding: '9px 16px', fontSize: '12px' }} onClick={() => { setNovaGalSlika({ opis: '', url: '' }); setShowNovaGalSlika(true) }}>
+              ➕ Dodaj sliku
+            </button>
+          </div>
         )}
       </div>
 
