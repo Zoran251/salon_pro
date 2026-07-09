@@ -227,6 +227,15 @@ export default function SalonLanding() {
   const [profilPoruka, setProfilPoruka] = useState('')
   const [profilGreska, setProfilGreska] = useState('')
   const prevShowFormaRef = useRef(false)
+
+  // Inicijalizuj pushSubscribed iz postojeće browser pretplate
+  useEffect(() => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+    navigator.serviceWorker.ready
+      .then(reg => reg.pushManager.getSubscription())
+      .then(sub => { if (sub) setPushSubscribed(true) })
+      .catch(() => {})
+  }, [])
   const [notifPanelOpen, setNotifPanelOpen] = useState(false)
   const [prikaziSvaObavestenja, setPrikaziSvaObavestenja] = useState(false)
   const [inAppToast, setInAppToast] = useState<{ title: string; body: string } | null>(null)

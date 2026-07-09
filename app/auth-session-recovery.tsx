@@ -11,6 +11,8 @@ async function registrujPush() {
     const { registerServiceWorker, subscribeToPush, sendSubscriptionToServer } = await import('@/lib/web-push/client')
     const reg = await registerServiceWorker()
     if (reg) {
+      const existing = await reg.pushManager.getSubscription()
+      if (!existing) return // ne traži dozvolu – čekamo da korisnik sam klikne
       const sub = await subscribeToPush(reg)
       if (sub) {
         const session = await waitForClientSession()
