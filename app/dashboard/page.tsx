@@ -205,7 +205,6 @@ export default function Dashboard() {
   /** Dva skrivena inputa: nova usluga (uvek cilj „nova”) i postojeća (cilj = id pre klika). */
   const uslugaSlikaNovaInputRef = useRef<HTMLInputElement>(null)
   const uslugaSlikaPostojecaInputRef = useRef<HTMLInputElement>(null)
-  const galerijaInputRef = useRef<HTMLInputElement>(null)
   const galerijaSlikaInputRef = useRef<HTMLInputElement>(null)
   const [galerijaUploading, setGalerijaUploading] = useState(false)
   const [showNovaGalSlika, setShowNovaGalSlika] = useState(false)
@@ -1287,34 +1286,6 @@ export default function Dashboard() {
     }
   }
 
-  const uploadGalerijaSliku = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !salon?.id) return
-    setGalerijaUploading(true)
-    try {
-      const ext = file.name.split('.').pop()
-      const path = `galerija/${salon.id}/${Date.now()}.${ext}`
-      const { error: uploadErr } = await supabase.storage.from('salon_images').upload(path, file)
-      if (uploadErr) throw uploadErr
-      const { data: { publicUrl } } = supabase.storage.from('salon_images').getPublicUrl(path)
-      const { error: insertErr } = await (supabase.from('salon_slike') as any).insert({
-        salon_id: salon.id, url: publicUrl, opis: '', redoslijed: 0,
-      })
-      if (insertErr) throw insertErr
-      const { data: refreshed } = await (supabase.from('salon_slike') as any)
-        .select('id, url, opis, redoslijed')
-        .eq('salon_id', salon.id)
-        .order('redoslijed', { ascending: true })
-        .order('created_at', { ascending: true })
-      setSalonSlike(refreshed || [])
-    } catch (err) {
-      console.error('Upload error:', err)
-    } finally {
-      setGalerijaUploading(false)
-      if (galerijaInputRef.current) galerijaInputRef.current.value = ''
-    }
-  }
-
   const obrisiGalerijuSliku = async (id: string) => {
     if (!salon?.id) return
     try {
@@ -1731,7 +1702,7 @@ export default function Dashboard() {
       <div style={cardStyle}>
         <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '12px' }}>🖼️ Galerija slika</h3>
         <p style={{ fontSize: '12px', color: muted, lineHeight: 1.55, marginBottom: '16px' }}>
-          Slike će biti prikazane na tvojoj javnoj stranici kao slideshow.
+          Slike će biti prikazane na tvojoj javnoj stranici kao slideshow. Maksimalna veličina: 5 MB.
         </p>
         <input
           ref={galerijaSlikaInputRef}
@@ -1741,12 +1712,17 @@ export default function Dashboard() {
           onChange={async (e) => {
             const file = e.target.files?.[0]
             if (!file || !salon?.id) return
+            if (file.size > 5 * 1024 * 1024) {
+              alert('Slika je prevelika. Maksimalno 5 MB.')
+              if (galerijaSlikaInputRef.current) galerijaSlikaInputRef.current.value = ''
+              return
+            }
             setGalerijaUploading(true)
             try {
               const ext = file.name.split('.').pop()
               const path = `galerija/${salon.id}/${Date.now()}.${ext}`
               const { error: uploadErr } = await supabase.storage.from('salon_images').upload(path, file)
-              if (uploadErr) throw uploadErr
+              if (uploadErr) { alert('Greška pri uploadu: ' + uploadErr.message); throw uploadErr }
               const { data: { publicUrl } } = supabase.storage.from('salon_images').getPublicUrl(path)
               setNovaGalSlika(prev => ({ ...prev, url: publicUrl }))
             } catch (err) {
@@ -1805,17 +1781,23 @@ export default function Dashboard() {
             <div style={{ display: 'flex', gap: '10px' }}>
               <button style={btnGold} disabled={!novaGalSlika.url} onClick={async () => {
                 if (!salon?.id || !novaGalSlika.url) return
-                await (supabase.from('salon_slike') as any).insert({
-                  salon_id: salon.id, url: novaGalSlika.url, opis: novaGalSlika.opis.trim(), redoslijed: 0,
-                })
-                const { data: refreshed } = await (supabase.from('salon_slike') as any)
-                  .select('id, url, opis, redoslijed')
-                  .eq('salon_id', salon.id)
-                  .order('redoslijed', { ascending: true })
-                  .order('created_at', { ascending: true })
-                setSalonSlike(refreshed || [])
-                setShowNovaGalSlika(false)
-                setNovaGalSlika({ opis: '', url: '' })
+                try {
+                  const { error: insertErr } = await (supabase.from('salon_slike') as any).insert({
+                    salon_id: salon.id, url: novaGalSlika.url, opis: novaGalSlika.opis.trim(), redoslijed: 0,
+                  })
+                  if (insertErr) { alert('Greška pri čuvanju: ' + insertErr.message); return }
+                  const { data: refreshed } = await (supabase.from('salon_slike') as any)
+                    .select('id, url, opis, redoslijed')
+                    .eq('salon_id', salon.id)
+                    .order('redoslijed', { ascending: true })
+                    .order('created_at', { ascending: true })
+                  setSalonSlike(refreshed || [])
+                  setShowNovaGalSlika(false)
+                  setNovaGalSlika({ opis: '', url: '' })
+                } catch (err) {
+                  alert('Greška pri čuvanju slike.')
+                  console.error(err)
+                }
               }}>
                 Sačuvaj
               </button>
