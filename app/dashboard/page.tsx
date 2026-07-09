@@ -1700,9 +1700,9 @@ export default function Dashboard() {
 
       {/* Galerija slika */}
       <div style={cardStyle}>
-        <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '12px' }}>🖼️ Galerija slika</h3>
+        <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '12px' }}>🏆 Istaknuti radovi</h3>
         <p style={{ fontSize: '12px', color: muted, lineHeight: 1.55, marginBottom: '16px' }}>
-          Slike će biti prikazane na tvojoj javnoj stranici kao slideshow. Maksimalna veličina: 5 MB.
+          Slike će biti prikazane na tvojoj javnoj stranici. Maksimalna veličina: 5 MB.
         </p>
         <input
           ref={galerijaSlikaInputRef}
@@ -1729,12 +1729,14 @@ export default function Dashboard() {
         />
         {/* Lista postojećih slika */}
         {salonSlike.map(s => (
-          <div key={s.id} style={{ ...cardStyle, padding: '12px', display: 'flex', gap: '14px', alignItems: 'center', marginBottom: '10px' }}>
-            <div style={{ width: '80px', height: '60px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, background: '#1a1a1a' }}>
-              <img src={s.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          <div key={s.id} style={{ ...cardStyle, padding: '12px', marginBottom: '10px' }}>
+            <div style={{ width: '100%', borderRadius: '8px', overflow: 'hidden', background: '#1a1a1a', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80px' }}>
+              <img src={s.url} alt="" style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }} />
             </div>
-            <div style={{ flex: 1, fontSize: '13px', color: text }}>{s.opis || '—'}</div>
-            <button style={btnOutline} onClick={() => obrisiGalerijuSliku(s.id)}>Obriši</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+              <div style={{ fontSize: '13px', color: text, fontWeight: s.opis ? 500 : 400 }}>{s.opis || '—'}</div>
+              <button style={btnOutline} onClick={() => obrisiGalerijuSliku(s.id)}>Obriši</button>
+            </div>
           </div>
         ))}
         {/* Forma za novu sliku */}

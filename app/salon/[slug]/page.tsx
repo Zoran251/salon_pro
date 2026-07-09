@@ -3006,10 +3006,18 @@ export default function SalonLanding() {
         {/* Galerija slika */}
         {salonSlike.length > 0 && (
           <div style={{ marginTop: '32px', marginBottom: '32px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 500, color: '#f5f0e8', marginBottom: '16px' }}>🏆 Istaknuti radovi</h3>
             <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', paddingBottom: '8px' }}>
               {salonSlike.map(s => (
-                <div key={s.id} style={{ flex: '0 0 auto', scrollSnapAlign: 'start', width: '280px', height: '200px', borderRadius: '12px', overflow: 'hidden' }}>
-                  <img src={s.url} alt={s.opis || 'Slika salona'} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <div key={s.id} style={{ flex: '0 0 auto', scrollSnapAlign: 'start', width: '300px', borderRadius: '12px', overflow: 'hidden', background: '#0a0a0a' }}>
+                  <div style={{ width: '100%', height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <img src={s.url} alt={s.opis || 'Slika salona'} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }} />
+                  </div>
+                  {s.opis && (
+                    <div style={{ padding: '10px 14px', fontSize: '13px', color: 'rgba(245,240,232,.65)', borderTop: '0.5px solid rgba(255,255,255,.05)' }}>
+                      {s.opis}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
