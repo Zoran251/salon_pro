@@ -127,6 +127,64 @@ export default function SalonProLanding() {
     'Otkaži kad hoćeš',
   ]
 
+  function PricingCard({ naziv, cijena, period, opis, zlatni, isticanje }: { naziv: string; cijena: string; period: string; opis: string; zlatni: boolean; isticanje: boolean }) {
+    return (
+      <div
+        className="lp-pricing-card"
+        style={{
+          background: isticanje ? 'linear-gradient(135deg,#1a1500,#0f0e00)' : CARD,
+          border: `1px solid ${zlatni ? GOLD : 'rgba(212,175,55,0.15)'}`,
+          borderRadius: 20,
+          padding: '32px 28px',
+          width: 260,
+          textAlign: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+          boxShadow: isticanje ? '0 0 80px rgba(212,175,55,0.12)' : 'none',
+          flexShrink: 0,
+        }}
+      >
+        {isticanje && (
+          <div style={{ position: 'absolute', top: 10, right: 10, background: GOLD, color: '#0a0a0a', fontSize: 10, fontWeight: 700, padding: '2px 10px', borderRadius: 12, fontFamily: 'sans-serif', letterSpacing: '0.1em' }}>
+            PREPORUČUJEMO
+          </div>
+        )}
+        <div style={{ fontSize: 13, fontWeight: 600, color: GOLD, marginBottom: 16, fontFamily: 'sans-serif', letterSpacing: '0.15em' }}>
+          {naziv.toUpperCase()}
+        </div>
+        <div style={{ marginBottom: 6 }}>
+          <span className="lp-price-big" style={{ color: GOLD, fontWeight: 900, fontFamily: 'Georgia,serif', fontSize: 'clamp(32px,4vw,42px)' }}>
+            {cijena}
+          </span>
+          <span style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'sans-serif', fontSize: 14 }}>{period}</span>
+        </div>
+        <p style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'sans-serif', fontSize: 12, lineHeight: 1.5, marginBottom: 20, minHeight: 36 }}>
+          {opis}
+        </p>
+        <Link href="/registracija" style={{ textDecoration: 'none' }}>
+          <motion.div
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            style={{
+              background: zlatni ? `linear-gradient(135deg, ${GOLD_LIGHT}, ${GOLD}, ${GOLD_DARK})` : 'rgba(255,255,255,0.06)',
+              color: zlatni ? '#000' : 'rgba(255,255,255,0.7)',
+              border: zlatni ? 'none' : '0.5px solid rgba(212,175,55,0.2)',
+              borderRadius: 30,
+              padding: '12px 24px',
+              fontWeight: zlatni ? 800 : 500,
+              fontSize: 13,
+              cursor: 'pointer',
+              fontFamily: 'sans-serif',
+              letterSpacing: '0.1em',
+            }}
+          >
+            {zlatni ? 'Izaberi doživotnu →' : `Izaberi ${naziv.toLowerCase()} →`}
+          </motion.div>
+        </Link>
+      </div>
+    )
+  }
+
   return (
     <div className="lp-page" style={{ minHeight: '100vh', background: BG, color: '#fff' }}>
       <nav
@@ -340,28 +398,7 @@ export default function SalonProLanding() {
 
       <section className="lp-pricing">
         <FadeIn>
-          <div
-            className="lp-pricing-card"
-            style={{
-              background: CARD,
-              border: `1px solid ${GOLD}33`,
-              textAlign: 'center',
-              position: 'relative',
-              overflow: 'hidden',
-              boxShadow: '0 0 80px rgba(212,175,55,0.08)',
-            }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 2,
-                background: `linear-gradient(to right, transparent, ${GOLD}, transparent)`,
-              }}
-            />
-
+          <div style={{ textAlign: 'center', marginBottom: 48 }}>
             <div
               className="lp-eyebrow"
               style={{
@@ -371,79 +408,56 @@ export default function SalonProLanding() {
                 background: `${GOLD}14`,
                 border: `1px solid ${GOLD}33`,
                 borderRadius: 20,
-                marginBottom: 24,
+                padding: '6px 18px',
+                marginBottom: 20,
               }}
             >
-              <span style={{ color: GOLD, fontFamily: 'sans-serif', letterSpacing: '0.2em' }}>CIJENA</span>
+              <span style={{ color: GOLD, fontFamily: 'sans-serif', letterSpacing: '0.2em' }}>CIJENE</span>
             </div>
+            <h2 style={{ fontSize: 'clamp(28px,5vw,44px)', fontWeight: 700, fontFamily: 'Georgia,serif', color: '#f5f0e8', margin: 0 }}>
+              Izaberi plan za tvoj salon
+            </h2>
+          </div>
 
-            <div style={{ marginBottom: 8 }}>
-              <span className="lp-price-big" style={{ color: GOLD, fontWeight: 900, fontFamily: 'Georgia,serif' }}>
-                29,99€
-              </span>
-              <span style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'sans-serif' }}> / mj.</span>
-            </div>
-            <p style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'sans-serif', marginBottom: 32 }}>
-              Prve 2 sedmice besplatno. Otkaži kad hoćeš.
-            </p>
+          <div style={{ display: 'flex', gap: 20, justifyContent: 'center', flexWrap: 'wrap' }}>
+            {/* Mjesečna */}
+            <PricingCard
+              naziv="Mjesečna"
+              cijena="29,99€"
+              period="/ mj."
+              opis="Prve 2 sedmice besplatno. Otkaži kad hoćeš."
+              zlatni={false}
+              isticanje={false}
+            />
 
-            <div style={{ textAlign: 'left', marginBottom: 32 }}>
-              {perks.map((p, i) => (
-                <div
-                  key={p}
-                  className="lp-perk-row"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    borderBottom: i < perks.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
-                    background: p.includes('Crna lista') ? 'rgba(231,76,60,0.05)' : 'transparent',
-                    borderRadius: p.includes('Crna lista') ? 8 : 0,
-                    paddingLeft: p.includes('Crna lista') ? 8 : 0,
-                    paddingRight: p.includes('Crna lista') ? 8 : 0,
-                    margin: p.includes('Crna lista') ? '4px -8px' : 0,
-                  }}
-                >
-                  <span style={{ color: p.includes('Crna lista') ? 'rgba(231,76,60,0.9)' : GOLD, fontSize: '1.1em' }}>
-                    {p.includes('Crna lista') ? '🚫' : '✓'}
-                  </span>
-                  <span
-                    style={{
-                      color: p.includes('Crna lista') ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.65)',
-                      fontFamily: 'sans-serif',
-                      fontWeight: p.includes('Crna lista') ? 600 : 400,
-                    }}
-                  >
-                    {p}
-                  </span>
-                  {p.includes('Crna lista') ? (
-                    <span
-                      style={{
-                        marginLeft: 'auto',
-                        background: 'rgba(231,76,60,0.15)',
-                        border: '1px solid rgba(231,76,60,0.3)',
-                        borderRadius: 20,
-                        padding: '1px 8px',
-                        fontSize: 8,
-                        color: 'rgba(231,76,60,0.85)',
-                        fontFamily: 'sans-serif',
-                        letterSpacing: '0.12em',
-                      }}
-                    >
-                      NOVO
-                    </span>
-                  ) : null}
-                </div>
-              ))}
-            </div>
+            {/* Godišnja */}
+            <PricingCard
+              naziv="Godišnja"
+              cijena="299€"
+              period="/ god."
+              opis={`≈ ${(299 / 12).toFixed(2).replace('.', ',')}€ / mj. · Uštedi ${Math.round(29.99 * 12 - 299)}€`}
+              zlatni={false}
+              isticanje={false}
+            />
 
-            <Link href="/registracija" style={{ textDecoration: 'none', display: 'block' }}>
+            {/* Doživotna */}
+            <PricingCard
+              naziv="Doživotna"
+              cijena="1.200€"
+              period=" jednokratno"
+              opis="Plaćaš jednom — koristiš zauvijek. Bez ikakvih dodatnih troškova."
+              zlatni={true}
+              isticanje={true}
+            />
+          </div>
+
+          <div style={{ textAlign: 'center', marginTop: 28 }}>
+            <Link href="/registracija" style={{ textDecoration: 'none', display: 'inline-block' }}>
               <motion.div
                 className="lp-pricing-cta"
                 whileHover={{ scale: 1.03, boxShadow: '0 22px 55px rgba(212,175,55,0.4)' }}
                 whileTap={{ scale: 0.97 }}
                 style={{
-                  width: '100%',
                   background: `linear-gradient(135deg, ${GOLD_LIGHT}, ${GOLD}, ${GOLD_DARK})`,
                   color: '#000',
                   fontWeight: 900,
@@ -454,14 +468,15 @@ export default function SalonProLanding() {
                   cursor: 'pointer',
                   boxShadow: '0 14px 40px rgba(212,175,55,0.3)',
                   fontFamily: 'sans-serif',
-                  textAlign: 'center',
+                  padding: '18px 48px',
+                  fontSize: '15px',
                 }}
               >
                 Počni besplatno →
               </motion.div>
             </Link>
-            <p style={{ color: 'rgba(255,255,255,0.18)', fontFamily: 'sans-serif', marginTop: 16 }}>
-              Kartica nije potrebna za probni period
+            <p style={{ color: 'rgba(255,255,255,0.18)', fontFamily: 'sans-serif', marginTop: 16, fontSize: '13px' }}>
+              Kartica nije potrebna za probni period · Svi planovi uključuju sve funkcije
             </p>
           </div>
         </FadeIn>

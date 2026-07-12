@@ -73,9 +73,9 @@ export const SLIDES: SlideData[] = [
     bg: 'radial-gradient(ellipse at 50% 30%, #1a1400 0%, #070707 68%)',
     accent: GOLD,
     accentGlow: 'rgba(212,175,55,0.28)',
-    headline: '29,99€ / mj.\nBez ugovora.',
+    headline: 'Od 29,99€ / mj.\nBez ugovora.',
     body: 'Postavi za 5 minuta. Otkaži kad hoćeš. Hiljade vlasnika salona više ne čekaju telefon.',
-    sub: 'Prve 2 sedmice besplatno. Kartica nije potrebna.',
+    sub: 'Mjesečno · Godišnje · Doživotno · Prve 2 sedmice besplatno',
     cta: true,
   },
 ]

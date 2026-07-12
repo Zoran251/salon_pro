@@ -283,7 +283,7 @@ function RegistracijaForm() {
                     autoCapitalize="characters"
                   />
                   <p style={{ fontSize: '11px', color: 'rgba(245,240,232,.32)', marginTop: '6px', lineHeight: 1.5 }}>
-                    Ako si došao preko linka sa kodom, polje je već popunjeno. Posle tri nova salona koja se registruju preko tvog koda, godišnja pretplata Pamet je 250 € umesto 360 €.
+                    Ako si došao preko linka sa kodom, polje je već popunjeno. Posle tri nova salona koja se registruju preko tvog koda, godišnja pretplata je {Math.round(299 * 0.85)} € umesto 299 €.
                   </p>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>

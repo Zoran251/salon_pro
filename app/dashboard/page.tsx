@@ -2723,7 +2723,7 @@ export default function Dashboard() {
         </div>
 
         <div style={cardStyle}>
-          <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '10px' }}>Preporuke i Pamet pretplata</h3>
+          <h3 style={{ fontSize: '15px', fontWeight: 500, color: text, marginBottom: '10px' }}>Preporuke i popusti</h3>
           <p style={{ fontSize: '12px', color: muted, lineHeight: 1.55, marginBottom: '14px' }}>
             Podeli link ispod sa kolegama. Kada se <strong style={{ color: text }}>{PREPORUKE_ZA_POPUST}</strong> nova salona registruju preko tvog koda, godišnja pretplata je{' '}
             <strong style={{ color: gold }}>{GODISNJA_CIJENA_SA_REF_EUR} €</strong> umesto {GODISNJA_CIJENA_EUR} €.
@@ -3656,7 +3656,8 @@ export default function Dashboard() {
           <div style={{ flex: 1 }} />
           <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(212,175,55,.06)', border: '0.5px solid rgba(212,175,55,.15)', marginTop: '12px' }}>
             <div style={{ fontSize: '11px', color: muted, marginBottom: '4px' }}>PLAN</div>
-            <div style={{ fontSize: '13px', color: gold, fontWeight: 500 }}>Pro · 29,99 €/mes</div>
+            <div style={{ fontSize: '13px', color: gold, fontWeight: 500 }}>Pro · 29,99 €/mjesec</div>
+            <div style={{ fontSize: '11px', color: muted, marginTop: '6px' }}>299 €/god · 1.200 € doživotno</div>
           </div>
           <button onClick={handleOdjava} style={{ background: 'none', border: 'none', color: muted, fontSize: '12px', cursor: 'pointer', padding: '10px', marginTop: '8px', fontFamily: 'sans-serif' }}>
             Odjavi se
