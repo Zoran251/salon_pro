@@ -116,6 +116,11 @@ export default function SalonProLanding() {
     },
   ]
 
+  const [promoKod, setPromoKod] = useState('')
+  const promoVazi = promoKod.trim().toLowerCase() === 'osnivac10'
+  const dozivotnaCijenaDisplay = promoVazi ? '500' : '1.200'
+  const dozivotnaPeriodDisplay = promoVazi ? ' € / jednokratno (kod: Osnivac10)' : ' € / jednokratno'
+
   const perks = [
     'Personalizovana landing page',
     'QR kod za štampanje',
@@ -127,60 +132,46 @@ export default function SalonProLanding() {
     'Otkaži kad hoćeš',
   ]
 
-  function PricingCard({ naziv, cijena, period, opis, zlatni, isticanje }: { naziv: string; cijena: string; period: string; opis: string; zlatni: boolean; isticanje: boolean }) {
+  function PricingCard({ naziv, cijena, period, opis, zlatni, isticanje, children }: { naziv: string; cijena: string; period: string; opis: string; zlatni: boolean; isticanje: boolean; children?: ReactNode }) {
     return (
       <div
         className="lp-pricing-card"
         style={{
-          background: isticanje ? 'linear-gradient(135deg,#1a1500,#0f0e00)' : CARD,
-          border: `1px solid ${zlatni ? GOLD : 'rgba(212,175,55,0.15)'}`,
-          borderRadius: 20,
-          padding: '32px 28px',
-          width: 260,
+          background: isticanje ? 'linear-gradient(160deg,#1f1800,#0f0e00)' : 'linear-gradient(160deg,#181818,#111)',
+          border: `1px solid ${zlatni ? GOLD : 'rgba(212,175,55,0.12)'}`,
+          borderRadius: 24,
+          padding: '40px 32px',
+          width: 300,
           textAlign: 'center',
           position: 'relative',
           overflow: 'hidden',
-          boxShadow: isticanje ? '0 0 80px rgba(212,175,55,0.12)' : 'none',
+          boxShadow: isticanje ? '0 0 100px rgba(212,175,55,0.1), 0 20px 60px rgba(0,0,0,0.5)' : '0 20px 60px rgba(0,0,0,0.3)',
           flexShrink: 0,
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
         {isticanje && (
-          <div style={{ position: 'absolute', top: 10, right: 10, background: GOLD, color: '#0a0a0a', fontSize: 10, fontWeight: 700, padding: '2px 10px', borderRadius: 12, fontFamily: 'sans-serif', letterSpacing: '0.1em' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,transparent,${GOLD},transparent)` }} />
+        )}
+        {isticanje && (
+          <div style={{ position: 'absolute', top: 14, right: 14, background: `linear-gradient(135deg,${GOLD},#b8960c)`, color: '#0a0a0a', fontSize: 9, fontWeight: 800, padding: '3px 12px', borderRadius: 20, fontFamily: 'sans-serif', letterSpacing: '0.12em', boxShadow: '0 4px 12px rgba(212,175,55,0.3)' }}>
             PREPORUČUJEMO
           </div>
         )}
-        <div style={{ fontSize: 13, fontWeight: 600, color: GOLD, marginBottom: 16, fontFamily: 'sans-serif', letterSpacing: '0.15em' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: zlatni ? GOLD : 'rgba(255,255,255,0.25)', marginBottom: 20, fontFamily: 'sans-serif', letterSpacing: '0.22em' }}>
           {naziv.toUpperCase()}
         </div>
-        <div style={{ marginBottom: 6 }}>
-          <span className="lp-price-big" style={{ color: GOLD, fontWeight: 900, fontFamily: 'Georgia,serif', fontSize: 'clamp(32px,4vw,42px)' }}>
+        <div style={{ marginBottom: 4 }}>
+          <span className="lp-price-big" style={{ color: '#f5f0e8', fontWeight: 700, fontFamily: 'Georgia,serif', fontSize: 'clamp(38px,5vw,48px)', letterSpacing: '-0.02em' }}>
             {cijena}
           </span>
-          <span style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'sans-serif', fontSize: 14 }}>{period}</span>
+          <span style={{ color: 'rgba(255,255,255,0.2)', fontFamily: 'sans-serif', fontSize: 14, fontWeight: 400 }}>{period}</span>
         </div>
-        <p style={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'sans-serif', fontSize: 12, lineHeight: 1.5, marginBottom: 20, minHeight: 36 }}>
+        <p style={{ color: 'rgba(255,255,255,0.25)', fontFamily: 'sans-serif', fontSize: 12, lineHeight: 1.6, marginBottom: 24, minHeight: 38 }}>
           {opis}
         </p>
-        <Link href="/registracija" style={{ textDecoration: 'none' }}>
-          <motion.div
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            style={{
-              background: zlatni ? `linear-gradient(135deg, ${GOLD_LIGHT}, ${GOLD}, ${GOLD_DARK})` : 'rgba(255,255,255,0.06)',
-              color: zlatni ? '#000' : 'rgba(255,255,255,0.7)',
-              border: zlatni ? 'none' : '0.5px solid rgba(212,175,55,0.2)',
-              borderRadius: 30,
-              padding: '12px 24px',
-              fontWeight: zlatni ? 800 : 500,
-              fontSize: 13,
-              cursor: 'pointer',
-              fontFamily: 'sans-serif',
-              letterSpacing: '0.1em',
-            }}
-          >
-            {zlatni ? 'Izaberi doživotnu →' : `Izaberi ${naziv.toLowerCase()} →`}
-          </motion.div>
-        </Link>
+        {children}
       </div>
     )
   }
@@ -419,36 +410,128 @@ export default function SalonProLanding() {
             </h2>
           </div>
 
-          <div style={{ display: 'flex', gap: 20, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 24, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'stretch' }}>
             {/* Mjesečna */}
             <PricingCard
               naziv="Mjesečna"
               cijena="29,99€"
-              period="/ mj."
-              opis="Prve 2 sedmice besplatno. Otkaži kad hoćeš."
+              period=" / mjesec"
+              opis="Prve 2 sedmice besplatno. Otkaži kad želiš."
               zlatni={false}
               isticanje={false}
-            />
+            >
+              <Link href="/registracija" style={{ textDecoration: 'none', marginTop: 'auto' }}>
+                <motion.div
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    color: 'rgba(255,255,255,0.6)',
+                    border: '0.5px solid rgba(212,175,55,0.15)',
+                    borderRadius: 30,
+                    padding: '14px 28px',
+                    fontWeight: 500,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    fontFamily: 'sans-serif',
+                    letterSpacing: '0.1em',
+                  }}
+                >
+                  Izaberi mjesečnu →
+                </motion.div>
+              </Link>
+            </PricingCard>
 
             {/* Godišnja */}
             <PricingCard
               naziv="Godišnja"
               cijena="299€"
-              period="/ god."
-              opis={`≈ ${(299 / 12).toFixed(2).replace('.', ',')}€ / mj. · Uštedi ${Math.round(29.99 * 12 - 299)}€`}
+              period=" / godina"
+              opis={`≈ ${(299 / 12).toFixed(2).replace('.', ',')}€ mjesečno · Ušteda ${Math.round(29.99 * 12 - 299)}€`}
               zlatni={false}
               isticanje={false}
-            />
+            >
+              <Link href="/registracija" style={{ textDecoration: 'none', marginTop: 'auto' }}>
+                <motion.div
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    color: 'rgba(255,255,255,0.6)',
+                    border: '0.5px solid rgba(212,175,55,0.15)',
+                    borderRadius: 30,
+                    padding: '14px 28px',
+                    fontWeight: 500,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    fontFamily: 'sans-serif',
+                    letterSpacing: '0.1em',
+                  }}
+                >
+                  Izaberi godišnju →
+                </motion.div>
+              </Link>
+            </PricingCard>
 
             {/* Doživotna */}
             <PricingCard
-              naziv="Doživotna"
-              cijena="1.200€"
-              period=" jednokratno"
-              opis="Plaćaš jednom — koristiš zauvijek. Bez ikakvih dodatnih troškova."
+              naziv="Doživotna licenca"
+              cijena={dozivotnaCijenaDisplay + '€'}
+              period={dozivotnaPeriodDisplay}
+              opis={promoVazi ? 'Promo kod Osnivac10 aktivan — doživotna za samo 500€!' : 'Plati jednom — koristi zauvijek. Bez ikakvih dodatnih troškova.'}
               zlatni={true}
               isticanje={true}
-            />
+            >
+              <div style={{ marginBottom: 16, marginTop: 'auto' }}>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <input
+                    type="text"
+                    placeholder="Promo kod"
+                    value={promoKod}
+                    onChange={e => setPromoKod(e.target.value)}
+                    style={{
+                      flex: 1,
+                      background: 'rgba(0,0,0,0.4)',
+                      border: promoVazi ? '0.5px solid rgba(212,175,55,0.5)' : '0.5px solid rgba(255,255,255,0.08)',
+                      borderRadius: 20,
+                      padding: '10px 16px',
+                      color: '#f5f0e8',
+                      fontSize: 12,
+                      outline: 'none',
+                      fontFamily: 'sans-serif',
+                      textAlign: 'center',
+                      letterSpacing: '0.1em',
+                    }}
+                  />
+                </div>
+                {promoVazi && (
+                  <div style={{ fontSize: 11, color: GOLD, marginBottom: 10, fontFamily: 'sans-serif' }}>
+                    ✓ Kod Osnivac10: doživotna za 500€ (još {10 - 1} naloga)
+                  </div>
+                )}
+              </div>
+              <Link href="/registracija" style={{ textDecoration: 'none' }}>
+                <motion.div
+                  whileHover={{ scale: 1.03, boxShadow: '0 12px 40px rgba(212,175,55,0.3)' }}
+                  whileTap={{ scale: 0.97 }}
+                  style={{
+                    background: `linear-gradient(135deg, ${GOLD_LIGHT}, ${GOLD}, ${GOLD_DARK})`,
+                    color: '#0a0a0a',
+                    border: 'none',
+                    borderRadius: 30,
+                    padding: '14px 28px',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    fontFamily: 'sans-serif',
+                    letterSpacing: '0.12em',
+                    boxShadow: '0 8px 30px rgba(212,175,55,0.15)',
+                  }}
+                >
+                  Izaberi doživotnu →
+                </motion.div>
+              </Link>
+            </PricingCard>
           </div>
 
           <div style={{ textAlign: 'center', marginTop: 28 }}>
