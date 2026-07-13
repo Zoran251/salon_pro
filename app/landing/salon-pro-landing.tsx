@@ -565,6 +565,45 @@ export default function SalonProLanding() {
         </FadeIn>
       </section>
 
+      <section className="lp-pricing" style={{ paddingBottom: '40px' }}>
+        <FadeIn>
+          <div style={{ textAlign: 'center' }}>
+            <div
+              className="lp-eyebrow"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                background: `${GOLD}14`,
+                border: `1px solid ${GOLD}33`,
+                borderRadius: 20,
+                padding: '6px 18px',
+                marginBottom: 20,
+              }}
+            >
+              <span style={{ color: GOLD, fontFamily: 'sans-serif', letterSpacing: '0.2em' }}>RECENZIJE</span>
+            </div>
+            <h2 style={{ fontSize: 'clamp(28px,5vw,44px)', fontWeight: 700, fontFamily: 'Georgia,serif', color: '#f5f0e8', margin: '0 0 32px' }}>
+              Šta kažu vlasnici salona
+            </h2>
+          </div>
+          <div style={{ display: 'flex', gap: 20, justifyContent: 'center', flexWrap: 'wrap' }}>
+            {[
+              { name: 'Marija P.', salon: 'Salon Marija', rating: 5, text: 'Od kada koristim Salon Pro, uštedim 3 sata dnevno na telefonu. Klijenti sami zakazuju, podsjetnici idu automatski — ja samo radim.', highlight: true },
+              { name: 'Marko J.', salon: 'Marko Barber', rating: 5, text: 'QR kod na izlogu je genijalna stvar. Prolaznici skeniraju i odmah zakažu. Nikad lakše.', highlight: false },
+              { name: 'Jelena N.', salon: 'Nail Art Studio', rating: 4, text: 'Lager me spasio — više ne naručujem na slijepo. Vidim tačno šta se troši i kada treba naručiti.', highlight: false },
+              { name: 'Ana K.', salon: 'Frizerski Studio Ana', rating: 5, text: 'Crna lista je fantastična. Više nema klijenata koji se ne pojave. Preporučujem svakom salonu!', highlight: true },
+            ].map(r => (
+              <div key={r.name} style={{ background: r.highlight ? 'linear-gradient(160deg,#1f1800,#0f0e00)' : CARD, border: `0.5px solid ${r.highlight ? GOLD : 'rgba(255,255,255,0.06)'}`, borderRadius: 20, padding: '28px 24px', width: 260, flexShrink: 0 }}>
+                <div style={{ fontSize: 14, color: GOLD, letterSpacing: '2px', marginBottom: 12 }}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</div>
+                <p style={{ fontSize: 13, color: 'rgba(245,240,232,.7)', lineHeight: 1.7, margin: '0 0 16px', fontFamily: 'sans-serif' }}>"{r.text}"</p>
+                <div style={{ fontSize: 12, color: 'rgba(245,240,232,.4)', fontFamily: 'sans-serif' }}>{r.name} · {r.salon}</div>
+              </div>
+            ))}
+          </div>
+        </FadeIn>
+      </section>
+
       <section className="lp-faq">
         <FadeIn>
           <h2 className="lp-faq-h2" style={{ fontWeight: 700, fontFamily: 'Georgia,serif', textAlign: 'center', color: '#fff' }}>
