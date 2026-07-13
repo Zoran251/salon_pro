@@ -3013,39 +3013,9 @@ export default function SalonLanding() {
       </div>
 
       <div className="content-pad" style={{ maxWidth: '900px', margin: '0 auto', padding: '0 48px 60px' }}>
-        {/* Galerija slika */}
-        {salonSlike.length > 0 && (
-          <div style={{ marginTop: '32px', marginBottom: '32px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: 500, color: '#f5f0e8', marginBottom: '20px' }}>🏆 Istaknuti radovi</h3>
-            <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-              <div style={{ width: '100%', height: '350px', borderRadius: '14px', overflow: 'hidden', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                {salonSlike.map((s, i) => (
-                  <img key={s.id} src={s.url} alt={s.opis || 'Slika salona'}
-                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', position: 'absolute', transition: 'opacity .6s ease', opacity: i === galerijaIndex ? 1 : 0 }}
-                  />
-                ))}
-              </div>
-              {salonSlike[galerijaIndex]?.opis && (
-                <div style={{ textAlign: 'center', fontSize: '13px', color: 'rgba(245,240,232,.55)', marginTop: '12px' }}>
-                  {salonSlike[galerijaIndex].opis}
-                </div>
-              )}
-              {salonSlike.length > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '14px' }}>
-                  {salonSlike.map((_, i) => (
-                    <button key={i} onClick={() => setGalerijaIndex(i)}
-                      style={{ width: '8px', height: '8px', borderRadius: '50%', border: 'none', padding: 0, cursor: 'pointer', background: i === galerijaIndex ? gold : 'rgba(255,255,255,.15)', transition: 'background .3s' }}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Recenzije */}
         {recenzije.length > 0 && (
-          <div style={{ marginBottom: '32px' }}>
+          <div style={{ marginTop: '32px', marginBottom: '32px' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 500, color: '#f5f0e8', marginBottom: '16px' }}>
               ⭐ Recenzije <span style={{ fontSize: '14px', color: 'rgba(245,240,232,.35)', fontWeight: 400 }}>({prosjecnaOcjena} · {recenzije.length})</span>
             </h3>
@@ -3086,7 +3056,7 @@ export default function SalonLanding() {
 
         {/* Ako nema recenzija ali je kupac ulogovan, ipak prikazi dugme */}
         {recenzije.length === 0 && klijentUlogovan && (
-          <div style={{ marginBottom: '32px', textAlign: 'center' }}>
+          <div style={{ marginTop: '32px', marginBottom: '32px', textAlign: 'center' }}>
             <p style={{ fontSize: '13px', color: 'rgba(245,240,232,.4)', marginBottom: '12px' }}>Budite prvi koji će ostaviti recenziju!</p>
             <button
               onClick={() => setShowRecenzijaModal(true)}
@@ -3094,6 +3064,36 @@ export default function SalonLanding() {
             >
               ✏️ Ostavi recenziju
             </button>
+          </div>
+        )}
+
+        {/* Galerija slika */}
+        {salonSlike.length > 0 && (
+          <div style={{ marginTop: '32px', marginBottom: '32px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 500, color: '#f5f0e8', marginBottom: '20px' }}>🏆 Istaknuti radovi</h3>
+            <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+              <div style={{ width: '100%', height: '350px', borderRadius: '14px', overflow: 'hidden', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                {salonSlike.map((s, i) => (
+                  <img key={s.id} src={s.url} alt={s.opis || 'Slika salona'}
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', position: 'absolute', transition: 'opacity .6s ease', opacity: i === galerijaIndex ? 1 : 0 }}
+                  />
+                ))}
+              </div>
+              {salonSlike[galerijaIndex]?.opis && (
+                <div style={{ textAlign: 'center', fontSize: '13px', color: 'rgba(245,240,232,.55)', marginTop: '12px' }}>
+                  {salonSlike[galerijaIndex].opis}
+                </div>
+              )}
+              {salonSlike.length > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '14px' }}>
+                  {salonSlike.map((_, i) => (
+                    <button key={i} onClick={() => setGalerijaIndex(i)}
+                      style={{ width: '8px', height: '8px', borderRadius: '50%', border: 'none', padding: 0, cursor: 'pointer', background: i === galerijaIndex ? gold : 'rgba(255,255,255,.15)', transition: 'background .3s' }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
