@@ -118,6 +118,10 @@ function PricingCard({ naziv, cijena, period, opis, zlatni, isticanje, children 
 }
 
 export default function SalonProLanding() {
+  const [promoKod, setPromoKod] = useState('')
+  const promoVazi = promoKod.trim().toLowerCase() === 'osnivac10'
+  const dozivotnaCijenaDisplay = promoVazi ? '500' : '1.200'
+  const dozivotnaPeriodDisplay = promoVazi ? ' € (kod Osnivac10)' : ' € / jednokratno'
   const belowRef = useRef<HTMLDivElement>(null)
   const scrollDown = () => belowRef.current?.scrollIntoView({ behavior: 'smooth' })
 
@@ -471,17 +475,39 @@ export default function SalonProLanding() {
             {/* Doživotna */}
             <PricingCard
               naziv="Doživotna licenca"
-              cijena="1.200€"
-              period=" jednokratno"
-              opis="Plati jednom — koristi zauvijek. Bez ikakvih dodatnih troškova."
+              cijena={dozivotnaCijenaDisplay + '€'}
+              period={dozivotnaPeriodDisplay}
+              opis={promoVazi ? '✅ Promo kod Osnivac10 aktivan' : 'Plati jednom — koristi zauvijek.'}
               zlatni={true}
               isticanje={true}
             >
-              <div style={{ marginBottom: 14, marginTop: 'auto', padding: '10px', border: '0.5px solid rgba(212,175,55,.2)', borderRadius: 12, background: 'rgba(212,175,55,.04)' }}>
-                <div style={{ fontSize: 10, color: GOLD, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 4 }}>🎯 AKCIJA ZA 10 NAJBRŽIH</div>
-                <div style={{ fontSize: 11, color: 'rgba(245,240,232,.5)' }}>
-                  Unesi kod <strong style={{ color: GOLD }}>Osnivac10</strong> i dobij doživotnu licencu za samo 500€
+              <div style={{ marginBottom: 12, marginTop: 'auto' }}>
+                <div style={{ padding: '10px', border: '0.5px solid rgba(212,175,55,.2)', borderRadius: 12, background: 'rgba(212,175,55,.04)', marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, color: GOLD, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 4 }}>🎯 AKCIJA ZA 10 NAJBRŽIH</div>
+                  <div style={{ fontSize: 11, color: 'rgba(245,240,232,.5)' }}>
+                    Unesi kod <strong style={{ color: GOLD }}>Osnivac10</strong> i dobij za samo 500€
+                  </div>
                 </div>
+                <input
+                  type="text"
+                  placeholder="Promo kod"
+                  value={promoKod}
+                  onChange={e => setPromoKod(e.target.value)}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(0,0,0,0.4)',
+                    border: promoVazi ? '0.5px solid rgba(212,175,55,0.5)' : '0.5px solid rgba(255,255,255,0.08)',
+                    borderRadius: 20,
+                    padding: '10px 16px',
+                    color: '#f5f0e8',
+                    fontSize: 12,
+                    outline: 'none',
+                    fontFamily: 'sans-serif',
+                    textAlign: 'center',
+                    letterSpacing: '0.1em',
+                    boxSizing: 'border-box',
+                  }}
+                />
               </div>
               <Link href="/registracija" style={{ textDecoration: 'none' }}>
                 <motion.div
