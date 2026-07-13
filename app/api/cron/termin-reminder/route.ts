@@ -19,10 +19,10 @@ export async function GET(request: Request) {
   const { data: { url, anonKey, ok } } = { data: getPublicSupabaseEnv() }
   if (!ok) return NextResponse.json({ error: 'Supabase env missing' }, { status: 500 })
 
-  // Pronađi potvrđene termine koji počinju za 45-75 minuta i još nisu dobili podsjetnik
+  // Pronađi potvrđene termine koji počinju za 30-90 minuta i još nisu dobili podsjetnik
   const now = new Date()
-  const fromTime = new Date(now.getTime() + 45 * 60 * 1000).toISOString()
-  const toTime = new Date(now.getTime() + 75 * 60 * 1000).toISOString()
+  const fromTime = new Date(now.getTime() + 30 * 60 * 1000).toISOString()
+  const toTime = new Date(now.getTime() + 90 * 60 * 1000).toISOString()
 
   const { data: termini, error: tErr } = await srv
     .from('termini')
