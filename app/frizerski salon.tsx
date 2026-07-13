@@ -149,7 +149,7 @@ export default function Home() {
                       <div style={{fontSize:11,color:'rgba(245,240,232,.5)'}}>
                         Unesi kod <strong style={{color:'#d4af37'}}>Osnivac10</strong> — 1.200€ → <strong style={{color:'#d4af37'}}>500€</strong>
                       </div>
-                      <div style={{fontSize:10,color:'rgba(212,175,55,.5)',marginTop:4}}>Preostalo još <strong style={{color:'#d4af37'}}>10</strong> licenci po ovoj akciji</div>
+                      <div style={{fontSize:10,color:'rgba(212,175,55,.5)',marginTop:4}}>Preostalo još <strong style={{color:'#d4af37'}}>{promoVazi ? 9 : 10}</strong> licenci po ovoj akciji</div>
                     </div>
                     <input type="text" placeholder="Promo kod" value={promoKod}
                       onChange={e => setPromoKod(e.target.value)}
