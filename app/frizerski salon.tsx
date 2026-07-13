@@ -147,8 +147,9 @@ export default function Home() {
                     <div style={{padding:'10px',border:'0.5px solid rgba(212,175,55,.2)',borderRadius:12,background:'rgba(212,175,55,.04)',marginBottom:12}}>
                       <div style={{fontSize:10,color:'#d4af37',fontWeight:700,letterSpacing:'0.1em',marginBottom:4}}>🎯 AKCIJA ZA 10 NAJBRŽIH</div>
                       <div style={{fontSize:11,color:'rgba(245,240,232,.5)'}}>
-                        Unesi kod <strong style={{color:'#d4af37'}}>Osnivac10</strong> i dobij za samo 500€
+                        Unesi kod <strong style={{color:'#d4af37'}}>Osnivac10</strong> — 1.200€ → <strong style={{color:'#d4af37'}}>500€</strong>
                       </div>
+                      <div style={{fontSize:10,color:'rgba(212,175,55,.5)',marginTop:4}}>Preostalo još <strong style={{color:'#d4af37'}}>10</strong> licenci po ovoj akciji</div>
                     </div>
                     <input type="text" placeholder="Promo kod" value={promoKod}
                       onChange={e => setPromoKod(e.target.value)}
