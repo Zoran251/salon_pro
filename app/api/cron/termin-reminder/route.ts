@@ -8,9 +8,9 @@ const CRON_SECRET = process.env.CRON_SECRET
 
 export async function GET(request: Request) {
   // Provjera CRON_SECRET (preko Authorization header ili ?key= parametra)
-  const url = new URL(request.url)
+  const requestUrl = new URL(request.url)
   const authHeader = request.headers.get('authorization')
-  const keyParam = url.searchParams.get('key')
+  const keyParam = requestUrl.searchParams.get('key')
   const authenticated = !CRON_SECRET || authHeader === `Bearer ${CRON_SECRET}` || keyParam === CRON_SECRET
   if (!authenticated) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
