@@ -73,6 +73,50 @@ function FAQItem({ q, a }: { q: string; a: string }) {
   )
 }
 
+function PricingCard({ naziv, cijena, period, opis, zlatni, isticanje, children }: { naziv: string; cijena: string; period: string; opis: string; zlatni: boolean; isticanje: boolean; children?: ReactNode }) {
+  return (
+    <div
+      className="lp-pricing-card"
+      style={{
+        background: isticanje ? 'linear-gradient(160deg,#1f1800,#0f0e00)' : 'linear-gradient(160deg,#181818,#111)',
+        border: `1px solid ${zlatni ? GOLD : 'rgba(212,175,55,0.12)'}`,
+        borderRadius: 24,
+        padding: '40px 32px',
+        width: 300,
+        textAlign: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+        boxShadow: isticanje ? '0 0 100px rgba(212,175,55,0.1), 0 20px 60px rgba(0,0,0,0.5)' : '0 20px 60px rgba(0,0,0,0.3)',
+        flexShrink: 0,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {isticanje && (
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,transparent,${GOLD},transparent)` }} />
+      )}
+      {isticanje && (
+        <div style={{ position: 'absolute', top: 14, right: 14, background: `linear-gradient(135deg,${GOLD},#b8960c)`, color: '#0a0a0a', fontSize: 9, fontWeight: 800, padding: '3px 12px', borderRadius: 20, fontFamily: 'sans-serif', letterSpacing: '0.12em', boxShadow: '0 4px 12px rgba(212,175,55,0.3)' }}>
+          PREPORUČUJEMO
+        </div>
+      )}
+      <div style={{ fontSize: 11, fontWeight: 700, color: zlatni ? GOLD : 'rgba(255,255,255,0.25)', marginBottom: 20, fontFamily: 'sans-serif', letterSpacing: '0.22em' }}>
+        {naziv.toUpperCase()}
+      </div>
+      <div style={{ marginBottom: 4 }}>
+        <span className="lp-price-big" style={{ color: '#f5f0e8', fontWeight: 700, fontFamily: 'Georgia,serif', fontSize: 'clamp(38px,5vw,48px)', letterSpacing: '-0.02em' }}>
+          {cijena}
+        </span>
+        <span style={{ color: 'rgba(255,255,255,0.2)', fontFamily: 'sans-serif', fontSize: 14, fontWeight: 400 }}>{period}</span>
+      </div>
+      <p style={{ color: 'rgba(255,255,255,0.25)', fontFamily: 'sans-serif', fontSize: 12, lineHeight: 1.6, marginBottom: 24, minHeight: 38 }}>
+        {opis}
+      </p>
+      {children}
+    </div>
+  )
+}
+
 export default function SalonProLanding() {
   const belowRef = useRef<HTMLDivElement>(null)
   const scrollDown = () => belowRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -131,50 +175,6 @@ export default function SalonProLanding() {
     'Crna lista neodgovornih klijenata',
     'Otkaži kad hoćeš',
   ]
-
-  function PricingCard({ naziv, cijena, period, opis, zlatni, isticanje, children }: { naziv: string; cijena: string; period: string; opis: string; zlatni: boolean; isticanje: boolean; children?: ReactNode }) {
-    return (
-      <div
-        className="lp-pricing-card"
-        style={{
-          background: isticanje ? 'linear-gradient(160deg,#1f1800,#0f0e00)' : 'linear-gradient(160deg,#181818,#111)',
-          border: `1px solid ${zlatni ? GOLD : 'rgba(212,175,55,0.12)'}`,
-          borderRadius: 24,
-          padding: '40px 32px',
-          width: 300,
-          textAlign: 'center',
-          position: 'relative',
-          overflow: 'hidden',
-          boxShadow: isticanje ? '0 0 100px rgba(212,175,55,0.1), 0 20px 60px rgba(0,0,0,0.5)' : '0 20px 60px rgba(0,0,0,0.3)',
-          flexShrink: 0,
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {isticanje && (
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,transparent,${GOLD},transparent)` }} />
-        )}
-        {isticanje && (
-          <div style={{ position: 'absolute', top: 14, right: 14, background: `linear-gradient(135deg,${GOLD},#b8960c)`, color: '#0a0a0a', fontSize: 9, fontWeight: 800, padding: '3px 12px', borderRadius: 20, fontFamily: 'sans-serif', letterSpacing: '0.12em', boxShadow: '0 4px 12px rgba(212,175,55,0.3)' }}>
-            PREPORUČUJEMO
-          </div>
-        )}
-        <div style={{ fontSize: 11, fontWeight: 700, color: zlatni ? GOLD : 'rgba(255,255,255,0.25)', marginBottom: 20, fontFamily: 'sans-serif', letterSpacing: '0.22em' }}>
-          {naziv.toUpperCase()}
-        </div>
-        <div style={{ marginBottom: 4 }}>
-          <span className="lp-price-big" style={{ color: '#f5f0e8', fontWeight: 700, fontFamily: 'Georgia,serif', fontSize: 'clamp(38px,5vw,48px)', letterSpacing: '-0.02em' }}>
-            {cijena}
-          </span>
-          <span style={{ color: 'rgba(255,255,255,0.2)', fontFamily: 'sans-serif', fontSize: 14, fontWeight: 400 }}>{period}</span>
-        </div>
-        <p style={{ color: 'rgba(255,255,255,0.25)', fontFamily: 'sans-serif', fontSize: 12, lineHeight: 1.6, marginBottom: 24, minHeight: 38 }}>
-          {opis}
-        </p>
-        {children}
-      </div>
-    )
-  }
 
   return (
     <div className="lp-page" style={{ minHeight: '100vh', background: BG, color: '#fff' }}>
