@@ -99,67 +99,55 @@ export default function Home() {
 
       {/* CIJENE */}
       <section className="sp" style={{padding:'0 48px 80px',maxWidth:'1200px',margin:'0 auto'}}>
-        {(() => {
-          const [promoKod, setPromoKod] = useState('')
-          const promoVazi = promoKod.trim().toLowerCase() === 'osnivac10'
-          const dozivotnaCijena = promoVazi ? '500' : '1.200'
-          return (
-            <>
-              <h2 style={{fontSize:'clamp(28px,4vw,40px)',fontWeight:600,color:'#f5f0e8',textAlign:'center',marginBottom:40,fontFamily:'Georgia,serif'}}>
-                Izaberi plan za tvoj salon
-              </h2>
-              <div style={{display:'flex',gap:20,justifyContent:'center',flexWrap:'wrap',alignItems:'stretch'}}>
-                {/* Mjesečna */}
-                <div style={{background:'linear-gradient(160deg,#181818,#111)',border:'0.5px solid rgba(212,175,55,.12)',borderRadius:24,padding:'36px 28px',width:280,textAlign:'center',flexShrink:0,display:'flex',flexDirection:'column',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
-                  <p style={{fontSize:11,fontWeight:700,color:'rgba(255,255,255,.25)',marginBottom:20,letterSpacing:'0.22em'}}>MJESEČNA</p>
-                  <div style={{fontSize:'44px',fontWeight:600,color:'#f5f0e8',lineHeight:1,marginBottom:4,letterSpacing:'-0.02em'}}>29<span style={{fontSize:'24px'}}>,99 €</span></div>
-                  <p style={{fontSize:'13px',color:'rgba(245,240,232,.3)',marginBottom:20}}>/ mjesec</p>
-                  <p style={{fontSize:'12px',color:'rgba(245,240,232,.2)',marginBottom:28,lineHeight:1.5}}>Prve 2 sedmice besplatno. Otkaži kad želiš.</p>
-                  <div style={{marginTop:'auto'}}>
-                    <Link href="/registracija" style={{fontSize:'13px',background:'rgba(255,255,255,.04)',color:'rgba(255,255,255,.6)',border:'0.5px solid rgba(212,175,55,.15)',padding:'14px 28px',borderRadius:30,fontWeight:500,textDecoration:'none',display:'inline-block',fontFamily:'sans-serif',letterSpacing:'0.1em'}}>
-                      Izaberi mjesečnu →
-                    </Link>
-                  </div>
-                </div>
-                {/* Godišnja */}
-                <div style={{background:'linear-gradient(160deg,#181818,#111)',border:'0.5px solid rgba(212,175,55,.12)',borderRadius:24,padding:'36px 28px',width:280,textAlign:'center',flexShrink:0,display:'flex',flexDirection:'column',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
-                  <p style={{fontSize:11,fontWeight:700,color:'rgba(255,255,255,.25)',marginBottom:20,letterSpacing:'0.22em'}}>GODIŠNJA</p>
-                  <div style={{fontSize:'44px',fontWeight:600,color:'#f5f0e8',lineHeight:1,marginBottom:4,letterSpacing:'-0.02em'}}>299 €</div>
-                  <p style={{fontSize:'13px',color:'rgba(245,240,232,.3)',marginBottom:20}}>/ godina</p>
-                  <p style={{fontSize:'12px',color:'rgba(245,240,232,.2)',marginBottom:28,lineHeight:1.5}}>≈ 24,92€ mjesečno · Ušteda {Math.round(29.99*12-299)}€</p>
-                  <div style={{marginTop:'auto'}}>
-                    <Link href="/registracija" style={{fontSize:'13px',background:'rgba(255,255,255,.04)',color:'rgba(255,255,255,.6)',border:'0.5px solid rgba(212,175,55,.15)',padding:'14px 28px',borderRadius:30,fontWeight:500,textDecoration:'none',display:'inline-block',fontFamily:'sans-serif',letterSpacing:'0.1em'}}>
-                      Izaberi godišnju →
-                    </Link>
-                  </div>
-                </div>
-                {/* Doživotna */}
-                <div style={{background:'linear-gradient(160deg,#1f1800,#0f0e00)',border:'1px solid rgba(212,175,55,.5)',borderRadius:24,padding:'36px 28px',width:280,textAlign:'center',flexShrink:0,display:'flex',flexDirection:'column',boxShadow:'0 0 80px rgba(212,175,55,0.08), 0 20px 60px rgba(0,0,0,0.4)',position:'relative'}}>
-                  <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:'linear-gradient(90deg,transparent,#d4af37,transparent)'}} />
-                  <div style={{position:'absolute',top:14,right:14,background:'linear-gradient(135deg,#d4af37,#b8960c)',color:'#0a0a0a',fontSize:9,fontWeight:800,padding:'3px 12px',borderRadius:20,fontFamily:'sans-serif',letterSpacing:'0.12em',boxShadow:'0 4px 12px rgba(212,175,55,0.3)'}}>PREPORUČUJEMO</div>
-                  <p style={{fontSize:11,fontWeight:700,color:'#d4af37',marginBottom:20,letterSpacing:'0.22em'}}>DOŽIVOTNA LICENCA</p>
-                  <div style={{fontSize:'44px',fontWeight:600,color:'#f5f0e8',lineHeight:1,marginBottom:4,letterSpacing:'-0.02em'}}>{dozivotnaCijena} €</div>
-                  <p style={{fontSize:'13px',color:'rgba(245,240,232,.3)',marginBottom:20}}>jednokratno</p>
-                  <p style={{fontSize:'12px',color:promoVazi?'#d4af37':'rgba(245,240,232,.2)',marginBottom:20,lineHeight:1.5}}>
-                    {promoVazi ? 'Promo kod Osnivac10 aktivan — doživotna za samo 500€!' : 'Plati jednom — koristi zauvijek.'}
-                  </p>
-                  <div style={{marginBottom:16}}>
-                    <input type="text" placeholder="Promo kod" value={promoKod}
-                      onChange={e => setPromoKod(e.target.value)}
-                      style={{width:'100%',background:'rgba(0,0,0,0.4)',border:promoVazi?'0.5px solid rgba(212,175,55,0.5)':'0.5px solid rgba(255,255,255,0.08)',borderRadius:20,padding:'10px 16px',color:'#f5f0e8',fontSize:12,outline:'none',fontFamily:'sans-serif',textAlign:'center',letterSpacing:'0.1em',boxSizing:'border-box'}}
-                    />
-                    {promoVazi && <div style={{fontSize:11,color:'#d4af37',marginTop:10,fontFamily:'sans-serif'}}>✓ Kod Osnivac10: doživotna za 500€ (još 9 naloga)</div>}
-                  </div>
-                  <div style={{marginTop:'auto'}}>
-                    <Link href="/registracija" style={{fontSize:'13px',background:'linear-gradient(135deg,#d4af37,#b8960c)',color:'#0a0a0a',border:'none',padding:'14px 28px',borderRadius:30,fontWeight:700,textDecoration:'none',display:'inline-block',fontFamily:'sans-serif',letterSpacing:'0.12em',boxShadow:'0 8px 30px rgba(212,175,55,0.15)'}}>
-                      Izaberi doživotnu →
-                    </Link>
-                  </div>
-                </div>
+        <h2 style={{fontSize:'clamp(28px,4vw,40px)',fontWeight:600,color:'#f5f0e8',textAlign:'center',marginBottom:40,fontFamily:'Georgia,serif'}}>
+          Izaberi plan za tvoj salon
+        </h2>
+        <div style={{display:'flex',gap:20,justifyContent:'center',flexWrap:'wrap',alignItems:'stretch'}}>
+          {/* Mjesečna */}
+          <div style={{background:'linear-gradient(160deg,#181818,#111)',border:'0.5px solid rgba(212,175,55,.12)',borderRadius:24,padding:'36px 28px',width:280,textAlign:'center',flexShrink:0,display:'flex',flexDirection:'column',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
+            <p style={{fontSize:11,fontWeight:700,color:'rgba(255,255,255,.25)',marginBottom:20,letterSpacing:'0.22em'}}>MJESEČNA</p>
+            <div style={{fontSize:'44px',fontWeight:600,color:'#f5f0e8',lineHeight:1,marginBottom:4,letterSpacing:'-0.02em'}}>29<span style={{fontSize:'24px'}}>,99 €</span></div>
+            <p style={{fontSize:'13px',color:'rgba(245,240,232,.3)',marginBottom:20}}>/ mjesec</p>
+            <p style={{fontSize:'12px',color:'rgba(245,240,232,.2)',marginBottom:28,lineHeight:1.5}}>Prve 2 sedmice besplatno. Otkaži kad želiš.</p>
+            <div style={{marginTop:'auto'}}>
+              <Link href="/registracija" style={{fontSize:'13px',background:'rgba(255,255,255,.04)',color:'rgba(255,255,255,.6)',border:'0.5px solid rgba(212,175,55,.15)',padding:'14px 28px',borderRadius:30,fontWeight:500,textDecoration:'none',display:'inline-block',fontFamily:'sans-serif',letterSpacing:'0.1em'}}>
+                Izaberi mjesečnu →
+              </Link>
+            </div>
+          </div>
+          {/* Godišnja */}
+          <div style={{background:'linear-gradient(160deg,#181818,#111)',border:'0.5px solid rgba(212,175,55,.12)',borderRadius:24,padding:'36px 28px',width:280,textAlign:'center',flexShrink:0,display:'flex',flexDirection:'column',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
+            <p style={{fontSize:11,fontWeight:700,color:'rgba(255,255,255,.25)',marginBottom:20,letterSpacing:'0.22em'}}>GODIŠNJA</p>
+            <div style={{fontSize:'44px',fontWeight:600,color:'#f5f0e8',lineHeight:1,marginBottom:4,letterSpacing:'-0.02em'}}>299 €</div>
+            <p style={{fontSize:'13px',color:'rgba(245,240,232,.3)',marginBottom:20}}>/ godina</p>
+            <p style={{fontSize:'12px',color:'rgba(245,240,232,.2)',marginBottom:28,lineHeight:1.5}}>≈ 24,92€ mjesečno · Ušteda {Math.round(29.99*12-299)}€</p>
+            <div style={{marginTop:'auto'}}>
+              <Link href="/registracija" style={{fontSize:'13px',background:'rgba(255,255,255,.04)',color:'rgba(255,255,255,.6)',border:'0.5px solid rgba(212,175,55,.15)',padding:'14px 28px',borderRadius:30,fontWeight:500,textDecoration:'none',display:'inline-block',fontFamily:'sans-serif',letterSpacing:'0.1em'}}>
+                Izaberi godišnju →
+              </Link>
+            </div>
+          </div>
+          {/* Doživotna */}
+          <div style={{background:'linear-gradient(160deg,#1f1800,#0f0e00)',border:'1px solid rgba(212,175,55,.5)',borderRadius:24,padding:'36px 28px',width:280,textAlign:'center',flexShrink:0,display:'flex',flexDirection:'column',boxShadow:'0 0 80px rgba(212,175,55,0.08), 0 20px 60px rgba(0,0,0,0.4)',position:'relative'}}>
+            <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:'linear-gradient(90deg,transparent,#d4af37,transparent)'}} />
+            <div style={{position:'absolute',top:14,right:14,background:'linear-gradient(135deg,#d4af37,#b8960c)',color:'#0a0a0a',fontSize:9,fontWeight:800,padding:'3px 12px',borderRadius:20,fontFamily:'sans-serif',letterSpacing:'0.12em',boxShadow:'0 4px 12px rgba(212,175,55,0.3)'}}>PREPORUČUJEMO</div>
+            <p style={{fontSize:11,fontWeight:700,color:'#d4af37',marginBottom:20,letterSpacing:'0.22em'}}>DOŽIVOTNA LICENCA</p>
+            <div style={{fontSize:'44px',fontWeight:600,color:'#f5f0e8',lineHeight:1,marginBottom:4,letterSpacing:'-0.02em'}}>1.200 €</div>
+            <p style={{fontSize:'13px',color:'rgba(245,240,232,.3)',marginBottom:20}}>jednokratno</p>
+            <p style={{fontSize:'12px',color:'rgba(245,240,232,.2)',marginBottom:20,lineHeight:1.5}}>Plati jednom — koristi zauvijek.</p>
+            <div style={{marginBottom:16,padding:'10px',border:'0.5px solid rgba(212,175,55,.2)',borderRadius:12,background:'rgba(212,175,55,.04)'}}>
+              <div style={{fontSize:10,color:'#d4af37',fontWeight:700,letterSpacing:'0.1em',marginBottom:4}}>🎯 AKCIJA ZA 10 NAJBRŽIH</div>
+              <div style={{fontSize:11,color:'rgba(245,240,232,.5)'}}>
+                Unesi kod <strong style={{color:'#d4af37'}}>Osnivac10</strong> i dobij doživotnu licencu za samo 500€
               </div>
-            </>
-          )
-        })()}
+            </div>
+            <div style={{marginTop:'auto'}}>
+              <Link href="/registracija" style={{fontSize:'13px',background:'linear-gradient(135deg,#d4af37,#b8960c)',color:'#0a0a0a',border:'none',padding:'14px 28px',borderRadius:30,fontWeight:700,textDecoration:'none',display:'inline-block',fontFamily:'sans-serif',letterSpacing:'0.12em',boxShadow:'0 8px 30px rgba(212,175,55,0.15)'}}>
+                Izaberi doživotnu →
+              </Link>
+            </div>
+          </div>
+        </div>
       </section>
 
       <footer style={{textAlign:'center',padding:'24px',borderTop:'0.5px solid rgba(212,175,55,.1)',color:'rgba(245,240,232,.3)',fontSize:'13px'}}>

@@ -160,11 +160,6 @@ export default function SalonProLanding() {
     },
   ]
 
-  const [promoKod, setPromoKod] = useState('')
-  const promoVazi = promoKod.trim().toLowerCase() === 'osnivac10'
-  const dozivotnaCijenaDisplay = promoVazi ? '500' : '1.200'
-  const dozivotnaPeriodDisplay = promoVazi ? ' € / jednokratno (kod: Osnivac10)' : ' € / jednokratno'
-
   const perks = [
     'Personalizovana landing page',
     'QR kod za štampanje',
@@ -476,39 +471,17 @@ export default function SalonProLanding() {
             {/* Doživotna */}
             <PricingCard
               naziv="Doživotna licenca"
-              cijena={dozivotnaCijenaDisplay + '€'}
-              period={dozivotnaPeriodDisplay}
-              opis={promoVazi ? 'Promo kod Osnivac10 aktivan — doživotna za samo 500€!' : 'Plati jednom — koristi zauvijek. Bez ikakvih dodatnih troškova.'}
+              cijena="1.200€"
+              period=" jednokratno"
+              opis="Plati jednom — koristi zauvijek. Bez ikakvih dodatnih troškova."
               zlatni={true}
               isticanje={true}
             >
-              <div style={{ marginBottom: 16, marginTop: 'auto' }}>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                  <input
-                    type="text"
-                    placeholder="Promo kod"
-                    value={promoKod}
-                    onChange={e => setPromoKod(e.target.value)}
-                    style={{
-                      flex: 1,
-                      background: 'rgba(0,0,0,0.4)',
-                      border: promoVazi ? '0.5px solid rgba(212,175,55,0.5)' : '0.5px solid rgba(255,255,255,0.08)',
-                      borderRadius: 20,
-                      padding: '10px 16px',
-                      color: '#f5f0e8',
-                      fontSize: 12,
-                      outline: 'none',
-                      fontFamily: 'sans-serif',
-                      textAlign: 'center',
-                      letterSpacing: '0.1em',
-                    }}
-                  />
+              <div style={{ marginBottom: 14, marginTop: 'auto', padding: '10px', border: '0.5px solid rgba(212,175,55,.2)', borderRadius: 12, background: 'rgba(212,175,55,.04)' }}>
+                <div style={{ fontSize: 10, color: GOLD, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 4 }}>🎯 AKCIJA ZA 10 NAJBRŽIH</div>
+                <div style={{ fontSize: 11, color: 'rgba(245,240,232,.5)' }}>
+                  Unesi kod <strong style={{ color: GOLD }}>Osnivac10</strong> i dobij doživotnu licencu za samo 500€
                 </div>
-                {promoVazi && (
-                  <div style={{ fontSize: 11, color: GOLD, marginBottom: 10, fontFamily: 'sans-serif' }}>
-                    ✓ Kod Osnivac10: doživotna za 500€ (još {10 - 1} naloga)
-                  </div>
-                )}
               </div>
               <Link href="/registracija" style={{ textDecoration: 'none' }}>
                 <motion.div
