@@ -7,9 +7,12 @@ import { sendPushToSubscriptions } from '@/lib/web-push/server'
 const CRON_SECRET = process.env.CRON_SECRET
 
 export async function GET(request: Request) {
-  // Provjera CRON_SECRET (optional, radi i bez)
+  // Provjera CRON_SECRET (preko Authorization header ili ?key= parametra)
+  const url = new URL(request.url)
   const authHeader = request.headers.get('authorization')
-  if (CRON_SECRET && (!authHeader || authHeader !== `Bearer ${CRON_SECRET}`)) {
+  const keyParam = url.searchParams.get('key')
+  const authenticated = !CRON_SECRET || authHeader === `Bearer ${CRON_SECRET}` || keyParam === CRON_SECRET
+  if (!authenticated) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
