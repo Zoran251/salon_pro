@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode, useEffect } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, motion, useInView } from 'framer-motion'
 import { BG, CARD, GOLD, GOLD_DARK, GOLD_LIGHT } from './constants'
@@ -19,6 +19,28 @@ function FadeIn({ children, delay = 0 }: { children: ReactNode; delay?: number }
     >
       {children}
     </motion.div>
+  )
+}
+
+function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <Link
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        color: hover ? GOLD : 'rgba(255,255,255,0.35)',
+        fontFamily: 'sans-serif',
+        fontSize: '13px',
+        textDecoration: 'none',
+        transition: 'color 0.2s',
+      }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      {children}
+    </Link>
   )
 }
 
@@ -911,13 +933,9 @@ export default function SalonProLanding() {
           Salon Pro
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <Link href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.35)', fontFamily: 'sans-serif', fontSize: '13px', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.currentTarget.style.color = GOLD} onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.35)' }}>
-            Uslovi korištenja
-          </Link>
+          <FooterLink href="/terms">Uslovi korištenja</FooterLink>
           <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span>
-          <Link href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.35)', fontFamily: 'sans-serif', fontSize: '13px', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.currentTarget.style.color = GOLD} onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.35)' }}>
-            Privatnost
-          </Link>
+          <FooterLink href="/privacy">Privatnost</FooterLink>
           <span style={{ color: 'rgba(255,255,255,0.18)', fontFamily: 'sans-serif', fontSize: '13px' }}>
             © {new Date().getFullYear()} Salon Pro. Sva prava zadržana.
           </span>
