@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { verifyPlatformAdmin } from '@/lib/admin-api-auth'
 import { getServerSupabaseClient, hasServiceRoleKey } from '@/lib/server-supabase'
 
-const ALLOWED_TABLES = ['saloni', 'usluge', 'lager', 'termini', 'zaposleni', 'rashodi', 'lojalnost', 'kupci_crna_lista', 'kupac_nalozi', 'salon_notifications'] as const
+const ALLOWED_TABLES = ['saloni', 'usluge', 'lager', 'termini', 'zaposleni', 'rashodi', 'lojalnost', 'kupci_crna_lista', 'kupac_nalozi', 'salon_notifications', 'contact_messages'] as const
 
 export async function GET(request: Request) {
   const auth = await verifyPlatformAdmin(request)

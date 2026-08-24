@@ -7,7 +7,7 @@ import { waitForClientSession } from '@/lib/wait-client-session'
 import { isPlatformAdminEmail } from '@/lib/platform-admin'
 import { DEFAULT_BRAND_COLORS } from '@/lib/hex-color'
 
-type AdminTab = 'saloni' | 'usluge' | 'lager' | 'termini' | 'zaposleni' | 'rashodi' | 'lojalnost'
+type AdminTab = 'saloni' | 'usluge' | 'lager' | 'termini' | 'zaposleni' | 'rashodi' | 'lojalnost' | 'pretplate' | 'poruke'
 
 interface AdminDataRow {
   id: string
@@ -22,6 +22,8 @@ const TAB_LABELS: Record<AdminTab, string> = {
   zaposleni: 'Zaposleni',
   rashodi: 'Rashodi',
   lojalnost: 'Lojalnost',
+  pretplate: 'Pretplate',
+  poruke: 'Poruke',
 }
 
 async function fetchToken(): Promise<string> {
@@ -83,6 +85,18 @@ export default function AdminPage() {
   const labelStyle: React.CSSProperties = { fontSize: '11px', color: muted, display: 'block', marginBottom: '5px', letterSpacing: '.3px' }
 
   const ucitajPodatke = useCallback(async (token: string, tabela: string) => {
+    if (tabela === 'pretplate') {
+      const res = await fetch('/api/admin/pretplate', { headers: { Authorization: `Bearer ${token}` } })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Greška')
+      setPodaci(json.data)
+      setGreska('')
+      setUspjeh('')
+      setForma({})
+      setSelektovanSalon(null)
+      selektovanSalonRef.current = null
+      return
+    }
     const data = await apiGet(token, tabela)
     setPodaci(data)
     setGreska('')
@@ -131,7 +145,22 @@ export default function AdminPage() {
   const izaberiRed = (row: AdminDataRow) => {
     const flat: Record<string, string> = {}
     for (const [k, v] of Object.entries(row as Record<string, unknown>)) {
-      flat[k] = v === null || v === undefined ? '' : String(v)
+      if (k === 'plan' && v && typeof v === 'object') {
+        const plan = v as Record<string, unknown>
+        flat['plan_tip'] = String(plan.tip || '')
+        flat['plan_naziv'] = String(plan.naziv || '')
+        flat['cijena_eur'] = String(plan.cijena_eur || '')
+        flat['plan_period'] = String(plan.period || '')
+      } else if (k === 'salon' && v && typeof v === 'object') {
+        const salon = v as Record<string, unknown>
+        flat['salon_naziv'] = String(salon.naziv || '')
+        flat['salon_email'] = String(salon.email || '')
+        flat['salon_telefon'] = String(salon.telefon || '')
+        flat['salon_grad'] = String(salon.grad || '')
+        flat['salon_slug'] = String(salon.slug || '')
+      } else {
+        flat[k] = v === null || v === undefined ? '' : String(v)
+      }
     }
     setForma(flat)
     setJeNovi(false)
@@ -202,6 +231,8 @@ export default function AdminPage() {
         zaposleni: ['id', 'salon_id', 'ime', 'uloga', 'foto_url', 'aktivan'],
         rashodi: ['id', 'salon_id', 'naziv', 'iznos', 'kategorija', 'datum', 'napomena'],
         lojalnost: ['id', 'salon_id', 'aktivan', 'tip', 'svaki_koji', 'vrijednost'],
+        pretplate: ['salon_naziv', 'plan_tip', 'status', 'starts_at', 'expires_at', 'cijena_eur'],
+        poruke: ['id', 'name', 'email', 'subject', 'type', 'status', 'created_at'],
       }
       return defaults[aktivnaTabela] || []
     }
@@ -218,7 +249,7 @@ export default function AdminPage() {
   if (!autorizovan) return null
 
   const fields = getFields()
-  const tabNav: AdminTab[] = ['saloni', 'usluge', 'lager', 'termini', 'zaposleni', 'rashodi', 'lojalnost']
+  const tabNav: AdminTab[] = ['saloni', 'usluge', 'lager', 'termini', 'zaposleni', 'rashodi', 'lojalnost', 'pretplate', 'poruke']
   const ignoreFields = new Set(['created_at', 'updated_at', '_table'])
 
   return (
@@ -259,11 +290,15 @@ export default function AdminPage() {
           <div style={cardStyle}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
               <h2 style={{ fontSize: '16px', fontWeight: 500 }}>{TAB_LABELS[aktivnaTabela]} ({podaci.length})</h2>
-              <button onClick={noviRed} style={{ background: 'transparent', border: `0.5px solid ${goldBorder}`, color: gold, padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: 'sans-serif' }}>+ Novi</button>
+              {aktivnaTabela !== 'pretplate' && <button onClick={noviRed} style={{ background: 'transparent', border: `0.5px solid ${goldBorder}`, color: gold, padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: 'sans-serif' }}>+ Novi</button>}
             </div>
             <div style={{ maxHeight: 'calc(100vh - 280px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {podaci.map(row => {
-                const prikaz = [row.naziv, row.ime, row.email, String(row.id).slice(0, 8)].filter(Boolean)[0] || String(row.id).slice(0, 8)
+                const plan = row.plan ? (row.plan as Record<string, unknown>) : null
+                const salon = row.salon ? (row.salon as Record<string, unknown>) : null
+                const naslov = aktivnaTabela === 'pretplate'
+                  ? (salon?.naziv as string || '?')
+                  : [row.naziv, row.ime, row.email, String(row.id).slice(0, 8)].filter(Boolean)[0] as string || String(row.id).slice(0, 8)
                 return (
                   <button key={String(row.id)} type="button" onClick={() => izaberiRed(row)}
                     style={{
@@ -273,8 +308,13 @@ export default function AdminPage() {
                       color: text, cursor: 'pointer', fontSize: '13px', fontFamily: 'sans-serif',
                     }}
                   >
-                    <div style={{ fontWeight: 500 }}>{String(prikaz)}</div>
-                    <div style={{ fontSize: '10px', color: muted, marginTop: '2px' }}>{String(row.id).slice(0, 8)}…</div>
+                    <div style={{ fontWeight: 500 }}>{String(naslov)}</div>
+                    <div style={{ fontSize: '10px', color: muted, marginTop: '2px' }}>
+                      {aktivnaTabela === 'pretplate'
+                        ? `${plan?.naziv as string || '?'} · ${row.status as string || '?'}`
+                        : String(row.id).slice(0, 8) + '…'
+                      }
+                    </div>
                   </button>
                 )
               })}
@@ -292,8 +332,59 @@ export default function AdminPage() {
               <>
                 <div style={cardStyle}>
                   <h3 style={{ fontSize: '15px', fontWeight: 500, marginBottom: '16px' }}>
-                    {forma.id ? `Uređivanje: ${forma.naziv || forma.ime || forma.id}` : 'Novi unos'}
+                    {forma.id ? `Pretplata: ${forma.salon_naziv || forma.id}` : 'Novi unos'}
                   </h3>
+                  {aktivnaTabela === 'pretplate' && forma.id ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '14px' }}>
+                        <div>
+                          <label style={labelStyle}>SALON</label>
+                          <input style={{ ...inputStyle, opacity: 0.6 }} value={forma.salon_naziv || '?'} readOnly />
+                        </div>
+                        <div>
+                          <label style={labelStyle}>EMAIL</label>
+                          <input style={{ ...inputStyle, opacity: 0.6 }} value={forma.salon_email || '?'} readOnly />
+                        </div>
+                        <div>
+                          <label style={labelStyle}>TELEFON</label>
+                          <input style={{ ...inputStyle, opacity: 0.6 }} value={forma.salon_telefon || '?'} readOnly />
+                        </div>
+                        <div>
+                          <label style={labelStyle}>GRAD</label>
+                          <input style={{ ...inputStyle, opacity: 0.6 }} value={forma.salon_grad || '?'} readOnly />
+                        </div>
+                        <div>
+                          <label style={labelStyle}>PLAN</label>
+                          <input style={{ ...inputStyle, opacity: 0.6 }} value={`${forma.plan_naziv} (${forma.cijena_eur}€)`} readOnly />
+                        </div>
+                        <div>
+                          <label style={labelStyle}>STATUS</label>
+                          <span style={{
+                            display: 'inline-block', padding: '4px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
+                            background: forma.status === 'aktivna' ? 'rgba(50,200,100,.15)' : forma.status === 'istekla' ? 'rgba(220,50,50,.15)' : 'rgba(200,200,50,.1)',
+                            border: `0.5px solid ${forma.status === 'aktivna' ? 'rgba(50,200,100,.3)' : forma.status === 'istekla' ? 'rgba(220,50,50,.3)' : 'rgba(200,200,50,.3)'}`,
+                            color: forma.status === 'aktivna' ? '#4caf81' : forma.status === 'istekla' ? '#ff6b6b' : '#d4af37',
+                          }}>{forma.status || '?'}</span>
+                        </div>
+                        <div>
+                          <label style={labelStyle}>POČETAK</label>
+                          <input style={{ ...inputStyle, opacity: 0.6 }} value={forma.starts_at ? new Date(forma.starts_at).toLocaleString('sr') : '?'} readOnly />
+                        </div>
+                        <div>
+                          <label style={labelStyle}>ISTIČE</label>
+                          <input style={{ ...inputStyle, opacity: 0.6 }} value={forma.expires_at ? new Date(forma.expires_at).toLocaleString('sr') : (forma.plan_period === 'lifetime' ? 'Doživotno' : 'Nije postavljeno')} readOnly />
+                        </div>
+                        <div>
+                          <label style={labelStyle}>SALON STRANICA</label>
+                          {forma.salon_slug ? (
+                            <Link href={`/salon/${forma.salon_slug}`} target="_blank" style={{ color: gold, fontSize: '13px' }}>
+                              /salon/{forma.salon_slug}
+                            </Link>
+                          ) : <input style={{ ...inputStyle, opacity: 0.6 }} value="—" readOnly />}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '14px' }}>
                     {fields.filter(f => !ignoreFields.has(f)).map(f => {
                       const isColor = f.startsWith('boja_')
@@ -403,6 +494,7 @@ export default function AdminPage() {
                       )
                     })}
                   </div>
+                  )}
                   {aktivnaTabela === 'saloni' && forma.slug && (
                     <div style={{ marginTop: '12px', fontSize: '12px', color: muted }}>
                       Stranica: <Link href={`/salon/${forma.slug}`} target="_blank" style={{ color: gold }}>/salon/{forma.slug}</Link>
@@ -417,6 +509,7 @@ export default function AdminPage() {
                   )}
                 </div>
 
+                {aktivnaTabela !== 'pretplate' && (
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button onClick={sacuvaj} disabled={cuvanje}
                     style={{
@@ -435,6 +528,7 @@ export default function AdminPage() {
                     >Obriši</button>
                   )}
                 </div>
+                )}
               </>
             )}
           </div>

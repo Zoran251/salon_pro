@@ -117,6 +117,234 @@ function PricingCard({ naziv, cijena, period, opis, zlatni, isticanje, children 
   )
 }
 
+function ContactForm() {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    subject: '',
+    message: '',
+    type: 'upit' as 'upit' | 'konsultacija',
+  })
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
+  const [errorMsg, setErrorMsg] = useState('')
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value })
+    setErrorMsg('')
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setStatus('submitting')
+    setErrorMsg('')
+
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+      const json = await res.json()
+
+      if (!res.ok) {
+        setStatus('error')
+        setErrorMsg(json.error || 'Greška pri slanju. Pokušajte ponovo.')
+        return
+      }
+
+      setStatus('success')
+      if (json.redirectUrl) {
+        setTimeout(() => {
+          window.open(json.redirectUrl, '_blank', 'noopener,noreferrer')
+        }, 1500)
+      }
+      setFormData({ name: '', email: '', phone: '', subject: '', message: '', type: 'upit' })
+    } catch {
+      setStatus('error')
+      setErrorMsg('Mrežna greška. Pokušajte ponovo.')
+    }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    background: 'rgba(0,0,0,0.3)',
+    border: `1px solid rgba(212,175,55,0.2)`,
+    borderRadius: 12,
+    padding: '14px 16px',
+    color: '#f5f0e8',
+    fontSize: '15px',
+    fontFamily: 'sans-serif',
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.2s',
+  }
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: '12px',
+    color: 'rgba(245,240,232,0.4)',
+    display: 'block',
+    marginBottom: '6px',
+    letterSpacing: '0.3px',
+    textAlign: 'left',
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div>
+          <label style={labelStyle} htmlFor="name">IME I PREZIME *</label>
+          <input
+            id="name"
+            name="name"
+            type="text"
+            placeholder="Vaše ime"
+            value={formData.name}
+            onChange={handleChange}
+            required
+            disabled={status === 'submitting'}
+            style={inputStyle}
+          />
+        </div>
+        <div>
+          <label style={labelStyle} htmlFor="email">EMAIL *</label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            placeholder="email@primer.com"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            disabled={status === 'submitting'}
+            style={inputStyle}
+          />
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div>
+          <label style={labelStyle} htmlFor="phone">TELEFON</label>
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            placeholder="+381 60 000 000"
+            value={formData.phone}
+            onChange={handleChange}
+            disabled={status === 'submitting'}
+            style={inputStyle}
+          />
+        </div>
+        <div>
+          <label style={labelStyle} htmlFor="subject">NASLOV *</label>
+          <input
+            id="subject"
+            name="subject"
+            type="text"
+            placeholder="Tema upita"
+            value={formData.subject}
+            onChange={handleChange}
+            required
+            disabled={status === 'submitting'}
+            style={inputStyle}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label style={labelStyle} htmlFor="message">PORUKA *</label>
+        <textarea
+          id="message"
+          name="message"
+          placeholder="Opišite vaš upit ili zašto želite konsultaciju..."
+          value={formData.message}
+          onChange={handleChange}
+          required
+          rows={5}
+          disabled={status === 'submitting'}
+          style={{ ...inputStyle, resize: 'vertical', minHeight: '120px' }}
+        />
+      </div>
+
+      <fieldset style={{ border: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <legend style={labelStyle}>TIP UPITA *</legend>
+        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: 'rgba(245,240,232,0.7)' }}>
+            <input
+              type="radio"
+              name="type"
+              value="upit"
+              checked={formData.type === 'upit'}
+              onChange={handleChange}
+              style={{ accentColor: GOLD, width: '18px', height: '18px' }}
+              disabled={status === 'submitting'}
+            />
+            Opšti upit
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: 'rgba(245,240,232,0.7)' }}>
+            <input
+              type="radio"
+              name="type"
+              value="konsultacija"
+              checked={formData.type === 'konsultacija'}
+              onChange={handleChange}
+              style={{ accentColor: GOLD, width: '18px', height: '18px' }}
+              disabled={status === 'submitting'}
+            />
+            Želim konsultaciju (preusmerava na Calendly)
+          </label>
+        </div>
+      </fieldset>
+
+      {errorMsg && (
+        <div style={{ background: 'rgba(220,50,50,0.1)', border: '1px solid rgba(220,50,50,0.3)', borderRadius: 10, padding: '12px 16px', color: '#ff6b6b', fontSize: '13px' }}>
+          {errorMsg}
+        </div>
+      )}
+
+      {status === 'success' && (
+        <div style={{ background: 'rgba(50,200,100,0.1)', border: '1px solid rgba(50,200,100,0.3)', borderRadius: 10, padding: '16px', color: '#4caf81', fontSize: '14px', textAlign: 'center' }}>
+          ✅ {formData.type === 'konsultacija'
+            ? 'Hvala! Preusmeravamo vas na zakazivanje konsultacije...'
+            : 'Hvala na upitu! Odgovorićemo u najkraćem roku.'}
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={status === 'submitting' || status === 'success'}
+        style={{
+          width: '100%',
+          padding: '16px 24px',
+          borderRadius: 14,
+          border: 'none',
+          background: `linear-gradient(135deg, ${GOLD}, ${GOLD_DARK})`,
+          color: '#0a0a0a',
+          fontSize: '16px',
+          fontWeight: 700,
+          fontFamily: 'sans-serif',
+          letterSpacing: '0.1em',
+          cursor: status === 'submitting' || status === 'success' ? 'wait' : 'pointer',
+          opacity: status === 'submitting' || status === 'success' ? 0.7 : 1,
+          transition: 'opacity 0.2s',
+        }}
+      >
+        {status === 'submitting' ? (
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+            <span style={{ width: '18px', height: '18px', border: '2px solid rgba(10,10,10,0.3)', borderTop: '2px solid #0a0a0a', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+            Šaljemo...
+          </span>
+        ) : status === 'success' ? (
+          'Poslato ✓'
+        ) : (
+          'Pošalji upit →'
+        )}
+      </button>
+    </form>
+  )
+}
+
 export default function SalonProLanding() {
   const [promoKod, setPromoKod] = useState('')
   const promoVazi = promoKod.trim().toLowerCase() === 'osnivac10'
@@ -638,6 +866,35 @@ export default function SalonProLanding() {
         ))}
       </section>
 
+      <section className="lp-contact" style={{ padding: '80px 24px', background: 'rgba(255,255,255,0.02)' }}>
+        <FadeIn>
+          <div style={{ maxWidth: '700px', margin: '0 auto', textAlign: 'center' }}>
+            <div
+              className="lp-eyebrow"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                background: `${GOLD}14`,
+                border: `1px solid ${GOLD}33`,
+                borderRadius: 20,
+                padding: '6px 18px',
+                marginBottom: 20,
+              }}
+            >
+              <span style={{ color: GOLD, fontFamily: 'sans-serif', letterSpacing: '0.2em' }}>KONTAKT</span>
+            </div>
+            <h2 style={{ fontSize: 'clamp(28px,5vw,44px)', fontWeight: 700, fontFamily: 'Georgia,serif', color: '#f5f0e8', margin: '0 0 12px' }}>
+              Imam pitanje ili želiš konsultaciju?
+            </h2>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'sans-serif', lineHeight: 1.7, marginBottom: 32 }}>
+              Javi nam se — odgovaramo u roku od 24h. Za detaljnu prezentaciju i konsultaciju možeš zakazati poziv.
+            </p>
+            <ContactForm />
+          </div>
+        </FadeIn>
+      </section>
+
       <footer
         className="lp-footer"
         style={{
@@ -647,14 +904,24 @@ export default function SalonProLanding() {
           alignItems: 'center',
           flexWrap: 'wrap',
           gap: 12,
+          padding: '24px 0',
         }}
       >
         <span className="lp-footer-brand" style={{ color: GOLD, fontFamily: 'Georgia,serif', fontStyle: 'italic' }}>
           Salon Pro
         </span>
-        <span className="lp-footer-copy" style={{ color: 'rgba(255,255,255,0.18)', fontFamily: 'sans-serif' }}>
-          © {new Date().getFullYear()} Salon Pro. Sva prava zadržana.
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <Link href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.35)', fontFamily: 'sans-serif', fontSize: '13px', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.currentTarget.style.color = GOLD} onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.35)' }}>
+            Uslovi korištenja
+          </Link>
+          <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span>
+          <Link href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.35)', fontFamily: 'sans-serif', fontSize: '13px', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.currentTarget.style.color = GOLD} onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.35)' }}>
+            Privatnost
+          </Link>
+          <span style={{ color: 'rgba(255,255,255,0.18)', fontFamily: 'sans-serif', fontSize: '13px' }}>
+            © {new Date().getFullYear()} Salon Pro. Sva prava zadržana.
+          </span>
+        </div>
       </footer>
     </div>
   )

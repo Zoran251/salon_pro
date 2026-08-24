@@ -18,6 +18,7 @@ type SalonRegistrationForm = {
   grad: string
   tipovi: string[]
   referalKod: string
+  prihvatioUslove: boolean
 }
 type SalonRegistrationField = {
   label: string
@@ -44,6 +45,7 @@ function RegistracijaForm() {
     grad: '',
     tipovi: [],
     referalKod: refInit,
+    prihvatioUslove: false,
   })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -296,16 +298,31 @@ function RegistracijaForm() {
                     <input name="grad" placeholder="Beograd" value={forma.grad} onChange={handleChange} />
                   </div>
                 </div>
-              </div>
+</div>
+                <div>
+                  <label style={{ fontSize: '12px', color: 'rgba(245,240,232,.4)', display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', lineHeight: 1.5, marginTop: '4px' }}>
+                    <input
+                      type="checkbox"
+                      name="prihvatioUslove"
+                      checked={forma.prihvatioUslove}
+                      onChange={handleChange}
+                      required
+                      style={{ accentColor: '#d4af37', width: '18px', height: '18px', flexShrink: 0, marginTop: '2px' }}
+                    />
+                    <span>
+                      Prihvatam <Link href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#d4af37', textDecoration: 'underline' }}>Uslove korištenja</Link> i <Link href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#d4af37', textDecoration: 'underline' }}>Pravila privatnosti</Link> *
+                    </span>
+                  </label>
+                </div>
 
-              {greska && (
+                {greska && (
                 <div role="alert" style={{ background: 'rgba(220,50,50,.1)', border: '0.5px solid rgba(220,50,50,.3)', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', color: '#ff6b6b' }}>
                   <span aria-hidden="true">⚠️ </span>{greska}
                 </div>
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <button className="submit-btn" disabled={!forma.naziv || !forma.email || !forma.lozinka || loading} onClick={handleSubmit}>
+                <button className="submit-btn" disabled={!forma.naziv || !forma.email || !forma.lozinka || !forma.prihvatioUslove || loading} onClick={handleSubmit}>
                   {loading
                     ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
                       <span style={{ width: '16px', height: '16px', border: '2px solid rgba(10,10,10,.3)', borderTop: '2px solid #0a0a0a', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
