@@ -49,6 +49,7 @@ export async function POST(request: Request) {
         : typeof body.referal_kod === 'string'
           ? body.referal_kod.trim().slice(0, 32)
           : ''
+    const prihvatioUslove = body.prihvatioUslove === true
 
     const uid = typeof userId === 'string' ? userId.trim() : ''
     if (!uid || !naziv || !email) {
@@ -103,6 +104,8 @@ export async function POST(request: Request) {
       boja_sekundarna: '#121212',
       boja_akcent: '#f5e17a',
       boja_font: '#f5f0e8',
+      prihvatio_uslove: prihvatioUslove,
+      uslovi_prihvacen_at: prihvatioUslove ? new Date().toISOString() : null,
     }
     if (referalKodUnos) {
       insertPayload.referal_kod_prijava = referalKodUnos

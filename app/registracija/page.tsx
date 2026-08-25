@@ -93,6 +93,7 @@ function RegistracijaForm() {
             grad: forma.grad,
             tip: tipBaza,
             referalKod: referalBody || undefined,
+            prihvatioUslove: forma.prihvatioUslove,
           }),
         })
         const j2 = (await res2.json()) as { error?: string }
@@ -151,7 +152,7 @@ function RegistracijaForm() {
         suffix += 1
       }
 
-      const insertRow: Database['public']['Tables']['saloni']['Insert'] = {
+      const insertRow = {
         id: r.userId,
         naziv: forma.naziv,
         slug: slug,
@@ -160,8 +161,10 @@ function RegistracijaForm() {
         grad: forma.grad,
         tip: tipBaza,
         aktivan: true,
+        prihvatio_uslove: forma.prihvatioUslove,
+        uslovi_prihvacen_at: forma.prihvatioUslove ? new Date().toISOString() : null,
         ...(referalBody ? { referal_kod_prijava: referalBody } : {}),
-      }
+      } as Database['public']['Tables']['saloni']['Insert']
 
       const { error: salonError } = await supabase.from('saloni').insert(insertRow)
       if (salonError) {
